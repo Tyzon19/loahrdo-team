@@ -1,0 +1,48 @@
+/**
+ * Server-only environment access.
+ *
+ * Vite only exposes VITE_* variables to the browser, but we still read these
+ * values exclusively inside server functions. The .env file is gitignored and
+ * is never imported by client code.
+ */
+let loaded = false;
+
+function ensureLoaded() {
+  if (loaded) return;
+  loaded = true;
+  if (typeof window !== "undefined") return;
+  try {
+    // Node 20.12+/22+: load .env for local Laragon development.
+    (process as unknown as { loadEnvFile?: (path?: string) => void }).loadEnvFile?.(".env");
+  } catch {
+    /* Missing .env is fine in production where real environment variables are set. */
+  }
+}
+
+export function serverEnv(key: string): string {
+  ensureLoaded();
+  const value = process.env[key];
+  if (!value) throw new Error(`Missing required environment variable: ${key}`);
+  return value;
+}
+
+export function serverEnvOptional(key: string): string | undefined {
+  ensureLoaded();
+  const value = process.env[key];
+  return value && value.trim() ? value.trim() : undefined;
+}
+
+export function allowedEmailDomains(): string[] {
+  return (serverEnvOptional("ALLOWED_EMAIL_DOMAINS") ?? "loa.edu.ph,lyceumalabang.edu.ph")
+    .split(",")
+    .map((d) => d.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+export function publicSiteUrl(): string {
+  return serverEnvOptional("SITE_URL") ?? "http://localhost:8080";
+}
+
+export function encryptedCookieRequired(): boolean {
+  return publicSiteUrl().startsWith("https://");
+}

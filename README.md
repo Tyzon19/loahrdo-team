@@ -1,0 +1,106 @@
+# LOA Vehicle Reservation & Trip Ticket
+
+Vehicle reservation and trip-ticket system for the Lyceum of Alabang Physical Facilities
+Management Office. Requisitioners file requests; Transport Services, the Director for
+Administration and the President review them in a fixed order.
+
+During the Head of Transport Services review, the assigned driver's name can be recorded with the
+vehicle details. The name is shown below the vehicle type and plate number on the trip ticket.
+
+Every finally approved ticket remains searchable in its saved request record. Administrators can
+use **Trip Archive & Analytics** to search by ticket, destination, requester, driver or vehicle;
+filter by travel dates; and review ticket totals, completed trips, daily activity and destination
+counts. Trip analytics count completed requests as actual trips; approved or dispatched tickets
+remain in the archive but are not counted as completed journeys.
+
+All data is stored in MySQL (Laragon locally). There is no demo request data: setup seeds
+one administrator account, three approver accounts, and the document header.
+
+## Requirements
+
+- Node.js 20+ and npm
+- Laragon with MySQL or MariaDB running
+
+## Local setup (Laragon)
+
+```sh
+npm install
+npm run db:setup   # creates the database, a limited app user, and all tables
+npm run db:seed    # creates the initial administrator, approvers and document header
+npm run dev
+```
+
+`db:setup` connects as MySQL root (Laragon default: user `root`, empty password). If your
+root account has a password, set `MYSQL_ROOT_USER` / `MYSQL_ROOT_PASSWORD` for that one
+command. It generates a random password for the application user, writes everything to
+`.env` (gitignored) and never prints it. The app user is granted only
+`SELECT, INSERT, UPDATE, DELETE` on the `loa_vrtt` database.
+
+`db:seed` prints an initial password once for each seeded account. Every seeded account
+must choose a new password at first sign-in. Accounts:
+
+| Role                 | Email                  |
+| -------------------- | ---------------------- |
+| Administrator        | `admin@loa.edu.ph`     |
+| Head of Transport    | `transport@loa.edu.ph` |
+| Director for Admin   | `director@loa.edu.ph`  |
+| University President | `president@loa.edu.ph` |
+
+Requisitioners can create accounts at `/register` only with a Lyceum Google Workspace/Gmail
+address ending in `@lyceumalabang.edu.ph`. The app sends a six-digit OTP to that institutional
+address and creates the account only after the code is verified. Personal `@gmail.com` and other
+domains cannot self-register.
+Approver, administrator, and assistant accounts cannot be self-registered. The administrator
+can create named assistant accounts and assign them as alternate signatories from Profile.
+Assistant accounts use a separate Assistant role and do not receive Transport Personnel access.
+Administrators can issue a one-time temporary password for any non-administrator account from
+Profile; the user is signed out of active sessions and must choose a new password at next sign-in.
+
+## Environment
+
+Copy values from `.env.example` when setting up a new environment. Never commit `.env`.
+
+| Variable                                                           | Purpose                                                     |
+| ------------------------------------------------------------------ | ----------------------------------------------------------- |
+| `DB_HOST` … `DB_PASSWORD`                                          | MySQL connection for the limited application user           |
+| `SITE_URL`                                                         | Public origin used for canonical links, Open Graph, sitemap |
+| `ALLOWED_EMAIL_DOMAINS`                                            | Institutional domains accepted for admin-created accounts   |
+| `GA_MEASUREMENT_ID`                                                | Optional GA4 ID, loaded only after analytics consent        |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN` | Gmail API sender credentials                                |
+
+For local OTP email sending, configure the Google OAuth client ID and secret, add
+`http://localhost:8080/api/gmail-test/callback` as an authorized redirect URI, and set
+`GOOGLE_TEST_RECIPIENT` to the authorized personal test address. Start the local app and visit
+`/api/gmail-test/start?template=gmail-connect`; grant the Gmail send permission. The local callback
+saves the refresh token to the ignored `.env` file without displaying it. Restart the dev server,
+then run `npm run db:setup` to create the registration OTP table before testing registration.
+For deployment, configure the same OAuth credentials and refresh token as private server
+environment variables; never expose them with a `VITE_` prefix.
+
+## Security notes
+
+- Sessions are random 256-bit tokens stored hashed in MySQL and sent in an httpOnly,
+  SameSite=Lax cookie; the cookie is `Secure` when `SITE_URL` is HTTPS.
+- Passwords use scrypt with a per-user salt. Five failed sign-ins lock the account for
+  15 minutes. Sign-in responses do not reveal whether an email exists.
+- Every server function re-checks the session and role server-side. Requisitioners can
+  only read their own requests and notifications; there are no client-only checks.
+- All SQL uses prepared statements. Inputs are validated with Zod on the server.
+- Security headers (CSP, HSTS, X-Frame-Options, nosniff, Referrer-Policy,
+  Permissions-Policy) are set in `src/server.ts`. Production error pages hide stack traces.
+- Analytics are first-party and cookie-free by default (path counts only, no IP, user or
+  query string). GA4 is optional and never loads before consent.
+
+  Registration verification emails use the standard branded OTP template in
+  `src/lib/email-template.ts`. OTPs expire after 10 minutes, can be resent once per minute, and
+  allow at most five verification attempts. Gmail connection and email preview endpoints are
+  available only on localhost in non-production; actual OTP sending uses the server-only Gmail
+  API sender.
+
+## Scripts
+
+- `npm run dev` — development server
+- `npm run build` / `npm run preview` — production build and preview
+- `npm test` — unit and routing tests
+- `npm run lint` — ESLint
+- `npm run db:setup` / `npm run db:seed` — database schema and initial accounts

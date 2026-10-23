@@ -1,0 +1,310 @@
+@import "tailwindcss";
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Design system definition.
+ *
+ * The @theme inline block maps CSS custom properties to Tailwind utility
+ * classes (e.g. --color-primary -> bg-primary, text-primary).
+ *
+ * The :root and .dark blocks define the actual color values using oklch.
+ * All colors MUST use oklch format.
+ *
+ * To add a new semantic color:
+ * 1. Add the variable to :root (light value) and .dark (dark value)
+ * 2. Register it in @theme inline as --color-<name>: var(--<name>)
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-info-soft: var(--info-soft);
+  --color-danger-soft: var(--danger-soft);
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-serif: "IBM Plex Serif", Georgia, serif;
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  --radius: 0.25rem;
+  --background: oklch(0.972 0.003 250);
+  --foreground: oklch(0.22 0.015 255);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.22 0.015 255);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.22 0.015 255);
+  --primary: oklch(0.36 0.1 258);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.955 0.006 250);
+  --secondary-foreground: oklch(0.28 0.03 258);
+  --muted: oklch(0.955 0.006 250);
+  --muted-foreground: oklch(0.48 0.015 255);
+  --accent: oklch(0.94 0.02 255);
+  --accent-foreground: oklch(0.3 0.08 258);
+  --destructive: oklch(0.53 0.19 27);
+  --destructive-foreground: oklch(0.99 0 0);
+  --success: oklch(0.5 0.12 150);
+  --success-soft: oklch(0.95 0.04 150);
+  --warning: oklch(0.58 0.13 70);
+  --warning-soft: oklch(0.96 0.05 85);
+  --info-soft: oklch(0.95 0.025 255);
+  --danger-soft: oklch(0.96 0.03 27);
+  --border: oklch(0.89 0.006 250);
+  --input: oklch(0.82 0.008 250);
+  --ring: oklch(0.5 0.12 258);
+  --chart-1: oklch(0.36 0.1 258);
+  --chart-2: oklch(0.5 0.12 150);
+  --chart-3: oklch(0.58 0.13 70);
+  --chart-4: oklch(0.53 0.19 27);
+  --chart-5: oklch(0.6 0.05 255);
+  --sidebar: oklch(0.24 0.04 258);
+  --sidebar-foreground: oklch(0.88 0.01 255);
+  --sidebar-primary: oklch(0.5 0.12 258);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.3 0.05 258);
+  --sidebar-accent-foreground: oklch(1 0 0);
+  --sidebar-border: oklch(0.32 0.04 258);
+  --sidebar-ring: oklch(0.5 0.12 258);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+  }
+}
+
+@layer base {
+  body {
+    font-family: var(--font-sans);
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+}
+
+.signature-protected {
+  -webkit-user-drag: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.startup-loading {
+  display: flex;
+  min-height: 100vh;
+  min-height: 100svh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  overflow: hidden;
+  padding: 1.5rem;
+  background: #fff;
+}
+
+.startup-loading__artwork {
+  width: min(48rem, 92vw);
+  max-height: calc(100svh - 8rem);
+  object-fit: contain;
+}
+
+.startup-loading__spinner {
+  width: 2rem;
+  height: 2rem;
+  flex: none;
+  border: 3px solid rgb(15 23 42 / 15%);
+  border-top-color: #f5c518;
+  border-radius: 50%;
+  animation: startup-loading-spin 0.8s linear infinite;
+}
+
+@keyframes startup-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .startup-loading__spinner {
+    animation-duration: 2s;
+  }
+}
+
+@utility panel {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+@media screen {
+  /* On-screen preview: show the sheet at its real A4 size instead of filling the viewport */
+  .print-sheet {
+    min-height: 0 !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
+    overflow-x: auto;
+  }
+
+  .print-sheet::after {
+    display: none;
+  }
+
+  .print-half {
+    position: relative;
+    width: 148.5mm;
+    height: auto;
+    min-height: 210mm;
+    margin: 0 auto;
+    overflow: visible;
+    background: white;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  }
+
+  .print-page {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    width: 148.5mm !important;
+    height: auto !important;
+    min-height: 210mm !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 3mm !important;
+    box-sizing: border-box !important;
+    background: white !important;
+    color: black !important;
+    transform: none !important;
+  }
+}
+
+@media print {
+  .requisitioner-ticket {
+    display: none !important;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
+  html,
+  body {
+    width: 210mm !important;
+    height: 297mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    font-size: 11px;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-sheet {
+    position: relative !important;
+    width: 210mm !important;
+    height: 297mm !important;
+    min-height: 297mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    background: white !important;
+  }
+
+  .print-sheet::after {
+    position: absolute;
+    top: 148.5mm;
+    right: 0;
+    left: 0;
+    border-top: 0.25mm dashed #94a3b8;
+    content: "";
+  }
+
+  .print-half {
+    position: relative !important;
+    width: 210mm !important;
+    height: 148.5mm !important;
+    min-height: 148.5mm !important;
+    overflow: hidden !important;
+    background: white !important;
+    break-inside: avoid;
+  }
+
+  .print-page {
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    width: 148.5mm !important;
+    height: 210mm !important;
+    min-height: 210mm !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 3mm !important;
+    box-sizing: border-box !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: white !important;
+    color: black !important;
+    transform: translate(-50%, -50%) rotate(90deg) scale(0.8) !important;
+    transform-origin: center center !important;
+    break-after: avoid-page;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .print-form > div {
+    break-inside: avoid;
+  }
+}

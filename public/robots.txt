@@ -1,0 +1,15 @@
+User-agent: *
+Allow: /$
+Allow: /privacy
+Disallow: /dashboard
+Disallow: /requests
+Disallow: /revise
+Disallow: /vehicles
+Disallow: /notifications
+Disallow: /profile
+Disallow: /change-password
+Disallow: /print
+Disallow: /login
+Disallow: /register
+
+Sitemap: https://vrtt.loa.edu.ph/sitemap.xml
