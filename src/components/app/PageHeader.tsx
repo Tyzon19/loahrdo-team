@@ -11,10 +11,12 @@ export function PageHeader({
   return (
     <div className="mb-5 flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
-        <h1 className="text-xl font-semibold text-foreground">{title}</h1>
-        {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
+        <h1 className="break-words text-xl font-semibold text-foreground">{title}</h1>
+        {description && (
+          <p className="mt-1 min-w-0 break-words text-sm text-muted-foreground">{description}</p>
+        )}
       </div>
-      {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
+      {actions && <div className="flex w-full flex-wrap gap-2 sm:w-auto">{actions}</div>}
     </div>
   );
 }
@@ -28,12 +30,12 @@ export function Section({
   actions?: ReactNode;
 }) {
   return (
-    <section className="panel">
-      <div className="flex items-center justify-between gap-2 border-b px-4 py-2.5">
-        <h2 className="text-sm font-semibold">{title}</h2>
-        {actions}
+    <section className="panel min-w-0">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
+        <h2 className="min-w-0 break-words text-sm font-semibold">{title}</h2>
+        {actions && <div className="ml-auto flex max-w-full flex-wrap gap-2">{actions}</div>}
       </div>
-      <div className="p-4">{children}</div>
+      <div className="min-w-0 p-4">{children}</div>
     </section>
   );
 }
@@ -54,7 +56,7 @@ export function Field({
         {label}
       </dt>
       <dd
-        className={`mt-0.5 break-words text-foreground ${comfortable ? "text-[15px]" : "text-sm"}`}
+        className={`mt-0.5 break-words [overflow-wrap:anywhere] text-foreground ${comfortable ? "text-[15px]" : "text-sm"}`}
       >
         {children}
       </dd>

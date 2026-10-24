@@ -79,10 +79,10 @@ function Notice({
   }[tone];
   const ic = { success: "text-success", danger: "text-destructive", info: "text-primary" }[tone];
   return (
-    <div role="status" className={`flex gap-3 rounded-sm border p-3 ${cls}`}>
+    <div role="status" className={`flex min-w-0 gap-3 rounded-sm border p-3 ${cls}`}>
       <Icon className={`mt-0.5 h-5 w-5 shrink-0 ${ic}`} aria-hidden />
-      <div className="min-w-0 space-y-0.5 text-sm">
-        <p className="font-semibold">{title}</p>
+      <div className="min-w-0 space-y-0.5 break-words [overflow-wrap:anywhere] text-sm">
+        <p className="break-words font-semibold">{title}</p>
         {children}
       </div>
     </div>
@@ -239,7 +239,7 @@ function RequestDetailPage() {
       )}
       <StageStepper r={r} />
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
+      <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-4">
           <Section title="Request details">
             <dl className="grid gap-4 sm:grid-cols-2">
@@ -290,15 +290,15 @@ function RequestDetailPage() {
               {STAGES.map((st) => {
                 const signature = sigs.find((x) => x.stage === st.key);
                 return (
-                  <div key={st.key} className="rounded-sm border p-3">
-                    <p className="text-[13px] font-semibold uppercase tracking-wide">{st.label}</p>
-                    <p className="text-[13px] text-muted-foreground">{st.title}</p>
+                  <div key={st.key} className="min-w-0 rounded-sm border p-3">
+                    <p className="break-words text-[13px] font-semibold uppercase tracking-wide">{st.label}</p>
+                    <p className="break-words text-[13px] text-muted-foreground">{st.title}</p>
                     <div className="mt-2 flex min-h-12 items-center">
                       {signature ? (
                         isOwner ? (
-                          <div className="flex items-center gap-2 rounded-sm bg-success-soft px-2.5 py-2 text-[13px] font-medium text-success">
+                          <div className="flex min-w-0 items-center gap-2 rounded-sm bg-success-soft px-2.5 py-2 text-[13px] font-medium text-success">
                             <BadgeCheck className="h-4 w-4 shrink-0" aria-hidden />
-                            <span>Signature securely recorded</span>
+                            <span className="break-words">Signature securely recorded</span>
                           </div>
                         ) : (
                           <SignatureMark
@@ -312,7 +312,7 @@ function RequestDetailPage() {
                       )}
                     </div>
                     {signature && (
-                      <p className="mt-1 text-[13px]">
+                      <p className="mt-1 break-words text-[13px]">
                         <strong>{signature.proxySignerName ?? signature.signerName}</strong>
                         {signature.proxySignerName && (
                           <>
@@ -451,13 +451,13 @@ function ActionPanel({
   }
 
   return (
-    <section className="panel border-primary/40" aria-label="Your action">
+    <section className="panel min-w-0 border-primary/40" aria-label="Your action">
       <div className="border-b bg-info-soft px-4 py-2.5">
         <p className="text-xs font-semibold uppercase tracking-wide text-primary">
           {stage.label} · Your action is required
         </p>
       </div>
-      <div className="space-y-4 p-4">
+      <div className="min-w-0 space-y-4 p-4">
         {isProxySigner ? (
           <p className="rounded-sm border border-primary/30 bg-info-soft p-3 text-sm">
             You are the assigned alternate signatory for the {stage.title}. Sign with your own
@@ -472,7 +472,7 @@ function ActionPanel({
           </p>
         )}
         {stageKey === "approve" && (
-          <dl className="grid gap-3 text-sm sm:grid-cols-2">
+          <dl className="grid min-w-0 gap-3 text-sm sm:grid-cols-2">
             <Field label="Requisitioner">
               {r.requisitionerName} · {r.department}
             </Field>
@@ -502,11 +502,11 @@ function ActionPanel({
           </p>
         )}
         {stageKey === "review" && (
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="text-sm sm:col-span-2">
+          <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="min-w-0 break-words text-sm sm:col-span-2">
               Reviewed By: <strong>{viewer.name}</strong>
             </div>
-            <div className="sm:col-span-2">
+            <div className="min-w-0 sm:col-span-2">
               <Label htmlFor="vehicle">Assign vehicle</Label>
               <Select
                 value={vehicleId}
@@ -549,7 +549,7 @@ function ActionPanel({
                 </p>
               )}
             </div>
-            <div>
+            <div className="min-w-0">
               <Label htmlFor="vehicle-type">Vehicle Type</Label>
               <Input
                 id="vehicle-type"
@@ -559,7 +559,7 @@ function ActionPanel({
                 onChange={(event) => setVehicleType(event.target.value)}
               />
             </div>
-            <div>
+            <div className="min-w-0">
               <Label htmlFor="plate-no">Plate No.</Label>
               <Input
                 id="plate-no"
@@ -569,7 +569,7 @@ function ActionPanel({
                 onChange={(event) => setPlateNo(event.target.value)}
               />
             </div>
-            <div>
+            <div className="min-w-0">
               <Label htmlFor="assigned-driver">Assigned Driver</Label>
               <Input
                 id="assigned-driver"
@@ -580,7 +580,7 @@ function ActionPanel({
                 placeholder="Enter the assigned driver's name"
               />
             </div>
-            <div className="sm:col-span-2">
+            <div className="min-w-0 sm:col-span-2">
               <Label htmlFor="remarks">Review Remarks</Label>
               <Textarea
                 id="remarks"
@@ -594,22 +594,22 @@ function ActionPanel({
         )}
 
         <div className="flex flex-col gap-2 border-t pt-4 sm:flex-row">
-          <Button size="lg" className="sm:min-w-56" onClick={() => setApproveOpen(true)}>
+          <Button size="lg" className="w-full whitespace-normal leading-snug sm:w-auto sm:min-w-56" onClick={() => setApproveOpen(true)}>
             <CheckCircle2 className="h-4 w-4" aria-hidden /> {ACTION_LABEL[stageKey]}
           </Button>
           <Button
             hidden={isProxySigner}
             size="lg"
             variant="outline"
-            className="border-destructive/50 text-destructive hover:bg-danger-soft hover:text-destructive"
+            className="w-full whitespace-normal leading-snug border-destructive/50 text-destructive hover:bg-danger-soft hover:text-destructive sm:w-auto"
             onClick={() => setRejectOpen(true)}
           >
             <CornerUpLeft className="h-4 w-4" aria-hidden />{" "}
             {stageKey === "approve" ? "Reject & Return" : "Reject & Return to Requisitioner"}
           </Button>
         </div>
-        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Mail className="h-3.5 w-3.5" aria-hidden />
+        <p className="flex min-w-0 items-start gap-1.5 break-words text-xs text-muted-foreground">
+          <Mail className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
           The next person receives an in-app notification. Email delivery is not connected yet.
         </p>
       </div>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useBlocker } from "@tanstack/react-router";
-import { Plus, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Plus, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -9,6 +9,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import type { RequestInput } from "@/lib/types";
 import { validateRequestInput } from "@/lib/workflow";
 import { fmtDate, fmtRange, fmtTime, todayISO } from "@/lib/format";
+import { LoadingScreen } from "@/components/app/LoadingPanel";
+import { Progress } from "@/components/ui/progress";
 import { Section } from "./PageHeader";
 function Req() { return <span className="text-destructive" aria-hidden> *</span>; }
 export function RequestForm({
@@ -22,6 +24,7 @@ export function RequestForm({
   const [v, setV] = useState<RequestInput>(initial);
   const [errors, setErrors] = useState<Partial<Record<keyof RequestInput, string>>>({});
   const [review, setReview] = useState(false);
+  const [mobileStep, setMobileStep] = useState(0);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -30,6 +33,44 @@ export function RequestForm({
   useEffect(() => { if (Object.keys(errors).length) setErrors(validateRequestInput(v, todayISO())); }, [v]);
   const set = <K extends keyof RequestInput>(k: K, val: RequestInput[K]) => setV((x) => ({ ...x, [k]: val }));
   const err = (k: keyof RequestInput) => errors[k] && <p id={`${k}-err`} className="mt-1 text-sm text-destructive">{errors[k]}</p>;
+  const mobileSteps: { title: string; description: string; fields: (keyof RequestInput)[] }[] = [
+    {
+      title: "Department & destination",
+      description: "Tell us which office is requesting the vehicle and where you need to go.",
+      fields: ["department", "destinations"],
+    },
+    {
+      title: "Trip schedule",
+      description: "Add the passenger count and the date and time for the trip.",
+      fields: ["passengers", "timeNeeded", "dateStart", "dateEnd"],
+    },
+    {
+      title: "Purpose of travel",
+      description: "Briefly explain why the vehicle is needed.",
+      fields: ["purpose"],
+    },
+  ];
+  const focusField: Partial<Record<keyof RequestInput, string>> = {
+    department: "department",
+    destinations: "destinations",
+    passengers: "passengers",
+    timeNeeded: "timeNeeded",
+    dateStart: "dateStart",
+    dateEnd: "dateEnd",
+    purpose: "purpose",
+  };
+  const mobileGroupClass = (step: number) =>
+    `${mobileStep === step ? "block" : "hidden"} sm:contents`;
+  function continueMobileStep() {
+    const validation = validateRequestInput(v, todayISO());
+    setErrors(validation);
+    const firstInvalid = mobileSteps[mobileStep]?.fields.find((field) => validation[field]);
+    if (firstInvalid) {
+      document.getElementById(focusField[firstInvalid] ?? "")?.focus();
+      return;
+    }
+    setMobileStep((step) => Math.min(step + 1, mobileSteps.length - 1));
+  }
   return (
     <form
       noValidate
@@ -43,13 +84,38 @@ export function RequestForm({
       }}
       className="space-y-4"
     >
+      {busy && <LoadingScreen label="Submitting vehicle request" mode="overlay" />}
       <Section title="Request details">
         <dl className="mb-4 grid grid-cols-1 gap-3 rounded-sm bg-muted p-3 text-sm sm:grid-cols-2">
           <div><dt className="text-xs text-muted-foreground">Request Number</dt><dd className="font-medium">{header.number}</dd></div>
           <div><dt className="text-xs text-muted-foreground">Date</dt><dd>{fmtDate(header.date)}</dd></div>
           <div className="sm:col-span-2"><dt className="text-xs text-muted-foreground">Requisitioner</dt><dd className="font-medium">{header.requisitioner} (signed-in account)</dd></div>
         </dl>
+        <div className="mb-5 rounded-lg border bg-background p-4 sm:hidden">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">
+                Step {mobileStep + 1} of {mobileSteps.length}
+              </p>
+              <h3 className="mt-1 text-base font-semibold">
+                {mobileSteps[mobileStep]?.title}
+              </h3>
+            </div>
+            <span className="shrink-0 text-sm font-semibold text-primary">
+              {Math.round(((mobileStep + 1) / mobileSteps.length) * 100)}%
+            </span>
+          </div>
+          <Progress
+            className="mt-3 h-1.5"
+            value={((mobileStep + 1) / mobileSteps.length) * 100}
+            aria-label={`Request form step ${mobileStep + 1} of ${mobileSteps.length}`}
+          />
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+            {mobileSteps[mobileStep]?.description}
+          </p>
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
+          <div className={mobileGroupClass(0)}>
           <div className="sm:col-span-2">
             <Label htmlFor="department">Department or Office<Req /></Label>
             <Input id="department" className="mt-1" value={v.department} onChange={(e) => set("department", e.target.value)} aria-invalid={!!errors.department} aria-describedby="department-err" />
@@ -68,6 +134,8 @@ export function RequestForm({
             </div>
             {err("destinations")}
           </div>
+          </div>
+          <div className={mobileGroupClass(1)}>
           <div>
             <Label htmlFor="passengers">Number of Passengers<Req /></Label>
             <Input id="passengers" type="number" min={1} inputMode="numeric" className="mt-1" value={Number.isNaN(v.passengers) ? "" : v.passengers} onChange={(e) => set("passengers", e.target.value === "" ? NaN : Number(e.target.value))} aria-invalid={!!errors.passengers} />
@@ -88,16 +156,39 @@ export function RequestForm({
             <Input id="dateEnd" type="date" min={v.dateStart || todayISO()} className="mt-1" value={v.dateEnd} onChange={(e) => set("dateEnd", e.target.value)} aria-invalid={!!errors.dateEnd} />
             {err("dateEnd")}
           </div>
+          </div>
+          <div className={mobileGroupClass(2)}>
           <div className="sm:col-span-2">
             <Label htmlFor="purpose">Purpose of Travel<Req /></Label>
             <Textarea id="purpose" rows={4} className="mt-1" value={v.purpose} onChange={(e) => set("purpose", e.target.value)} aria-invalid={!!errors.purpose} />
             {err("purpose")}
           </div>
+          </div>
         </div>
         <p className="mt-3 text-xs text-muted-foreground"><span className="text-destructive">*</span> Required. Vehicle type and plate number are assigned by Transport Services.</p>
       </Section>
-      <div className="flex justify-end gap-2">
+      <div className="hidden justify-end gap-2 sm:flex">
         <Button type="submit">Review before submitting</Button>
+      </div>
+      <div className="flex items-center justify-between gap-3 sm:hidden">
+        <Button
+          type="button"
+          variant="outline"
+          disabled={mobileStep === 0}
+          onClick={() => setMobileStep((step) => Math.max(step - 1, 0))}
+          className={mobileStep === 0 ? "invisible" : ""}
+        >
+          <ArrowLeft aria-hidden="true" />
+          Back
+        </Button>
+        {mobileStep < mobileSteps.length - 1 ? (
+          <Button type="button" onClick={continueMobileStep}>
+            Next
+            <ArrowRight aria-hidden="true" />
+          </Button>
+        ) : (
+          <Button type="submit">Review request</Button>
+        )}
       </div>
       <AlertDialog open={review} onOpenChange={setReview}>
         <AlertDialogContent className="max-h-[92vh] overflow-y-auto">

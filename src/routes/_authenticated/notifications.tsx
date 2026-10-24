@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Mail, MailOpen, RefreshCw } from "lucide-react";
+import { ArrowLeft, Mail, MailOpen, RefreshCw } from "lucide-react";
 import { PageHeader, Section, EmptyState } from "@/components/app/PageHeader";
 import { LoadingPanel } from "@/components/app/LoadingPanel";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import {
   getRequestFn,
   listNotificationsFn,
@@ -19,6 +20,9 @@ import { cn } from "@/lib/utils";
 import { SITE } from "@/lib/site";
 
 export const Route = createFileRoute("/_authenticated/notifications")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    view: search["view"] === "detail" || search["view"] === "list" ? search["view"] : undefined,
+  }),
   head: () => ({
     meta: [
       { title: `Notifications — ${SITE.name}` },
@@ -31,29 +35,43 @@ export const Route = createFileRoute("/_authenticated/notifications")({
 
 function Notifications() {
   const queryClient = useQueryClient();
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
   const notifications = useQuery({
     queryKey: ["notifications"],
     queryFn: () => unwrap(listNotificationsFn()),
   });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const items = notifications.data ?? [];
-  const email = items.find((item) => item.id === selectedId) ?? items[0];
+  const selectedEmail = items.find((item) => item.id === selectedId) ?? null;
+  const email = selectedEmail ?? items[0] ?? null;
+  const showMobileDetails = search.view === "detail" && Boolean(selectedEmail);
 
   async function openEmail(item: EmailMessage) {
     setSelectedId(item.id);
+    await navigate({ search: { view: "detail" }, resetScroll: false });
     if (item.read) return;
-    const result = await markNotificationReadFn({ data: item.id });
-    if (result.ok) {
+
+    try {
+      const result = await markNotificationReadFn({ data: item.id });
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
       await queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    } catch {
+      toast.error("We couldn't mark this notification as read. Please try again.");
     }
   }
 
   return (
     <>
-      <PageHeader
-        title="Notifications"
-        description="In-app alerts for requests that need your attention."
-      />
+      <div className={cn(showMobileDetails && "hidden lg:block")}>
+        <PageHeader
+          title="Notifications"
+          description="In-app alerts for requests that need your attention."
+        />
+      </div>
       {notifications.isPending ? (
         <LoadingPanel label="Loading notifications" rows={6} />
       ) : notifications.isError ? (
@@ -66,46 +84,90 @@ function Notifications() {
           </div>
         </Section>
       ) : items.length === 0 ? (
-        <Section title="Inbox">
+        <Section title="Notifications">
           <EmptyState title="No notifications yet.">
             You&apos;ll see an alert here when a request needs your review, approval, or revision.
           </EmptyState>
         </Section>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
-          <div className="panel overflow-hidden">
-            <ul>
-              {items.map((item) => (
-                <li key={item.id}>
-                  <button
-                    onClick={() => void openEmail(item)}
-                    className={cn(
-                      "flex w-full gap-2 border-b px-3 py-2.5 text-left hover:bg-muted",
-                      email?.id === item.id && "bg-accent",
-                    )}
-                  >
-                    {item.read ? (
-                      <MailOpen
-                        className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground"
-                        aria-hidden
-                      />
-                    ) : (
-                      <Mail className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
-                    )}
-                    <span className="min-w-0">
-                      <span className={cn("block truncate text-sm", !item.read && "font-semibold")}>
-                        {item.subject}
+        <div className="grid min-w-0 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+          <div
+            className={cn(
+              "panel min-w-0 overflow-hidden lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto",
+              showMobileDetails && "hidden lg:block",
+            )}
+          >
+            <ul aria-label="Your notifications">
+              {items.map((item) => {
+                const preview = `${item.heading} ${item.body}`.trim();
+                return (
+                  <li key={item.id} className="min-w-0">
+                    <button
+                      onClick={() => void openEmail(item)}
+                      aria-label={`Open notification: ${item.subject}`}
+                      aria-current={email?.id === item.id ? "true" : undefined}
+                      className={cn(
+                        "flex w-full min-w-0 items-start gap-3 border-b px-3 py-2 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-4 sm:py-3",
+                        email?.id === item.id && "bg-accent",
+                      )}
+                    >
+                      {item.read ? (
+                        <MailOpen
+                          className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground"
+                          aria-hidden
+                        />
+                      ) : (
+                        <Mail className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
+                      )}
+                      <span className="min-w-0 flex-1">
+                        <span
+                          className={cn(
+                            "block truncate text-sm leading-5",
+                            !item.read && "font-semibold text-foreground",
+                          )}
+                        >
+                          {item.subject}
+                        </span>
+                        <span className="mt-0.5 block h-4 truncate text-xs leading-4 text-muted-foreground">
+                          {preview}
+                        </span>
+                        <span className="mt-0.5 block text-[11px] leading-4 text-muted-foreground">
+                          {fmtDateTime(item.at)}
+                        </span>
                       </span>
-                      <span className="block text-xs text-muted-foreground">
-                        {fmtDateTime(item.at)}
-                      </span>
-                    </span>
-                  </button>
-                </li>
-              ))}
+                      {!item.read && (
+                        <span
+                          className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary"
+                          aria-label="Unread"
+                        />
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           </div>
-          {email && <NotificationPreview email={email} />}
+
+          {email && (
+            <div className={cn("min-w-0", !showMobileDetails && "hidden lg:block")}>
+              <div className="mb-3 flex items-center gap-2 lg:hidden">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="-ml-2"
+                  onClick={() => {
+                    setSelectedId(null);
+                    void navigate({ search: { view: "list" }, resetScroll: false });
+                  }}
+                >
+                  <ArrowLeft className="h-4 w-4" aria-hidden />
+                  Notifications
+                </Button>
+              </div>
+              <NotificationPreview email={email} />
+            </div>
+          )}
         </div>
       )}
     </>
@@ -137,23 +199,23 @@ function NotificationPreview({ email }: { email: EmailMessage }) {
   }
 
   return (
-    <article className="panel overflow-hidden" aria-label="Notification preview">
-      <div className="border-b bg-muted px-4 py-2 text-xs text-muted-foreground">
+    <article className="panel min-w-0 overflow-hidden" aria-label="Notification details">
+      <div className="min-w-0 border-b bg-muted px-4 py-2 text-xs text-muted-foreground [overflow-wrap:anywhere]">
         <p>
           <strong className="font-medium">To:</strong>{" "}
           <span className="font-medium">
             {email.toName} &lt;{email.toEmail}&gt;
           </span>
         </p>
-        <p>
+        <p className="mt-1 break-words">
           <strong className="font-medium">Subject:</strong>{" "}
-          <span className="font-medium">{email.subject}</span>
+          <span className="font-medium [overflow-wrap:anywhere]">{email.subject}</span>
         </p>
         <p className="mt-1 text-warning">
           In-app notification. Email delivery is not connected yet.
         </p>
       </div>
-      <div className="mx-auto max-w-xl p-5">
+      <div className="mx-auto min-w-0 max-w-xl p-4 sm:p-5">
         <div className="border-b-4 border-primary pb-3">
           <p className="font-serif text-base font-bold text-primary">Lyceum of Alabang Inc.</p>
           <p className="text-xs text-muted-foreground">
@@ -163,18 +225,22 @@ function NotificationPreview({ email }: { email: EmailMessage }) {
         <p className="mt-4 text-sm">
           Dear <span className="font-medium">{email.toName}</span>,
         </p>
-        <p className="mt-2 text-base font-semibold">{email.heading}</p>
-        {!photo && <p className="mt-2 text-sm">{email.body}</p>}
+        <p className="mt-2 break-words text-base font-semibold [overflow-wrap:anywhere]">
+          {email.heading}
+        </p>
+        {!photo && (
+          <p className="mt-2 break-words text-sm [overflow-wrap:anywhere]">{email.body}</p>
+        )}
         {photo && (
           <img
             src={photo}
             alt={`Trip ticket ${r?.number ?? ""}`}
-            className="mt-4 w-full border border-foreground/40 bg-white"
+            className="mt-4 block h-auto max-w-full border border-foreground/40 bg-white"
           />
         )}
         {!photo && r && (
-          <table className="mt-4 w-full text-sm">
-            <tbody className="[&_td]:border-b [&_td]:py-1.5 [&_td:first-child]:w-40 [&_td:first-child]:text-muted-foreground">
+          <table className="mt-4 w-full table-fixed text-sm">
+            <tbody className="[&_td]:break-words [&_td]:border-b [&_td]:py-1.5 [&_td]:align-top [&_td]:[overflow-wrap:anywhere] [&_td:first-child]:w-28 [&_td:first-child]:pr-2 [&_td:first-child]:text-muted-foreground sm:[&_td:first-child]:w-40 sm:[&_td:first-child]:pr-3">
               <tr>
                 <td className="font-medium">Request Number</td>
                 <td className="font-medium">{r.number}</td>
@@ -212,11 +278,6 @@ function NotificationPreview({ email }: { email: EmailMessage }) {
         >
           {email.ctaLabel}
         </button>
-        <p className="mt-4 text-xs text-muted-foreground">
-          This link opens the request on the LOA website. You will need to sign in, review the
-          details, and confirm your decision there — the notification alone does not approve
-          anything.
-        </p>
       </div>
     </article>
   );

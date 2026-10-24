@@ -98,6 +98,8 @@ CREATE TABLE IF NOT EXISTS requests (
   CONSTRAINT requests_attempt_ck CHECK (attempt >= 1)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+
+
 CREATE TABLE IF NOT EXISTS request_destinations (
   request_id CHAR(36) NOT NULL,
   sort_order INT NOT NULL,

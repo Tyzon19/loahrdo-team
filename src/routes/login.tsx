@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PublicShell } from "@/components/marketing/PublicShell";
+import { LoadingScreen } from "@/components/app/LoadingPanel";
 import { loginFn } from "@/server-functions";
 import { SITE, canonical } from "@/lib/site";
 
@@ -65,25 +66,31 @@ function LoginPage() {
     setBusy(true);
     setError(null);
 
-    const result = await loginFn({ data: { email, password } });
-    if (!result.ok) {
-      setError(result.error);
-      setBusy(false);
-      return;
-    }
+    try {
+      const result = await loginFn({ data: { email, password } });
+      if (!result.ok) {
+        setError(result.error);
+        setBusy(false);
+        return;
+      }
 
-    await router.invalidate();
-    toast.success("Signed in.");
-    const target = result.data.mustChangePassword
-      ? "/change-password"
-      : search.redirect && search.redirect !== "/login"
-        ? search.redirect
-        : "/dashboard";
-    window.location.assign(target);
+      await router.invalidate();
+      toast.success("Signed in.");
+      const target = result.data.mustChangePassword
+        ? "/change-password"
+        : search.redirect && search.redirect !== "/login"
+          ? search.redirect
+          : "/dashboard";
+      window.location.assign(target);
+    } catch {
+      setError("We couldn't sign you in. Check your connection and try again.");
+      setBusy(false);
+    }
   }
 
   return (
     <PublicShell>
+      {busy && <LoadingScreen label="Signing in" mode="overlay" />}
       <div className="mx-auto grid w-full max-w-6xl gap-8 px-4 py-8 sm:gap-10 sm:py-12 lg:grid-cols-[1fr_32rem] lg:items-center lg:py-20">
         <div className="hidden lg:block">
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">

@@ -1,31 +1,52 @@
-import { Skeleton } from "@/components/ui/skeleton";
-export function LoadingPanel({ label = "Loading", rows = 5 }: { label?: string; rows?: number }) {
+import { LoaderCircle } from "lucide-react";
+import { useEffect, useState } from "react";
+
+type LoadingScreenProps = {
+  label?: string;
+  mode?: "inline" | "overlay";
+};
+
+export function ButtonLoading({ label }: { label: string }) {
   return (
-    <div role="status" aria-live="polite" className="panel p-4">
-      <span className="sr-only">{label}</span>
-      <div className="space-y-2.5">
-        <Skeleton className="h-4 w-40" />
-        {Array.from({ length: rows }).map((_, index) => (
-          <Skeleton key={index} className="h-9 w-full" />
-        ))}
-      </div>
-    </div>
+    <span className="inline-flex items-center gap-2" role="status">
+      <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+      {label}
+    </span>
   );
 }
-export function LoadingStats() {
+
+export function LoadingScreen({ label = "Loading", mode = "inline" }: LoadingScreenProps) {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setVisible(true), 400);
+    return () => window.clearTimeout(timeout);
+  }, []);
+
+  if (!visible) return null;
+
   return (
     <div
       role="status"
       aria-live="polite"
-      className="mb-4 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3 xl:grid-cols-5"
+      aria-atomic="true"
+      className={`startup-loading ${mode === "overlay" ? "startup-loading--overlay" : "startup-loading--inline"}`}
     >
-      <span className="sr-only">Loading overview statistics</span>
-      {Array.from({ length: 5 }).map((_, index) => (
-        <div key={index} className="panel min-w-0 p-3 sm:p-4">
-          <Skeleton className="h-3 w-24" />
-          <Skeleton className="mt-2 h-7 w-12" />
-        </div>
-      ))}
+      <img className="startup-loading__artwork" src="/loa-loading.png" alt="" />
+      <span className="startup-loading__spinner" aria-hidden="true" />
+      <span className="text-sm font-medium text-muted-foreground">{label}</span>
+    </div>
+  );
+}
+
+export function LoadingPanel({ label = "Loading" }: { label?: string; rows?: number }) {
+  return <LoadingScreen label={label} />;
+}
+
+export function LoadingStats() {
+  return (
+    <div className="mb-4">
+      <LoadingScreen label="Loading overview statistics" />
     </div>
   );
 }

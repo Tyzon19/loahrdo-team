@@ -96,19 +96,22 @@ export function renderEmailTemplate(
     logoContentId: escapeHtml(logoContentId),
     ticketContentId: ticketImageContentId ? escapeHtml(ticketImageContentId) : undefined,
   };
-  const ticketRows = ticketPreview
+  const ticketRow = (label: string, value: string): [string, string] => [label, value];
+  const ticketRows: [string, string][] = ticketPreview
     ? [
-        ["Office", ticketPreview.department],
-        ["Purpose", ticketPreview.purpose],
-        ["Destination", ticketPreview.destinations.join(", ")],
-        [
+        ticketRow("Office", ticketPreview.department),
+        ticketRow("Purpose", ticketPreview.purpose),
+        ticketRow("Destination", ticketPreview.destinations.join(", ")),
+        ticketRow(
           "Travel date",
           ticketPreview.dateStart === ticketPreview.dateEnd
             ? ticketPreview.dateStart
             : `${ticketPreview.dateStart} to ${ticketPreview.dateEnd}`,
-        ],
-        ["Passengers", String(ticketPreview.passengers)],
-        ...(ticketPreview.currentStage ? [["Current Stage", ticketPreview.currentStage]] : []),
+        ),
+        ticketRow("Passengers", String(ticketPreview.passengers)),
+        ...(ticketPreview.currentStage
+          ? [ticketRow("Current Stage", ticketPreview.currentStage)]
+          : []),
       ]
     : [];
   const safeTicketRows = ticketRows
@@ -229,7 +232,7 @@ export function renderRegistrationOtpEmail(
     ignoredNotice,
     "",
     "Lyceum of Alabang",
-    "Vehicle Reservation & Trip Ticket Team",
+    "Vehicle Reservation & Trip Ticket",
     "This is an automated message. Please do not reply.",
   ].join("\n");
   const html = `<!doctype html>

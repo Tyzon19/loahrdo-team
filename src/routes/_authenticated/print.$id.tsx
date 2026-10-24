@@ -5,7 +5,7 @@ import { ArrowLeft, Download, Send } from "lucide-react";
 import { toPng } from "html-to-image";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { LoadingPanel } from "@/components/app/LoadingPanel";
+import { ButtonLoading, LoadingPanel, LoadingScreen } from "@/components/app/LoadingPanel";
 import {
   getPrintableRequestFn,
   markApprovalNoticeReadFn,
@@ -157,7 +157,6 @@ function PrintTicket() {
 
   const r = detail.request;
   const d = detail.doc;
-  const isRequisitioner = viewer?.role === "requisitioner";
   const approved = ["approved", "dispatched", "completed"].includes(r.status);
   const ticketAlreadySent = ticketSent || detail.tripTicketAttached;
   const sigs = currentSignatures(r);
@@ -223,8 +222,10 @@ function PrintTicket() {
   }
 
   return (
+    <>
+    {sending && <LoadingScreen label="Sending trip ticket" mode="overlay" />}
     <div
-      className={`print-sheet min-h-screen bg-background py-6 print:min-h-0 print:bg-white print:py-0 ${isRequisitioner ? "requisitioner-ticket" : ""}`}
+      className="print-sheet min-h-screen bg-background py-6 print:min-h-0 print:bg-white print:py-0"
     >
       <div className="no-print mx-auto mb-4 flex max-w-[210mm] items-center justify-between px-4">
         <Button asChild variant="ghost">
@@ -233,39 +234,32 @@ function PrintTicket() {
           </Link>
         </Button>
         <div className="flex gap-2">
-          {approved && !isRequisitioner && (
+          {approved && (
             <Button variant="outline" onClick={() => void downloadTicket()} disabled={downloading}>
               <Download className="h-4 w-4" aria-hidden />
-              {downloading ? "Preparing…" : "Download ticket"}
+              {downloading ? <ButtonLoading label="Preparing…" /> : "Download ticket"}
             </Button>
           )}
-          {!isRequisitioner && (
-            <Button
-              onClick={() => void sendToRequisitioner()}
-              disabled={!approved || sending || testEmailSent}
-            >
-              <Send className="h-4 w-4" aria-hidden />
-              {sending
-                ? "Sending…"
-                : testEmailSent
-                  ? "Test Email Sent"
-                  : import.meta.env.DEV
-                    ? ticketAlreadySent
-                      ? "Resend Ticket Test Email"
-                      : "Send Ticket Test Email"
-                    : ticketAlreadySent
-                      ? "Ticket Sent"
-                      : "Send to Requisitioner"}
-            </Button>
-          )}
+          <Button
+            onClick={() => void sendToRequisitioner()}
+            disabled={!approved || sending || testEmailSent}
+          >
+            <Send className="h-4 w-4" aria-hidden />
+            {sending ? (
+              "Sending…"
+            ) : testEmailSent ? (
+              "Test Email Sent"
+            ) : import.meta.env.DEV ? (
+              ticketAlreadySent ? "Resend Ticket Test Email" : "Send Ticket Test Email"
+            ) : ticketAlreadySent ? (
+              "Ticket Sent"
+            ) : (
+              "Send to Requisitioner"
+            )}
+          </Button>
         </div>
       </div>
-      {approved && isRequisitioner && (
-        <p className="no-print mx-auto mb-3 max-w-[210mm] px-4 text-xs text-muted-foreground">
-          Download the official ticket for your digital records or show it on screen to your driver.
-        </p>
-      )}
-      {approved && !isRequisitioner && (
+      {approved && (
         <p className="no-print mx-auto mb-3 max-w-[210mm] px-4 text-xs text-muted-foreground">
           Download a digital copy or attach it to the requisitioner&apos;s in-app notification.
           {import.meta.env.DEV &&
@@ -374,7 +368,7 @@ function PrintTicket() {
                           image={signature.image}
                           method={signature.method}
                           name={signature.signerName}
-                          protectedDisplay={isRequisitioner}
+                          protectedDisplay={false}
                         />
                       )}
                     </div>
@@ -414,7 +408,7 @@ function PrintTicket() {
                           image={signature.image}
                           method={signature.method}
                           name={signature.proxySignerName}
-                          protectedDisplay={isRequisitioner}
+                          protectedDisplay={false}
                         />
                       </div>
                       <div
@@ -512,5 +506,6 @@ function PrintTicket() {
         </div>
       </div>
     </div>
+    </>
   );
 }

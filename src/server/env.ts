@@ -12,10 +12,8 @@ function ensureLoaded() {
   loaded = true;
   if (typeof window !== "undefined") return;
   try {
-    // Node 20.12+/22+: load .env for local Laragon development.
     (process as unknown as { loadEnvFile?: (path?: string) => void }).loadEnvFile?.(".env");
   } catch {
-    /* Missing .env is fine in production where real environment variables are set. */
   }
 }
 

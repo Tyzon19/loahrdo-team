@@ -1,11 +1,20 @@
 import { createFileRoute, Link, redirect as routerRedirect } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
-import { AlertCircle, IdCard, MailCheck, ShieldCheck } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  Check,
+  IdCard,
+  KeyRound,
+  MailCheck,
+  ShieldCheck,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PublicShell } from "@/components/marketing/PublicShell";
+import { ButtonLoading } from "@/components/app/LoadingPanel";
 import { institutionalEmailAllowed, registerSchema } from "@/lib/validation";
 import { requestRegistrationOtpFn, verifyRegistrationOtpFn } from "@/server-functions";
 import { SITE, canonical } from "@/lib/site";
@@ -162,7 +171,19 @@ function RegisterPage() {
 
   return (
     <PublicShell>
-      <div className="mx-auto grid w-full max-w-6xl gap-10 px-4 py-12 lg:grid-cols-[1fr_32rem] lg:items-center lg:py-16">
+      <div className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-7 sm:gap-10 sm:py-12 lg:grid-cols-[1fr_32rem] lg:items-center lg:py-16">
+        <div className="lg:hidden">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+            Lyceum of Alabang · Requisitioner access
+          </p>
+          <h1 className="mt-2 font-serif text-2xl font-bold leading-tight sm:text-3xl">
+            Create your account
+          </h1>
+          <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+            Verify your institutional email to start requesting school vehicles.
+          </p>
+        </div>
+
         <div className="hidden lg:block">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
             Requisitioner access
@@ -190,9 +211,60 @@ function RegisterPage() {
           </ul>
         </div>
 
-        <div className="panel w-full p-6 sm:p-8">
-          <h2 className="font-serif text-2xl font-bold">Create an account</h2>
-          <p className="mt-1 text-sm text-muted-foreground">All fields are required.</p>
+        <div className="panel w-full rounded-xl p-5 shadow-sm sm:p-8">
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              {verificationStarted ? (
+                <MailCheck className="h-5 w-5" aria-hidden />
+              ) : (
+                <IdCard className="h-5 w-5" aria-hidden />
+              )}
+            </div>
+            <div className="min-w-0">
+              <h2 className="font-serif text-xl font-bold sm:text-2xl">
+                {verificationStarted ? "Verify your email" : "Account details"}
+              </h2>
+              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                {verificationStarted
+                  ? "Enter the code we sent to your institutional inbox."
+                  : "Use your official Lyceum institutional account."}
+              </p>
+            </div>
+          </div>
+
+          <ol
+            className="mt-6 grid grid-cols-[1fr_auto_1fr] items-center gap-2"
+            aria-label="Registration progress"
+          >
+            <li className="flex min-w-0 items-center gap-2">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                {verificationStarted ? <Check className="h-4 w-4" aria-hidden /> : "1"}
+              </span>
+              <span className="min-w-0 text-xs font-medium leading-tight sm:text-sm">
+                Your details
+              </span>
+            </li>
+            <span className="h-px w-6 bg-border sm:w-10" aria-hidden />
+            <li
+              className={`flex min-w-0 items-center justify-end gap-2 ${
+                verificationStarted ? "text-primary" : "text-muted-foreground"
+              }`}
+              aria-current={verificationStarted ? "step" : undefined}
+            >
+              <span
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold ${
+                  verificationStarted
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-background"
+                }`}
+              >
+                2
+              </span>
+              <span className="min-w-0 text-xs font-medium leading-tight sm:text-sm">
+                Verify email
+              </span>
+            </li>
+          </ol>
 
           <form className="mt-6 space-y-4" onSubmit={onSubmit} noValidate>
             {error && (
@@ -290,7 +362,11 @@ function RegisterPage() {
                   {fieldError("confirm")}
                 </div>
                 <Button type="submit" className="w-full" size="lg" disabled={busy}>
-                  {busy ? "Sending verification code…" : "Send verification code"}
+                  {busy ? (
+                    <ButtonLoading label="Sending verification code…" />
+                  ) : (
+                    "Send verification code"
+                  )}
                 </Button>
               </>
             ) : (
@@ -316,32 +392,39 @@ function RegisterPage() {
                     pattern="[0-9]{6}"
                     maxLength={6}
                     required
-                    className="mt-1 text-center text-xl tracking-[0.35em]"
+                    className="mt-2 h-14 text-center text-2xl font-semibold tracking-[0.55em]"
                     value={code}
                     onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
                     aria-invalid={Boolean(errors.code)}
                     aria-describedby="registration-code-help"
                   />
-                  <p id="registration-code-help" className="mt-1 text-xs text-muted-foreground">
-                    For your security, do not share this code with anyone.
+                  <p
+                    id="registration-code-help"
+                    className="mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-muted-foreground"
+                  >
+                    <KeyRound className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+                    For your security, never share this code. It expires in 10 minutes.
                   </p>
                   {fieldError("code")}
                 </div>
                 <Button type="submit" className="w-full" size="lg" disabled={busy}>
-                  {busy ? "Verifying…" : "Verify email and create account"}
+                  {busy ? <ButtonLoading label="Verifying…" /> : "Verify email and create account"}
                 </Button>
-                <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                <div className="flex flex-col-reverse items-stretch justify-between gap-1 sm:flex-row sm:items-center">
                   <Button
                     type="button"
                     variant="ghost"
                     onClick={() => void requestCode()}
                     disabled={busy || resendSeconds > 0}
                   >
-                    {resendSeconds > 0 ? `Resend code in ${resendSeconds}s` : "Resend code"}
+                    {resendSeconds > 0
+                      ? `Resend code in ${resendSeconds}s`
+                      : "Didn't get a code? Resend"}
                   </Button>
                   <Button
                     type="button"
                     variant="ghost"
+                    className="justify-start sm:justify-center"
                     onClick={() => {
                       setVerificationStarted(false);
                       setCode("");
@@ -350,7 +433,8 @@ function RegisterPage() {
                     }}
                     disabled={busy}
                   >
-                    Edit registration details
+                    <ArrowLeft className="h-4 w-4" aria-hidden />
+                    Change details
                   </Button>
                 </div>
               </div>

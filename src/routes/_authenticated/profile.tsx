@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader, Section, Field } from "@/components/app/PageHeader";
 import { SignatoryAssistantSettings } from "@/components/app/SignatoryAssistantSettings";
+import { ButtonLoading } from "@/components/app/LoadingPanel";
 import { ROLE_TITLES } from "@/lib/workflow";
 import { updateProfileFn } from "@/server-functions";
 import { SITE } from "@/lib/site";
@@ -99,7 +100,7 @@ function Profile() {
               </div>
             <div className="sm:col-span-2">
               <Button type="submit" disabled={busy}>
-                {busy ? "Saving…" : "Save profile"}
+                {busy ? <ButtonLoading label="Saving…" /> : "Save profile"}
               </Button>
             </div>
           </form>

@@ -4,7 +4,6 @@ import { PublicShell } from "@/components/marketing/PublicShell";
 import { Button } from "@/components/ui/button";
 import { resetAnalyticsConsent } from "@/lib/consent";
 import { SITE, canonical } from "@/lib/site";
-
 export const Route = createFileRoute("/privacy")({
   head: () => ({
     meta: [
@@ -28,7 +27,6 @@ export const Route = createFileRoute("/privacy")({
   }),
   component: PrivacyPage,
 });
-
 function PrivacyPage() {
   return (
     <PublicShell>

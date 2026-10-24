@@ -77,7 +77,7 @@ export function StageStepper({ r }: { r: VehicleRequest }) {
         {steps.map((step, index) => (
           <li
             key={step.id}
-            className="relative grid grid-cols-[28px_minmax(0,1fr)] gap-x-3 pb-6 last:pb-0 sm:block sm:pb-0"
+            className="relative grid min-w-0 grid-cols-[28px_minmax(0,1fr)] gap-x-3 pb-6 last:pb-0 sm:block sm:pb-0"
             aria-current={step.current ? "step" : undefined}
           >
             <div className="flex items-start sm:mb-2 sm:h-7 sm:items-center">
@@ -109,13 +109,13 @@ export function StageStepper({ r }: { r: VehicleRequest }) {
               )}
             </div>
             <div className="min-w-0 pt-0.5 sm:pt-0">
-              <h3 className="text-[13px] font-semibold leading-5">{step.title}</h3>
-              <p className="mb-1.5 truncate text-[11px] leading-[17px] text-muted-foreground">
+              <h3 className="break-words text-[13px] font-semibold leading-5">{step.title}</h3>
+              <p className="mb-1.5 break-words text-[11px] leading-[17px] text-muted-foreground sm:truncate">
                 {step.approver}
               </p>
               <p
                 className={cn(
-                  "flex items-center gap-1 text-[11px] leading-[17px] text-muted-foreground",
+                  "flex min-w-0 flex-wrap items-center gap-1 break-words text-[11px] leading-[17px] text-muted-foreground",
                   step.status === "approved" && "text-success",
                   step.status === "pending" && "font-semibold text-warning",
                   step.status === "returned" && "font-semibold text-destructive",
@@ -168,12 +168,12 @@ const ICON: Record<HistoryEvent["type"], typeof Circle> = {
                 aria-hidden
               />
               <div className="min-w-0 text-sm">
-                <p>
+                <p className="break-words">
                   <strong>{e.actorName}</strong>{" "}
                   <span className="text-muted-foreground">· {ROLE_TITLES[e.actorRole]}</span>
                 </p>
-                <p>{e.message}</p>
-                {e.reason && <p className="mt-0.5 text-destructive">Reason: {e.reason}</p>}
+                <p className="break-words">{e.message}</p>
+                {e.reason && <p className="mt-0.5 break-words text-destructive">Reason: {e.reason}</p>}
                 <p className="text-xs text-muted-foreground">{fmtDateTime(e.at)}</p>
               </div>
             </div>

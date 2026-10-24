@@ -8,6 +8,7 @@ import { SignaturePad, type SignatureValue } from "./SignaturePad";
 import type { User, VehicleRequest } from "@/lib/types";
 import { ROLE_TITLES } from "@/lib/workflow";
 import { fmtRange, fmtTime } from "@/lib/format";
+import { LoadingScreen } from "@/components/app/LoadingPanel";
 export function ApproveDialog({
   open, onOpenChange, request, user, proxySigner, assistantName,
   stageLabel, actionLabel, onConfirm,
@@ -27,17 +28,19 @@ export function ApproveDialog({
   const [busy, setBusy] = useState(false);
   const ready = !!sig && agree && !busy;
   return (
+    <>
+    {busy && <LoadingScreen label="Saving approval" mode="overlay" />}
     <Dialog open={open} onOpenChange={(o) => { if (!busy) { onOpenChange(o); if (!o) { setSig(null); setAgree(false); } } }}>
-      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="w-[calc(100vw-1rem)] max-h-[92dvh] overflow-x-hidden overflow-y-auto p-4 sm:w-full sm:max-w-lg sm:p-6">
         <DialogHeader>
           <DialogTitle>{actionLabel}</DialogTitle>
           <DialogDescription>Stage: <strong>{stageLabel}</strong></DialogDescription>
         </DialogHeader>
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-sm border bg-muted p-3 text-sm">
-          <dt className="text-muted-foreground">Request</dt><dd className="font-medium">{request.number}</dd>
-          <dt className="text-muted-foreground">Requisitioner</dt><dd>{request.requisitionerName}</dd>
-          <dt className="text-muted-foreground">Destination</dt><dd>{request.destinations.join("; ")}</dd>
-          <dt className="text-muted-foreground">Date / Time</dt><dd>{fmtRange(request.dateStart, request.dateEnd)}, {fmtTime(request.timeNeeded)}</dd>
+        <dl className="grid min-w-0 grid-cols-2 gap-x-3 gap-y-1 rounded-sm border bg-muted p-3 text-sm sm:gap-x-4">
+          <dt className="min-w-0 text-muted-foreground">Request</dt><dd className="min-w-0 break-words [overflow-wrap:anywhere] font-medium">{request.number}</dd>
+          <dt className="min-w-0 text-muted-foreground">Requisitioner</dt><dd className="min-w-0 break-words [overflow-wrap:anywhere]">{request.requisitionerName}</dd>
+          <dt className="min-w-0 text-muted-foreground">Destination</dt><dd className="min-w-0 break-words [overflow-wrap:anywhere]">{request.destinations.join("; ")}</dd>
+          <dt className="min-w-0 text-muted-foreground">Date / Time</dt><dd className="min-w-0 break-words [overflow-wrap:anywhere]">{fmtRange(request.dateStart, request.dateEnd)}, {fmtTime(request.timeNeeded)}</dd>
         </dl>
         {proxySigner && (
           <p className="rounded-sm border border-primary/30 bg-info-soft p-3 text-sm">
@@ -74,11 +77,12 @@ export function ApproveDialog({
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
           <Button disabled={!ready} onClick={async () => { if (!sig) return; setBusy(true); try { await onConfirm(sig); } finally { setBusy(false); } }}>
-            {busy ? "Saving…" : `Confirm & Sign`}
+            {busy ? "Saving…" : "Confirm & Sign"}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    </>
   );
 }
 export function RejectDialog({
@@ -86,13 +90,14 @@ export function RejectDialog({
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
-  onConfirm: (reason: string) => void;
+  onConfirm: (reason: string) => Promise<void> | void;
   stageTitle: string;
 }) {
   const [reason, setReason] = useState("");
   const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   return (
-    <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) { setReason(""); setErr(null); } }}>
+    <Dialog open={open} onOpenChange={(o) => { if (!busy) { onOpenChange(o); if (!o) { setReason(""); setErr(null); } } }}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Reject &amp; Return to Requisitioner</DialogTitle>
@@ -105,9 +110,17 @@ export function RejectDialog({
           <p className="mt-1 text-xs text-muted-foreground">Recorded as returned by the {stageTitle}.</p>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button variant="destructive" onClick={() => { if (reason.trim().length < 5) { setErr("Please give a reason (at least 5 characters)."); return; } onConfirm(reason); }}>
-            Return Request
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
+          <Button variant="destructive" disabled={busy} onClick={async () => {
+            if (reason.trim().length < 5) { setErr("Please give a reason (at least 5 characters)."); return; }
+            setBusy(true);
+            try {
+              await onConfirm(reason);
+            } finally {
+              setBusy(false);
+            }
+          }}>
+            {busy ? "Returning…" : "Return Request"}
           </Button>
         </DialogFooter>
       </DialogContent>

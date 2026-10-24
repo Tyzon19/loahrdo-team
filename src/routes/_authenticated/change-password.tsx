@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader, Section } from "@/components/app/PageHeader";
+import { ButtonLoading } from "@/components/app/LoadingPanel";
 import { passwordIssues } from "@/lib/validation";
 import { changePasswordFn } from "@/server-functions";
 import { SITE } from "@/lib/site";
@@ -138,7 +139,7 @@ function ChangePassword() {
               )}
             </div>
             <Button type="submit" disabled={busy}>
-              {busy ? "Saving…" : "Update password"}
+              {busy ? <ButtonLoading label="Saving…" /> : "Update password"}
             </Button>
           </form>
         </Section>

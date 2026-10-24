@@ -153,10 +153,28 @@
   background: #fff;
 }
 
+.startup-loading--inline {
+  min-height: 12rem;
+  width: 100%;
+  gap: 0.75rem;
+  border-radius: var(--radius);
+}
+
+.startup-loading--overlay {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+}
+
 .startup-loading__artwork {
   width: min(48rem, 92vw);
   max-height: calc(100svh - 8rem);
   object-fit: contain;
+}
+
+.startup-loading--inline .startup-loading__artwork {
+  width: min(24rem, 82vw);
+  max-height: 6rem;
 }
 
 .startup-loading__spinner {

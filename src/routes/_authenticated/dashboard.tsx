@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { PageHeader, Section } from "@/components/app/PageHeader";
 import { RequestsTable } from "@/components/app/RequestsTable";
 import { StatsCards } from "@/components/app/StatsCards";
-import { LoadingPanel } from "@/components/app/LoadingPanel";
+import { LoadingPanel, LoadingScreen } from "@/components/app/LoadingPanel";
 import { dashboardStatsFn, listNotificationsFn, listRequestsFn } from "@/server-functions";
 import { unwrap } from "@/lib/api";
 import { ROLE_TITLES, STAGES } from "@/lib/workflow";
@@ -96,6 +96,10 @@ function Dashboard() {
         </div>
       </>
     );
+  }
+
+  if (stats.isPending || requests.isPending) {
+    return <LoadingScreen label="Loading dashboard" mode="overlay" />;
   }
 
   return (

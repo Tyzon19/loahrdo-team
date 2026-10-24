@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Section } from "@/components/app/PageHeader";
-import { LoadingPanel } from "@/components/app/LoadingPanel";
+import { ButtonLoading, LoadingPanel } from "@/components/app/LoadingPanel";
 import {
   createAssistantAccountFn,
   getSignatoryAssistantsFn,
@@ -29,6 +29,16 @@ type NewAssistantAccount = {
   email: string;
   department: string;
 };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function resultError(value: unknown, fallback: string): string {
+  return isRecord(value) && value["ok"] === false && typeof value["error"] === "string"
+    ? value["error"]
+    : fallback;
+}
 
 const EMPTY_FORM: AssistantForm = {
   review: { name: "", userId: "" },
@@ -82,49 +92,86 @@ export function SignatoryAssistantSettings() {
     event.preventDefault();
     if (busy) return;
     setBusy(true);
-    const result = await saveSignatoryAssistantsFn({ data: form });
-    setBusy(false);
-    if (!result.ok) {
-      toast.error(result.error);
-      return;
+    try {
+      const result: unknown = await saveSignatoryAssistantsFn({ data: form });
+      if (!isRecord(result) || result["ok"] !== true) {
+        toast.error(resultError(result, "We couldn't save the alternate signatories."));
+        return;
+      }
+      toast.success("Signatory assistant names saved.");
+      await queryClient.invalidateQueries({ queryKey: ["signatory-assistants"] });
+      await queryClient.invalidateQueries({ queryKey: ["request"] });
+    } catch {
+      toast.error("We couldn't save the alternate signatories. Please try again.");
+    } finally {
+      setBusy(false);
     }
-    toast.success("Signatory assistant names saved.");
-    await queryClient.invalidateQueries({ queryKey: ["signatory-assistants"] });
-    await queryClient.invalidateQueries({ queryKey: ["request"] });
   }
   async function createAccount(event: React.FormEvent) {
     event.preventDefault();
     if (accountBusy) return;
     setAccountBusy(true);
     setCreatedAccount(null);
-    const result = await createAssistantAccountFn({ data: accountForm });
-    setAccountBusy(false);
-    if (!result.ok) {
-      toast.error(result.error);
-      return;
+    try {
+      const result: unknown = await createAssistantAccountFn({ data: accountForm });
+      const data = isRecord(result) ? result["data"] : undefined;
+      const email = isRecord(data) ? data["email"] : undefined;
+      const temporaryPassword = isRecord(data) ? data["temporaryPassword"] : undefined;
+      if (
+        !isRecord(result) ||
+        result["ok"] !== true ||
+        typeof email !== "string" ||
+        typeof temporaryPassword !== "string"
+      ) {
+        toast.error(resultError(result, "We couldn't create the assistant account."));
+        return;
+      }
+      setCreatedAccount({
+        email,
+        temporaryPassword,
+      });
+      setAccountForm({
+        name: "",
+        email: "",
+        department: "",
+      });
+      toast.success("Assistant account created. Copy the temporary password now.");
+      await queryClient.invalidateQueries({ queryKey: ["signatory-assistants"] });
+    } catch {
+      toast.error("We couldn't create the assistant account. Please try again.");
+    } finally {
+      setAccountBusy(false);
     }
-    setCreatedAccount(result.data);
-    setAccountForm({
-      name: "",
-      email: "",
-      department: "",
-    });
-    toast.success("Assistant account created. Copy the temporary password now.");
-    await queryClient.invalidateQueries({ queryKey: ["signatory-assistants"] });
   }
   async function resetPassword(event: React.FormEvent) {
     event.preventDefault();
     if (resetBusy || !resetUserId) return;
     setResetBusy(true);
     setResetCredentials(null);
-    const result = await resetUserPasswordFn({ data: { userId: resetUserId } });
-    setResetBusy(false);
-    if (!result.ok) {
-      toast.error(result.error);
-      return;
+    try {
+      const result: unknown = await resetUserPasswordFn({ data: { userId: resetUserId } });
+      const data = isRecord(result) ? result["data"] : undefined;
+      const email = isRecord(data) ? data["email"] : undefined;
+      const temporaryPassword = isRecord(data) ? data["temporaryPassword"] : undefined;
+      if (
+        !isRecord(result) ||
+        result["ok"] !== true ||
+        typeof email !== "string" ||
+        typeof temporaryPassword !== "string"
+      ) {
+        toast.error(resultError(result, "We couldn't reset the user's password."));
+        return;
+      }
+      setResetCredentials({
+        email,
+        temporaryPassword,
+      });
+      toast.success("Password reset. Copy the temporary password and share it securely.");
+    } catch {
+      toast.error("We couldn't reset the user's password. Please try again.");
+    } finally {
+      setResetBusy(false);
     }
-    setResetCredentials(result.data);
-    toast.success("Password reset. Copy the temporary password and share it securely.");
   }
   return (
     <div className="space-y-4">
@@ -176,7 +223,7 @@ export function SignatoryAssistantSettings() {
             />
           </div>
           <Button className="sm:col-span-2" type="submit" disabled={accountBusy}>
-            {accountBusy ? "Creating…" : "Create assistant account"}
+            {accountBusy ? <ButtonLoading label="Creating…" /> : "Create assistant account"}
           </Button>
         </form>
         {createdAccount && (
@@ -236,7 +283,7 @@ export function SignatoryAssistantSettings() {
               </select>
             </div>
             <Button type="submit" variant="outline" disabled={resetBusy || !resetUserId}>
-              {resetBusy ? "Resetting…" : "Issue new temporary password"}
+              {resetBusy ? <ButtonLoading label="Resetting…" /> : "Issue new temporary password"}
             </Button>
           </form>
         )}
@@ -305,7 +352,7 @@ export function SignatoryAssistantSettings() {
             </div>
           ))}
           <Button type="submit" disabled={busy}>
-            {busy ? "Saving…" : "Save alternate signatories"}
+            {busy ? <ButtonLoading label="Saving…" /> : "Save alternate signatories"}
           </Button>
         </form>
       )}

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader, Section, EmptyState } from "@/components/app/PageHeader";
-import { LoadingPanel } from "@/components/app/LoadingPanel";
+import { ButtonLoading, LoadingPanel } from "@/components/app/LoadingPanel";
 import { addVehicleFn, listVehiclesFn } from "@/server-functions";
 import { unwrap } from "@/lib/api";
 import { canManageVehicles } from "@/lib/access";
@@ -188,7 +188,7 @@ function Vehicles() {
               />
             </div>
             <Button type="submit" disabled={busy}>
-              {busy ? "Adding…" : "Add vehicle"}
+              {busy ? <ButtonLoading label="Adding…" /> : "Add vehicle"}
             </Button>
           </form>
         </Section>
