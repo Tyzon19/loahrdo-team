@@ -31,6 +31,44 @@ interface SampleTicketRow extends RowDataPacket {
   image: Buffer;
 }
 
+interface WorkflowSampleRow extends RowDataPacket {
+  id: string;
+  number: string;
+  department: string;
+  purpose: string;
+  passengers: number;
+  date_start: Date | string;
+  date_end: Date | string;
+  destinations: string | null;
+}
+
+const ACTION_TESTS = {
+  "action-review": {
+    kind: "action_review",
+    stage: "review",
+    subject: "Action Required",
+    heading: "A vehicle request is waiting for your review.",
+    body: "TEST EMAIL: This sample represents the first approval notice, sent to the Head of Transport Services when a requisitioner submits a request. No approval action was taken.",
+    currentStage: "Reviewed By — Head of Transport Services",
+  },
+  "action-recommendation": {
+    kind: "action_recommend",
+    stage: "recommend",
+    subject: "Action Required",
+    heading: "A vehicle request is waiting for your recommending approval.",
+    body: "TEST EMAIL: This sample represents the notice sent to the Director for Administration after the Head of Transport Services signs. No approval action was taken.",
+    currentStage: "Recommending Approval — Director for Administration",
+  },
+  "action-approval": {
+    kind: "action_approve",
+    stage: "approve",
+    subject: "Final Approval Required",
+    heading: "A vehicle request is waiting for your final approval.",
+    body: "TEST EMAIL: This sample represents the notice sent to the President after the Director for Administration signs. No approval action was taken.",
+    currentStage: "Approved By — President",
+  },
+} as const;
+
 function htmlPage(title: string, message: string, status = 200) {
   const safeTitle = escapeHtml(title);
   const safeMessage = escapeHtml(message);
@@ -235,7 +273,9 @@ export const Route = createFileRoute("/api/gmail-test/callback")({
               { headers: responseHeaders },
             );
           }
-          const isOtpPreview = cookieValue(request, "gmail_test_template") === "registration-otp";
+          const template = cookieValue(request, "gmail_test_template") ?? "";
+          const isOtpPreview = template === "registration-otp";
+          const actionTest = Object.entries(ACTION_TESTS).find(([key]) => key === template)?.[1];
           let email: ReturnType<typeof renderEmailTemplate>;
           let ticketImage: Buffer | undefined;
           if (isOtpPreview) {
@@ -246,6 +286,60 @@ export const Route = createFileRoute("/api/gmail-test/callback")({
                 expiresInMinutes: 10,
               },
               LOGO_CONTENT_ID,
+            );
+          } else if (actionTest) {
+            const samples = await all<WorkflowSampleRow[]>(
+              `SELECT r.id, r.number, r.department, r.purpose, r.passengers,
+                      r.date_start, r.date_end,
+                      GROUP_CONCAT(DISTINCT d.destination ORDER BY d.sort_order SEPARATOR ', ') AS destinations
+               FROM requests r
+               JOIN users u ON u.id = r.requisitioner_id
+               LEFT JOIN request_destinations d ON d.request_id = r.id
+               WHERE LOWER(u.email) = ?
+               GROUP BY r.id
+               ORDER BY r.submitted_at DESC
+               LIMIT 1`,
+              [recipient],
+            );
+            const sample = samples[0];
+            if (!sample) {
+              return htmlPage(
+                "No test request is ready",
+                "Submit a request from the configured test account first. The approval email test only uses requests owned by that account.",
+                404,
+              );
+            }
+            const message: EmailMessage = {
+              id: randomBytes(16).toString("hex"),
+              at: new Date().toISOString(),
+              toUserId: "email-template-test",
+              toName: "MJ Turingan",
+              toEmail: recipient,
+              subject: `[TEST] [LOA Vehicle Request] ${actionTest.subject} — ${sample.number}`,
+              requestId: sample.id,
+              requestNumber: sample.number,
+              kind: actionTest.kind,
+              stage: actionTest.stage,
+              heading: actionTest.heading,
+              body: actionTest.body,
+              ctaLabel: "Review and Sign Request",
+              read: false,
+            };
+            email = renderEmailTemplate(
+              message,
+              publicSiteUrl(),
+              `/requests/${sample.id}`,
+              LOGO_CONTENT_ID,
+              undefined,
+              {
+                department: sample.department,
+                purpose: sample.purpose,
+                destinations: sample.destinations?.split(", ") ?? [],
+                passengers: sample.passengers,
+                dateStart: dateLabel(sample.date_start),
+                dateEnd: dateLabel(sample.date_end),
+                currentStage: actionTest.currentStage,
+              },
             );
           } else {
             const samples = await all<SampleTicketRow[]>(

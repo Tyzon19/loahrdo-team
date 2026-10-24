@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Eraser, PenLine, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
 export interface SignatureValue {
   image: string;
   method: "drawn" | "uploaded";
 }
-
 export function SignaturePad({ onChange }: { onChange: (v: SignatureValue | null) => void }) {
   const [mode, setMode] = useState<"draw" | "upload">("draw");
   const [uploaded, setUploaded] = useState<string | null>(null);
@@ -27,7 +25,6 @@ export function SignaturePad({ onChange }: { onChange: (v: SignatureValue | null
     ctx.lineCap = "round";
     ctx.strokeStyle = getComputedStyle(c).color;
   }, [mode]);
-
   const pos = (e: React.PointerEvent) => {
     const r = canvas.current!.getBoundingClientRect();
     return { x: e.clientX - r.left, y: e.clientY - r.top };
@@ -142,7 +139,6 @@ export function SignaturePad({ onChange }: { onChange: (v: SignatureValue | null
     </div>
   );
 }
-
 export function SignatureMark({
   image,
   method,
@@ -163,10 +159,8 @@ export function SignatureMark({
     );
   return <span className="text-xs italic text-muted-foreground">Signature on file ({method})</span>;
 }
-
 function ProtectedSignatureImage({ image, name }: { image: string; name: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -182,7 +176,6 @@ function ProtectedSignatureImage({ image, name }: { image: string; name: string 
     };
     signatureImage.src = image;
   }, [image]);
-
   return (
     <div
       className="signature-protected select-none"

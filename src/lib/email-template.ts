@@ -13,6 +13,7 @@ export interface EmailTicketPreview {
   passengers: number;
   dateStart: string;
   dateEnd: string;
+  currentStage?: string;
 }
 
 export interface RegistrationOtpEmailInput {
@@ -75,9 +76,18 @@ export function renderEmailTemplate(
     throw new Error("The email action path must be an application-relative path.");
   }
   const actionUrl = absoluteActionUrl(baseUrl, actionPath);
+  const returnedReasonMatch =
+    message.kind === "returned" ? /Reason:\s*([\s\S]*)$/i.exec(message.body) : null;
+  const returnedReason = returnedReasonMatch?.[1]?.trim();
+  const bodyBeforeReason = returnedReasonMatch
+    ? message.body.slice(0, returnedReasonMatch.index).trim()
+    : message.body;
   const safe = {
     actionUrl: escapeHtml(actionUrl),
-    body: escapeHtml(message.body).replace(/\r?\n/g, "<br>"),
+    body: escapeHtml(bodyBeforeReason).replace(/\r?\n/g, "<br>"),
+    returnedReason: returnedReason
+      ? escapeHtml(returnedReason).replace(/\r?\n/g, "<br>")
+      : undefined,
     ctaLabel: escapeHtml(message.ctaLabel),
     heading: escapeHtml(message.heading),
     name: escapeHtml(message.toName),
@@ -98,6 +108,7 @@ export function renderEmailTemplate(
             : `${ticketPreview.dateStart} to ${ticketPreview.dateEnd}`,
         ],
         ["Passengers", String(ticketPreview.passengers)],
+        ...(ticketPreview.currentStage ? [["Current Stage", ticketPreview.currentStage]] : []),
       ]
     : [];
   const safeTicketRows = ticketRows
@@ -155,7 +166,8 @@ export function renderEmailTemplate(
               <td class="email-content" style="padding:32px;">
                 <p style="margin:0 0 18px;color:#353b45;font-size:14px;line-height:1.6;">Dear ${safe.name},</p>
                 <h1 style="margin:0 0 14px;color:#202833;font-size:18px;line-height:1.45;font-weight:600;">${safe.heading}</h1>
-                <p style="margin:0 0 22px;color:#353b45;font-size:14px;line-height:1.65;">${safe.body}</p>
+                ${safe.body ? `<p style="margin:0 0 22px;color:#353b45;font-size:14px;line-height:1.65;">${safe.body}</p>` : ""}
+                ${safe.returnedReason ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 22px;border:1px solid #fecaca;border-left:4px solid #dc2626;border-radius:5px;background-color:#fef2f2;"><tr><td style="padding:14px 16px;color:#991b1b;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;"><strong style="display:block;margin-bottom:4px;color:#b91c1c;font-size:13px;">Reason for return</strong><span>${safe.returnedReason}</span></td></tr></table>` : ""}
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 24px;background-color:#f7f8fa;border:1px solid #e5e9f0;border-radius:6px;">
                   <tr>
                     <td colspan="2" style="padding:12px;color:#687386;font-size:11px;line-height:1.4;letter-spacing:.06em;">REQUEST NUMBER</td>
@@ -179,7 +191,7 @@ export function renderEmailTemplate(
             <tr>
               <td style="padding:12px 32px 26px;">
                 <p style="margin:0;color:#353b45;font-size:14px;line-height:1.6;">Kind regards,<br><strong>Lyceum of Alabang<br>Vehicle Reservation &amp; Trip Ticket Team</strong></p>
-                <p style="margin:20px 0 0;color:#687386;font-size:11px;line-height:1.6;">This is an automated notification. Please do not reply to this email.</p>
+                <p style="margin:20px 0 0;color:#ff3333;font-size:13px;font-weight:700;line-height:1.6;">This is an automated notification. Please do not reply to this email.</p>
               </td>
             </tr>
           </table>
@@ -188,7 +200,6 @@ export function renderEmailTemplate(
     </table>
   </body>
 </html>`;
-
   return { subject: message.subject, html, text };
 }
 

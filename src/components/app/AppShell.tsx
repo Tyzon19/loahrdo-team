@@ -29,9 +29,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { listNotificationsFn, logoutFn } from "@/server-functions";
 import { unwrap } from "@/lib/api";
-
 type NavItem = { to: string; label: string; icon: typeof Bell; exact?: boolean };
-
 const ITEMS = {
   dash: { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
   newReq: { to: "/requests/new", label: "New Vehicle Request", icon: FilePlus2 },
@@ -120,7 +118,6 @@ export function AppShell({ user, children }: { user: Viewer; children: ReactNode
     await router.invalidate();
     navigate({ to: "/login" });
   }
-
   return (
     <div className="flex min-h-screen">
       <aside className="no-print sticky top-0 hidden h-screen w-56 shrink-0 md:block">

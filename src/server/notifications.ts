@@ -37,6 +37,32 @@ export async function notificationImage(input: unknown): Promise<string | null> 
   return `data:${String(row["mime"])};base64,${Buffer.from(row["image"] as Buffer).toString("base64")}`;
 }
 
+/** Returns only the approved ticket snapshot for its own requisitioner. */
+export async function officialTripTicketImage(input: unknown): Promise<string | null> {
+  const viewer = await requireViewer();
+  if (viewer.role !== "requisitioner") {
+    throw new AppError("Only requisitioners can view their official trip ticket.");
+  }
+  const parsed = requestIdSchema.safeParse(input);
+  if (!parsed.success) return null;
+
+  const rows = await all<RowDataPacket[]>(
+    `SELECT a.mime, a.image
+     FROM requests r
+     JOIN notifications n
+       ON n.request_id = r.id AND n.to_user_id = r.requisitioner_id AND n.kind = 'approved_requester'
+     JOIN notification_attachments a ON a.notification_id = n.id
+     WHERE r.id = ? AND r.requisitioner_id = ?
+       AND r.status IN ('approved', 'dispatched', 'completed')
+     ORDER BY n.created_at DESC
+     LIMIT 1`,
+    [parsed.data, viewer.id],
+  );
+  const row = rows[0];
+  if (!row) return null;
+  return `data:${String(row["mime"])};base64,${Buffer.from(row["image"] as Buffer).toString("base64")}`;
+}
+
 export async function markNotificationRead(input: unknown): Promise<{ ok: true }> {
   const viewer = await requireViewer();
   const parsed = notificationIdSchema.safeParse(input);

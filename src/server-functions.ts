@@ -149,6 +149,12 @@ export const notificationImageFn = createServerFn({ method: "POST" })
     runSafely(async () => (await import("./server/notifications")).notificationImage(data)),
   );
 
+export const officialTripTicketImageFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/notifications")).officialTripTicketImage(data)),
+  );
+
 export const markNotificationReadFn = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) =>

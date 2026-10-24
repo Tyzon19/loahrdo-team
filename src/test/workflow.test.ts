@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { approveStage, createRequest, rejectStage, resubmit, WorkflowError, type Ctx } from "@/lib/workflow";
+import {
+  approveStage,
+  createRequest,
+  rejectStage,
+  resubmit,
+  STAGES,
+  WorkflowError,
+  type Ctx,
+} from "@/lib/workflow";
 import type { User } from "@/lib/types";
 
 const users: User[] = [
@@ -13,9 +21,21 @@ let i = 0;
 const ctx: Ctx = { users, now: "2026-10-22T00:00:00.000Z", newId: () => `x${i++}` };
 const u = (id: string) => users.find((x) => x.id === id)!;
 const sig = { method: "drawn" as const, image: "data:image/png;base64,AAA" };
-const input = { department: "CAS", destinations: ["Manila"], passengers: 5, dateStart: "2026-11-01", dateEnd: "2026-11-01", timeNeeded: "07:00", purpose: "Field trip for class" };
+const input = {
+  department: "CAS",
+  destinations: ["Manila"],
+  passengers: 5,
+  dateStart: "2026-11-01",
+  dateEnd: "2026-11-01",
+  timeNeeded: "07:00",
+  purpose: "Field trip for class",
+};
 
 describe("approval workflow", () => {
+  it("keeps the President's title separate from the configured approver name", () => {
+    expect(STAGES.find((stage) => stage.key === "approve")?.title).toBe("President");
+  });
+
   it("follows Head of Transport → Director → President order", () => {
     let r = createRequest(ctx, input, u("r"), "VR-1").request;
     expect(r.status).toBe("pending_review");
@@ -47,15 +67,34 @@ describe("approval workflow", () => {
     const r = createRequest(ctx, input, u("r"), "VR-2").request;
     expect(() => rejectStage(ctx, r, u("h"), "  ")).toThrow(WorkflowError);
   });
+  it("creates a return email for the original requisitioner", () => {
+    const r = createRequest(ctx, input, u("r"), "VR-RETURN").request;
+    const result = rejectStage(ctx, r, u("h"), "Missing travel details");
+
+    expect(result.emails).toHaveLength(1);
+    expect(result.emails[0]).toMatchObject({
+      toUserId: "r",
+      toEmail: "r@x",
+      kind: "returned",
+      requestId: r.id,
+    });
+  });
   it("allows an assigned alternate to sign with their own authenticated identity", () => {
     const r = createRequest(ctx, input, u("r"), "VR-4").request;
-    expect(() =>
-      approveStage(ctx, r, u("t"), { ...sig, proxySignerName: "Staff" }),
-    ).toThrow(WorkflowError);
-    const out = approveStage(ctx, r, u("t"), {
-      ...sig,
-      proxySignerName: "Staff",
-    }, {}, true);
+    expect(() => approveStage(ctx, r, u("t"), { ...sig, proxySignerName: "Staff" })).toThrow(
+      WorkflowError,
+    );
+    const out = approveStage(
+      ctx,
+      r,
+      u("t"),
+      {
+        ...sig,
+        proxySignerName: "Staff",
+      },
+      {},
+      true,
+    );
     expect(out.request.status).toBe("pending_recommendation");
     expect(out.request.signatures[0]).toMatchObject({
       signerId: "t",

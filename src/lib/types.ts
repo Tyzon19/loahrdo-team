@@ -140,7 +140,6 @@ export interface DashboardStats {
   approved: number;
   completed: number;
   awaitingYou: number;
-  avgApprovalHours: number | null;
   thisMonth: number;
   pageViews30d: number | null;
 }

@@ -226,9 +226,19 @@
     color: black !important;
     transform: none !important;
   }
+
+  .official-ticket-image {
+    width: 148.5mm !important;
+    max-width: none !important;
+  }
 }
 
 @media print {
+  .official-ticket-view::after {
+    display: none !important;
+    content: none !important;
+  }
+
   .requisitioner-ticket {
     display: none !important;
   }
@@ -250,6 +260,13 @@
 
   .no-print {
     display: none !important;
+  }
+
+  .official-ticket-image {
+    width: 148.5mm !important;
+    max-width: 148.5mm !important;
+    margin: 0 auto !important;
+    break-inside: avoid;
   }
 
   .print-sheet {

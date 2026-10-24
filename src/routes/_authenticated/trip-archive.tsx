@@ -55,11 +55,11 @@ export const Route = createFileRoute("/_authenticated/trip-archive")({
 const PAGE_SIZE = 20;
 
 const tripsChartConfig = {
-  trips: { label: "Completed trips", color: "var(--color-chart-1)" },
+  trips: { label: "Trip tickets", color: "var(--color-chart-1)" },
 } satisfies ChartConfig;
 
 const destinationChartConfig = {
-  trips: { label: "Completed trips", color: "var(--color-chart-2)" },
+  trips: { label: "Trip tickets", color: "var(--color-chart-2)" },
 } satisfies ChartConfig;
 
 function localDate(date: Date) {
@@ -114,16 +114,6 @@ function TripArchive() {
         year: "2-digit",
       }),
     }));
-  const dailyChartData = (data?.dailyTrips ?? [])
-    .slice()
-    .reverse()
-    .map((entry) => ({
-      ...entry,
-      label: new Date(`${entry.date}T12:00:00`).toLocaleDateString("en-PH", {
-        month: "short",
-        day: "numeric",
-      }),
-    }));
   const destinationChartData = (data?.destinations ?? []).slice(0, 8).slice().reverse();
 
   function setCurrentDay() {
@@ -150,7 +140,7 @@ function TripArchive() {
     <>
       <PageHeader
         title="Trip Archive & Analytics"
-        description="Completed travel activity and searchable trip ticket records."
+        description="Trip volume, workflow status, and destination trends for approved trip tickets."
       />
 
       <Card className="min-w-0 overflow-hidden border-primary/15 shadow-sm">
@@ -247,38 +237,38 @@ function TripArchive() {
               icon={TicketCheck}
               label="Archived tickets"
               value={data?.summary.tickets ?? 0}
-              hint="Approved and beyond"
-              detail="All saved trip records"
+              hint="Final-approved and onward"
+              detail="Approved, dispatched, and completed requests"
             />
             <Metric
               icon={CheckCircle2}
-              label="Completed trips"
+              label="Completed"
               value={data?.summary.completedTrips ?? 0}
-              hint="Recorded as returned"
-              detail="Counts actual completed journeys"
+              hint="Marked completed in the workflow"
+              detail="Counts requests with completed status"
             />
             <Metric
               icon={Truck}
               label="Dispatched"
               value={data?.summary.dispatched ?? 0}
-              hint="Trips currently in progress"
-              detail="Vehicle has been dispatched"
+              hint="Marked as dispatched"
+              detail="Trips currently recorded as dispatched"
             />
             <Metric
               icon={Clock3}
               label="Awaiting dispatch"
               value={data?.summary.approved ?? 0}
               hint="Approved trip tickets"
-              detail="Not yet marked dispatched"
+              detail="Approved, not yet marked dispatched"
             />
           </div>
 
           <div className="grid min-w-0 gap-3 sm:gap-4 xl:grid-cols-5">
             <Card className="min-w-0 xl:col-span-3">
               <CardHeader className="p-4 pb-2 sm:p-6 sm:pb-2">
-                <CardTitle className="text-base">Monthly trip activity</CardTitle>
+                <CardTitle className="text-base">Monthly trip volume</CardTitle>
                 <CardDescription>
-                  Completed journeys by travel month · up to 12 months
+                  Approved trip tickets grouped by scheduled start month · up to 12 months
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
@@ -317,7 +307,7 @@ function TripArchive() {
                   </ChartContainer>
                 ) : (
                   <div className="flex h-[210px] items-center justify-center sm:h-[260px]">
-                    <EmptyState title="No completed monthly trips in this period." />
+                    <EmptyState title="No trip tickets in this period." />
                   </div>
                 )}
               </CardContent>
@@ -326,9 +316,12 @@ function TripArchive() {
             <Card className="min-w-0 xl:col-span-2">
               <CardHeader className="p-4 pb-2 sm:p-6 sm:pb-2">
                 <CardTitle className="flex items-center gap-2 text-base">
-                  <MapPin className="h-4 w-4 text-primary" aria-hidden /> Most visited destinations
+                  <MapPin className="h-4 w-4 text-primary" aria-hidden />
+                  Most requested destinations
                 </CardTitle>
-                <CardDescription>Completed ticket stops in this period</CardDescription>
+                <CardDescription>
+                  Destinations across approved trip tickets in this period
+                </CardDescription>
               </CardHeader>
               <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
                 {destinationChartData.length ? (
@@ -363,7 +356,7 @@ function TripArchive() {
                   </ChartContainer>
                 ) : (
                   <div className="flex h-[230px] items-center justify-center sm:h-[260px]">
-                    <EmptyState title="No completed trips in this period." />
+                    <EmptyState title="No destination data in this period." />
                   </div>
                 )}
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -372,51 +365,6 @@ function TripArchive() {
               </CardContent>
             </Card>
           </div>
-
-          <Card className="min-w-0">
-            <CardHeader className="p-4 pb-2 sm:p-6 sm:pb-2">
-              <CardTitle className="text-base">Daily trip activity</CardTitle>
-              <CardDescription>
-                Completed journeys by travel day · latest 31 active days in this period
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-              {dailyChartData.length ? (
-                <ChartContainer
-                  config={tripsChartConfig}
-                  className="h-[190px] w-full aspect-auto sm:h-[230px]"
-                >
-                  <BarChart
-                    accessibilityLayer
-                    data={dailyChartData}
-                    margin={{ left: 4, right: 12, top: 12 }}
-                  >
-                    <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                    <XAxis
-                      dataKey="label"
-                      tickLine={false}
-                      axisLine={false}
-                      tickMargin={10}
-                      minTickGap={24}
-                      tick={{ fontSize: 11 }}
-                    />
-                    <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={28} />
-                    <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
-                    <Bar
-                      dataKey="trips"
-                      fill="var(--color-trips)"
-                      radius={[5, 5, 0, 0]}
-                      maxBarSize={34}
-                    />
-                  </BarChart>
-                </ChartContainer>
-              ) : (
-                <div className="flex h-[190px] items-center justify-center sm:h-[230px]">
-                  <EmptyState title="No completed daily trips in this period." />
-                </div>
-              )}
-            </CardContent>
-          </Card>
 
           <Card className="min-w-0 overflow-hidden">
             <CardHeader className="gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between sm:p-6">

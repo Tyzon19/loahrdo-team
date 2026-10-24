@@ -35,7 +35,6 @@ const EMPTY_FORM: AssistantForm = {
   recommend: { name: "", userId: "" },
   approve: { name: "", userId: "" },
 };
-
 export function SignatoryAssistantSettings() {
   const queryClient = useQueryClient();
   const query = useQuery({
@@ -93,7 +92,6 @@ export function SignatoryAssistantSettings() {
     await queryClient.invalidateQueries({ queryKey: ["signatory-assistants"] });
     await queryClient.invalidateQueries({ queryKey: ["request"] });
   }
-
   async function createAccount(event: React.FormEvent) {
     event.preventDefault();
     if (accountBusy) return;
@@ -114,7 +112,6 @@ export function SignatoryAssistantSettings() {
     toast.success("Assistant account created. Copy the temporary password now.");
     await queryClient.invalidateQueries({ queryKey: ["signatory-assistants"] });
   }
-
   async function resetPassword(event: React.FormEvent) {
     event.preventDefault();
     if (resetBusy || !resetUserId) return;
@@ -129,7 +126,6 @@ export function SignatoryAssistantSettings() {
     setResetCredentials(result.data);
     toast.success("Password reset. Copy the temporary password and share it securely.");
   }
-
   return (
     <div className="space-y-4">
       <Section title="Create Assistant Account">
@@ -203,7 +199,6 @@ export function SignatoryAssistantSettings() {
           </div>
         )}
       </Section>
-
       <Section title="Reset User Password">
         <p className="mb-4 text-sm text-muted-foreground">
           Issue a new one-time temporary password for a non-administrator account. This signs the
@@ -264,7 +259,6 @@ export function SignatoryAssistantSettings() {
           </div>
         )}
       </Section>
-
       <Section title="Assign Alternate Signatories">
         <p className="mb-4 text-sm text-muted-foreground">
           Choose an assistant account for each signatory. The assigned assistant signs in with

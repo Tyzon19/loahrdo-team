@@ -75,6 +75,13 @@ function Revise() {
       queryClient.invalidateQueries({ queryKey: ["notifications"] }),
     ]);
     toast.success("Request resubmitted. Approval restarts with the Head of Transport Services.");
+    if (result.data.workflowEmail?.sent) {
+      toast.success("Test approval email sent to mj.turingan@lyceumalabang.edu.ph.");
+    } else if (result.data.workflowEmail) {
+      toast.error(
+        `Request resubmitted, but the test email was not sent: ${result.data.workflowEmail.message}`,
+      );
+    }
     await navigate({
       to: "/requests/$id",
       params: { id: r!.id },

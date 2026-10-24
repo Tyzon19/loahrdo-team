@@ -1,6 +1,5 @@
 import type { DashboardStats } from "@/lib/types";
 import { LoadingStats } from "./LoadingPanel";
-
 export function StatsCards({
   stats,
   loading,
@@ -31,15 +30,9 @@ export function StatsCards({
       value: stats.returned,
       hint: "Sent back for revision",
     },
-    {
-      label: "Avg. approval time",
-      value: stats.avgApprovalHours == null ? "—" : `${stats.avgApprovalHours}h`,
-      hint: "From submission to final approval",
-    },
   ];
-
   return (
-    <dl className="mb-4 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3 xl:grid-cols-5">
+    <dl className="mb-4 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3 xl:grid-cols-4">
       {cards.map((card) => (
         <div key={card.label} className="panel min-w-0 p-3 sm:p-4">
           <dt className="break-words text-[10px] font-medium uppercase leading-tight tracking-wide text-muted-foreground sm:text-xs">

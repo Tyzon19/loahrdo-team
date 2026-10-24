@@ -2,7 +2,6 @@ import { CheckCircle2, CircleDot, Clock, CornerUpLeft, Flag, Truck } from "lucid
 import type { Status } from "@/lib/types";
 import { STATUS_LABELS } from "@/lib/workflow";
 import { cn } from "@/lib/utils";
-
 const MAP: Record<Status, { icon: typeof Clock; cls: string }> = {
   pending_review: { icon: Clock, cls: "bg-info-soft text-primary border-primary/25" },
   pending_recommendation: { icon: Clock, cls: "bg-info-soft text-primary border-primary/25" },
@@ -12,7 +11,6 @@ const MAP: Record<Status, { icon: typeof Clock; cls: string }> = {
   dispatched: { icon: Truck, cls: "bg-success-soft text-success border-success/30" },
   completed: { icon: Flag, cls: "bg-muted text-muted-foreground border-border" },
 };
-
 export function StatusBadge({ status, className }: { status: Status; className?: string }) {
   const { icon: Icon, cls } = MAP[status];
   return (

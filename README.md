@@ -74,8 +74,24 @@ For local OTP email sending, configure the Google OAuth client ID and secret, ad
 `/api/gmail-test/start?template=gmail-connect`; grant the Gmail send permission. The local callback
 saves the refresh token to the ignored `.env` file without displaying it. Restart the dev server,
 then run `npm run db:setup` to create the registration OTP table before testing registration.
-For deployment, configure the same OAuth credentials and refresh token as private server
-environment variables; never expose them with a `VITE_` prefix.
+While running locally, submitting a request or resubmitting one sends the first-stage approval
+email, signing a stage sends the next-stage email, and returning a request sends a return email.
+These automatic workflow test emails are sent only to `GOOGLE_TEST_RECIPIENT`, which is locked
+to the authorized personal test address; they never go to signatories' or requisitioners' configured
+addresses. Delivery happens after the request is saved, so a failed email does not undo the workflow
+action. Requests submitted or returned before this integration was enabled are not emailed retroactively.
+When staff send an approved ticket, the app also attaches it to the requisitioner's in-app
+notification. In local development only, a separate test email with the ticket image is sent to
+the same locked personal test address, never to the requisitioner's database email. If the ticket
+was already attached before ticket email delivery was enabled, staff can use “Resend Ticket Test
+Email” to send the saved official image to the test account.
+
+For manual approval email template tests, submit a request using the configured test account, then visit
+`/api/gmail-test/start?template=action-review`, `action-recommendation`, or `action-approval`
+while running locally. Each test message is sent only to `GOOGLE_TEST_RECIPIENT`, which is locked
+to the authorized personal test address; the samples do not advance or modify the request workflow.
+Automatic approval workflow email delivery remains disabled outside local development. Never expose
+OAuth credentials or refresh tokens with a `VITE_` prefix.
 
 ## Security notes
 

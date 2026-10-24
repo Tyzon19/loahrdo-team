@@ -1,5 +1,4 @@
 import { Skeleton } from "@/components/ui/skeleton";
-
 export function LoadingPanel({ label = "Loading", rows = 5 }: { label?: string; rows?: number }) {
   return (
     <div role="status" aria-live="polite" className="panel p-4">
@@ -13,7 +12,6 @@ export function LoadingPanel({ label = "Loading", rows = 5 }: { label?: string; 
     </div>
   );
 }
-
 export function LoadingStats() {
   return (
     <div

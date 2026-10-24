@@ -124,47 +124,6 @@ function Landing() {
         </div>
       </section>
 
-      <section className="border-y bg-card" aria-labelledby="why-it-matters">
-        <div className="mx-auto grid w-full max-w-6xl gap-8 px-4 py-16 lg:grid-cols-2">
-          <div>
-            <h2 id="why-it-matters" className="font-serif text-2xl font-bold sm:text-3xl">
-              Built for accountable school travel
-            </h2>
-            <p className="mt-2 max-w-xl text-muted-foreground">
-              Every decision is recorded with the signer, timestamp and reason, so the office can
-              answer questions about any trip without searching through paper forms.
-            </p>
-          </div>
-          <ul className="grid gap-3">
-            {[
-              {
-                icon: ShieldCheck,
-                title: "One account per person",
-                body: "Approvers sign in with their own account. Nobody can act for someone else.",
-              },
-              {
-                icon: Lock,
-                title: "Requests stay private",
-                body: "Requisitioners only see their own submissions; staff access is role-based.",
-              },
-              {
-                icon: ClipboardCheck,
-                title: "A complete audit trail",
-                body: "Submissions, signatures, returns and re-submissions are kept per attempt.",
-              },
-            ].map((item) => (
-              <li key={item.title} className="flex gap-3 rounded-sm border bg-background p-4">
-                <item.icon className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden />
-                <div>
-                  <p className="font-medium">{item.title}</p>
-                  <p className="mt-0.5 text-sm text-muted-foreground">{item.body}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
-
       <section className="border-y bg-card" aria-labelledby="contact-us">
         <div className="mx-auto w-full max-w-6xl px-4 py-12">
           <h2 id="contact-us" className="font-serif text-2xl font-bold sm:text-3xl">

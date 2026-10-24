@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Printer, Send } from "lucide-react";
+import { ArrowLeft, Download, Send } from "lucide-react";
 import { toPng } from "html-to-image";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { LoadingPanel } from "@/components/app/LoadingPanel";
 import {
   getPrintableRequestFn,
   markApprovalNoticeReadFn,
+  officialTripTicketImageFn,
   sendTripTicketFn,
 } from "@/server-functions";
 import { unwrap } from "@/lib/api";
@@ -34,10 +35,18 @@ function PrintTicket() {
   const queryClient = useQueryClient();
   const sheetRef = useRef<HTMLDivElement>(null);
   const [sending, setSending] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [ticketSent, setTicketSent] = useState(false);
+  const [testEmailSent, setTestEmailSent] = useState(false);
+  const officialTicket = useQuery({
+    queryKey: ["official-trip-ticket", id],
+    queryFn: () => unwrap(officialTripTicketImageFn({ data: id })),
+    enabled: viewer?.role === "requisitioner",
+  });
   const query = useQuery({
     queryKey: ["request", id],
     queryFn: () => unwrap(getPrintableRequestFn({ data: id })),
+    enabled: !!viewer && viewer.role !== "requisitioner",
   });
   useEffect(() => {
     const number = query.data?.request.number;
@@ -49,24 +58,82 @@ function PrintTicket() {
     };
   }, [query.data?.request.number]);
   useEffect(() => {
-    const request = query.data?.request;
-    if (
-      viewer?.role !== "requisitioner" ||
-      !request ||
-      !["approved", "dispatched", "completed"].includes(request.status)
-    ) {
-      return;
-    }
-
+    if (viewer?.role !== "requisitioner" || !officialTicket.data) return;
     void (async () => {
       try {
-        await unwrap(markApprovalNoticeReadFn({ data: request.id }));
+        await unwrap(markApprovalNoticeReadFn({ data: id }));
         await queryClient.invalidateQueries({ queryKey: ["notifications"] });
       } catch {
         toast.error("We couldn't update your approval notice. Please try again.");
       }
     })();
-  }, [query.data?.request, queryClient, viewer?.role]);
+  }, [id, officialTicket.data, queryClient, viewer?.role]);
+
+  if (viewer?.role === "requisitioner") {
+    if (officialTicket.isPending) {
+      return (
+        <div className="mx-auto max-w-[210mm] p-4">
+          <LoadingPanel label="Loading official trip ticket" rows={10} />
+        </div>
+      );
+    }
+    if (officialTicket.isError) {
+      return (
+        <div className="mx-auto max-w-[210mm] p-8" role="alert">
+          <p>We couldn&apos;t load your official trip ticket.</p>
+          <Button className="mt-3" variant="outline" onClick={() => void officialTicket.refetch()}>
+            Try again
+          </Button>
+        </div>
+      );
+    }
+    if (!officialTicket.data) {
+      return (
+        <div className="mx-auto max-w-[210mm] p-8">
+          <p role="status">
+            The official ticket image is not available yet. Please contact the office that approved
+            your request.
+          </p>
+          <Link
+            to="/requests/$id"
+            params={{ id }}
+            className="mt-3 inline-block text-primary underline"
+          >
+            Back to request
+          </Link>
+        </div>
+      );
+    }
+
+    return (
+      <div className="official-ticket-view print-sheet min-h-screen bg-background py-6">
+        <div className="no-print mx-auto mb-4 flex max-w-[210mm] items-center px-4">
+          <div className="flex w-full items-center justify-between">
+            <Button asChild variant="ghost">
+              <Link to="/requests/$id" params={{ id }}>
+                <ArrowLeft className="h-4 w-4" aria-hidden /> Back to request
+              </Link>
+            </Button>
+            <Button asChild>
+              <a href={officialTicket.data} download={`${id}-trip-ticket.png`}>
+                <Download className="h-4 w-4" aria-hidden /> Download ticket
+              </a>
+            </Button>
+          </div>
+        </div>
+        <p className="no-print mx-auto mb-3 max-w-[210mm] px-4 text-xs text-muted-foreground">
+          Download the official ticket snapshot attached to your approval notice for your digital
+          records.
+        </p>
+        <img
+          src={officialTicket.data}
+          alt="Official approved trip ticket"
+          className="official-ticket-image mx-auto block w-full max-w-[148.5mm] select-none bg-white shadow-sm"
+          draggable={false}
+        />
+      </div>
+    );
+  }
 
   if (query.isPending) {
     return (
@@ -96,28 +163,58 @@ function PrintTicket() {
   const sigs = currentSignatures(r);
   const dp = r.dispatch;
 
-  async function sendToRequisitioner() {
+  async function captureTicketImage() {
     const node = sheetRef.current;
-    if (!node) return;
+    if (!node) throw new Error("Ticket preview is not ready.");
+    return toPng(node, {
+      pixelRatio: 2,
+      backgroundColor: "#ffffff",
+      cacheBust: true,
+      skipFonts: true,
+    });
+  }
+
+  async function downloadTicket() {
+    setDownloading(true);
+    try {
+      const image = await captureTicketImage();
+      const link = document.createElement("a");
+      link.href = image;
+      link.download = `${r.number.replace(/[^a-zA-Z0-9-_]/g, "_")}-trip-ticket.png`;
+      link.click();
+      toast.success("Trip ticket downloaded.");
+    } catch {
+      toast.error("We couldn't download the trip ticket. Please try again.");
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  async function sendToRequisitioner() {
     setSending(true);
     try {
       // Capture the ticket exactly as it renders (2x for a sharp photo).
-      const image = await toPng(node, {
-        pixelRatio: 2,
-        backgroundColor: "#ffffff",
-        cacheBust: true,
-      });
+      const image = await captureTicketImage();
       const result = await sendTripTicketFn({ data: { id: r.id, image } });
       if (!result.ok) {
         toast.error(result.error);
         return;
       }
       setTicketSent(true);
-      toast.success(
-        result.data.alreadySent
-          ? "The trip ticket is already attached to the requisitioner's notification."
-          : "Trip ticket attached to the requisitioner's notification.",
-      );
+      if (result.data.testEmail?.sent) {
+        setTestEmailSent(true);
+        toast.success("Trip ticket test email sent only to mj.turingan@lyceumalabang.edu.ph.");
+      } else if (result.data.testEmail) {
+        toast.error(
+          `The ticket is saved in the requisitioner's in-app notification, but the test email was not sent: ${result.data.testEmail.message}`,
+        );
+      } else {
+        toast.success(
+          result.data.alreadySent
+            ? "The trip ticket is attached to the requisitioner's in-app notification."
+            : "Trip ticket attached to the requisitioner's in-app notification.",
+        );
+      }
     } catch {
       toast.error("We couldn't create the trip ticket photo. Try again.");
     } finally {
@@ -137,30 +234,42 @@ function PrintTicket() {
         </Button>
         <div className="flex gap-2">
           {approved && !isRequisitioner && (
-            <Button variant="outline" onClick={() => window.print()}>
-              <Printer className="h-4 w-4" aria-hidden /> Download / Print PDF
+            <Button variant="outline" onClick={() => void downloadTicket()} disabled={downloading}>
+              <Download className="h-4 w-4" aria-hidden />
+              {downloading ? "Preparing…" : "Download ticket"}
             </Button>
           )}
           {!isRequisitioner && (
             <Button
               onClick={() => void sendToRequisitioner()}
-              disabled={!approved || sending || ticketAlreadySent}
+              disabled={!approved || sending || testEmailSent}
             >
               <Send className="h-4 w-4" aria-hidden />
-              {sending ? "Preparing…" : ticketAlreadySent ? "Ticket Sent" : "Send to Requisitioner"}
+              {sending
+                ? "Sending…"
+                : testEmailSent
+                  ? "Test Email Sent"
+                  : import.meta.env.DEV
+                    ? ticketAlreadySent
+                      ? "Resend Ticket Test Email"
+                      : "Send Ticket Test Email"
+                    : ticketAlreadySent
+                      ? "Ticket Sent"
+                      : "Send to Requisitioner"}
             </Button>
           )}
         </div>
       </div>
       {approved && isRequisitioner && (
         <p className="no-print mx-auto mb-3 max-w-[210mm] px-4 text-xs text-muted-foreground">
-          Show this ticket on screen to your driver. Signature images are protected from casual
-          dragging and selection; browser screenshots and developer tools cannot be fully blocked.
+          Download the official ticket for your digital records or show it on screen to your driver.
         </p>
       )}
       {approved && !isRequisitioner && (
         <p className="no-print mx-auto mb-3 max-w-[210mm] px-4 text-xs text-muted-foreground">
-          To save a copy, choose “Save as PDF” in your browser&apos;s print dialog.
+          Download a digital copy or attach it to the requisitioner&apos;s in-app notification.
+          {import.meta.env.DEV &&
+            " Local test email delivery is restricted to mj.turingan@lyceumalabang.edu.ph."}
         </p>
       )}
       {!approved && (
@@ -250,10 +359,16 @@ function PrintTicket() {
               const title = st.key === "review" ? "Head - Transport Services" : st.title;
               const block = (
                 <div
-                  className={`grid ${signature?.proxySignerName ? "grid-cols-2" : "grid-cols-1"} px-2 pb-1`}
+                  className={`grid ${
+                    signature?.proxySignerName ? "grid-cols-2" : "grid-cols-1"
+                  } px-2 pb-1`}
                 >
-                  <div className="flex flex-col items-center">
-                    <div className="flex h-12 items-end">
+                  <div
+                    className={`flex min-w-0 flex-col items-center ${
+                      signature?.proxySignerName ? "border-r border-foreground/40 px-1" : ""
+                    }`}
+                  >
+                    <div className="flex h-12 max-w-full items-end justify-center overflow-hidden">
                       {signature && !signature.proxySignerName && (
                         <SignatureMark
                           image={signature.image}
@@ -263,20 +378,38 @@ function PrintTicket() {
                         />
                       )}
                     </div>
-                    <p className="text-center text-xs font-bold">{name}</p>
-                    <p className="text-center text-xs">{title}</p>
+                    <div
+                      className="m-0 w-full text-center text-xs font-bold"
+                      style={{ lineHeight: 1.35, overflowWrap: "anywhere" }}
+                    >
+                      {name}
+                    </div>
+                    <div
+                      className="m-0 w-full text-center text-xs"
+                      style={{ lineHeight: 1.35, overflowWrap: "anywhere" }}
+                    >
+                      {title}
+                    </div>
                     {signature && !signature.proxySignerName && (
-                      <p className="text-[9px] text-muted-foreground">
+                      <div
+                        className="m-0 w-full text-center text-[9px] text-muted-foreground"
+                        style={{ lineHeight: 1.35, overflowWrap: "anywhere" }}
+                      >
                         Signed {fmtDateTime(signature.at)}
-                      </p>
+                      </div>
                     )}
                     {!signature && detail.assistantNames[st.key] && (
-                      <p className="text-[10px]">CC: {detail.assistantNames[st.key]}</p>
+                      <div
+                        className="m-0 w-full text-center text-[10px]"
+                        style={{ lineHeight: 1.35, overflowWrap: "anywhere" }}
+                      >
+                        CC: {detail.assistantNames[st.key]}
+                      </div>
                     )}
                   </div>
                   {signature?.proxySignerName && (
-                    <div className="flex flex-col items-center border-l border-foreground/40 px-1">
-                      <div className="flex h-12 items-end">
+                    <div className="flex min-w-0 flex-col items-center border-l border-foreground/40 px-1">
+                      <div className="flex h-12 max-w-full items-end justify-center overflow-hidden">
                         <SignatureMark
                           image={signature.image}
                           method={signature.method}
@@ -284,11 +417,24 @@ function PrintTicket() {
                           protectedDisplay={isRequisitioner}
                         />
                       </div>
-                      <p className="text-center text-xs font-bold">{signature.proxySignerName}</p>
-                      <p className="text-center text-[10px]">Alternate Signatory</p>
-                      <p className="text-center text-[9px] text-muted-foreground">
+                      <div
+                        className="m-0 w-full text-center text-xs font-bold"
+                        style={{ lineHeight: 1.35, overflowWrap: "anywhere" }}
+                      >
+                        {signature.proxySignerName}
+                      </div>
+                      <div
+                        className="m-0 w-full text-center text-[10px]"
+                        style={{ lineHeight: 1.35, overflowWrap: "anywhere" }}
+                      >
+                        Alternate Signatory
+                      </div>
+                      <div
+                        className="m-0 w-full text-center text-[9px] text-muted-foreground"
+                        style={{ lineHeight: 1.35, overflowWrap: "anywhere" }}
+                      >
                         Signed {fmtDateTime(signature.at)}
-                      </p>
+                      </div>
                     </div>
                   )}
                 </div>

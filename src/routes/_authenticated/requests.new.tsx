@@ -54,6 +54,13 @@ function NewRequest() {
     await queryClient.invalidateQueries({ queryKey: ["requests"] });
     await queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
     toast.success(`Request ${result.data.number} submitted.`);
+    if (result.data.workflowEmail?.sent) {
+      toast.success("Test approval email sent to mj.turingan@lyceumalabang.edu.ph.");
+    } else if (result.data.workflowEmail) {
+      toast.error(
+        `Request submitted, but the test email was not sent: ${result.data.workflowEmail.message}`,
+      );
+    }
     await navigate({
       to: "/requests/$id",
       params: { id: result.data.id },

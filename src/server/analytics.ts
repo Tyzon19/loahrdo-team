@@ -104,19 +104,10 @@ export async function getTripArchive(input: unknown) {
      LIMIT ? OFFSET ?`,
     [...params, ARCHIVE_PAGE_SIZE, page * ARCHIVE_PAGE_SIZE],
   );
-  const dailyRows = await all<RowDataPacket[]>(
-    `SELECT DATE_FORMAT(r.date_start, '%Y-%m-%d') AS day, COUNT(*) AS trips
-     FROM requests r LEFT JOIN dispatch_records dr ON dr.request_id = r.id
-     WHERE ${whereSql} AND r.status = 'completed'
-     GROUP BY DATE(r.date_start)
-     ORDER BY DATE(r.date_start) DESC
-     LIMIT 31`,
-    params,
-  );
   const monthlyRows = await all<RowDataPacket[]>(
     `SELECT DATE_FORMAT(r.date_start, '%Y-%m') AS month, COUNT(*) AS trips
      FROM requests r LEFT JOIN dispatch_records dr ON dr.request_id = r.id
-     WHERE ${whereSql} AND r.status = 'completed'
+     WHERE ${whereSql}
      GROUP BY YEAR(r.date_start), MONTH(r.date_start)
      ORDER BY YEAR(r.date_start) DESC, MONTH(r.date_start) DESC
      LIMIT 12`,
@@ -127,7 +118,7 @@ export async function getTripArchive(input: unknown) {
      FROM requests r
      JOIN request_destinations d ON d.request_id = r.id
      LEFT JOIN dispatch_records dr ON dr.request_id = r.id
-     WHERE ${whereSql} AND r.status = 'completed'
+     WHERE ${whereSql}
      GROUP BY d.destination
      ORDER BY trips DESC, d.destination
      LIMIT 20`,
@@ -145,10 +136,6 @@ export async function getTripArchive(input: unknown) {
       dispatched: Number(counts?.dispatched ?? 0),
       approved: Number(counts?.approved ?? 0),
     },
-    dailyTrips: dailyRows.map((row) => ({
-      date: String(row["day"]),
-      trips: Number(row["trips"]),
-    })),
     monthlyTrips: monthlyRows.map((row) => ({
       month: String(row["month"]),
       trips: Number(row["trips"]),

@@ -237,9 +237,7 @@ function RequestDetailPage() {
           isProxySigner={isProxySigner}
         />
       )}
-      <Section title="Approval progress">
-        <StageStepper r={r} />
-      </Section>
+      <StageStepper r={r} />
 
       <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
         <div className="space-y-4">
@@ -421,9 +419,16 @@ function ActionPanel({
     setApproveOpen(false);
     toast.success(
       stageKey === "approve"
-        ? "Request approved. The trip ticket is ready to print."
+        ? "Request approved. The trip ticket is ready to download."
         : "Signed and forwarded to the next approver.",
     );
+    if (result.data.workflowEmail?.sent) {
+      toast.success("Test approval email sent to mj.turingan@lyceumalabang.edu.ph.");
+    } else if (result.data.workflowEmail) {
+      toast.error(
+        `Approval was saved, but the test email was not sent: ${result.data.workflowEmail.message}`,
+      );
+    }
     await refresh();
   }
 
@@ -435,6 +440,13 @@ function ActionPanel({
     }
     setRejectOpen(false);
     toast.success("Request returned to the requisitioner.");
+    if (result.data.workflowEmail?.sent) {
+      toast.success("Test return email sent to mj.turingan@lyceumalabang.edu.ph.");
+    } else if (result.data.workflowEmail) {
+      toast.error(
+        `Request was returned, but the test email was not sent: ${result.data.workflowEmail.message}`,
+      );
+    }
     await refresh();
   }
 

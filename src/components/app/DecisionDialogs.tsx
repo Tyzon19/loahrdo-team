@@ -8,7 +8,6 @@ import { SignaturePad, type SignatureValue } from "./SignaturePad";
 import type { User, VehicleRequest } from "@/lib/types";
 import { ROLE_TITLES } from "@/lib/workflow";
 import { fmtRange, fmtTime } from "@/lib/format";
-
 export function ApproveDialog({
   open, onOpenChange, request, user, proxySigner, assistantName,
   stageLabel, actionLabel, onConfirm,
@@ -82,7 +81,6 @@ export function ApproveDialog({
     </Dialog>
   );
 }
-
 export function RejectDialog({
   open, onOpenChange, onConfirm, stageTitle,
 }: {

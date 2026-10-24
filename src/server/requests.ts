@@ -46,6 +46,7 @@ import {
 import { requireViewer } from "./auth";
 import { all, getPool, likePattern, run, withTransaction } from "./db";
 import { AppError, isDuplicateKey, parseInput } from "@/lib/errors";
+import { sendTripTicketTestEmail, sendWorkflowTestEmail } from "./gmail";
 import {
   loadApproverNames,
   loadAssistantNames,
@@ -266,23 +267,22 @@ export async function listRequests(input: unknown): Promise<RequestRow[]> {
 
 async function requestDetail(
   id: unknown,
-  includeOwnerSignatureImages: boolean,
+  includeSignatureImages: boolean,
 ): Promise<RequestDetail | null> {
   const viewer = await requireViewer();
+  if (includeSignatureImages && viewer.role === "requisitioner") {
+    throw new AppError("The official trip ticket image is required.");
+  }
   const parsed = requestIdSchema.safeParse(id);
   if (!parsed.success) return null;
 
   const pool = await getPool();
-  let request = await loadRequest(pool, parsed.data, viewer.role !== "requisitioner");
+  const request = await loadRequest(
+    pool,
+    parsed.data,
+    viewer.role !== "requisitioner" || includeSignatureImages,
+  );
   if (!request || !canSee(viewer, request.requisitionerId)) return null;
-  if (
-    includeOwnerSignatureImages &&
-    viewer.role === "requisitioner" &&
-    ["approved", "dispatched", "completed"].includes(request.status)
-  ) {
-    request = await loadRequest(pool, parsed.data, true);
-    if (!request || !canSee(viewer, request.requisitionerId)) return null;
-  }
   const [doc, approverNames, assistantNames, assistantUserIds] = await Promise.all([
     loadDoc(pool),
     loadApproverNames(pool),
@@ -338,7 +338,11 @@ export function getPrintableRequestDetail(id: unknown): Promise<RequestDetail | 
 
 /* ------------------------------- Writes ------------------------------ */
 
-export async function submitRequest(input: unknown): Promise<{ id: string; number: string }> {
+export async function submitRequest(input: unknown): Promise<{
+  id: string;
+  number: string;
+  workflowEmail?: Awaited<ReturnType<typeof sendWorkflowTestEmail>>;
+}> {
   const viewer = await requireViewer();
   if (viewer.role !== "requisitioner") {
     throw new AppError("Only requisitioners can submit vehicle requests.");
@@ -346,7 +350,7 @@ export async function submitRequest(input: unknown): Promise<{ id: string; numbe
   const data = parseInput(requestInputSchema, input);
   assertFutureDate(data);
 
-  return withTransaction(async (conn) => {
+  const result = await withTransaction(async (conn) => {
     const year = new Date().getFullYear();
     await run(
       `INSERT INTO request_sequences (year, last_number) VALUES (?, 1)
@@ -397,13 +401,18 @@ export async function submitRequest(input: unknown): Promise<{ id: string; numbe
     );
     await insertDestinations(conn, request.id, request.destinations);
     await insertHistory(conn, request.id, request.history);
-    await insertNotifications(
-      conn,
-      await notifyAssistant(conn, out.emails, request, ctx, "review"),
-    );
+    const notifications = await notifyAssistant(conn, out.emails, request, ctx, "review");
+    await insertNotifications(conn, notifications);
 
-    return { id: request.id, number: request.number };
+    return {
+      id: request.id,
+      number: request.number,
+      request,
+      email: notifications.find((message) => message.stage === "review"),
+    };
   });
+  const workflowEmail = await sendWorkflowTestEmail(result.email, result.request);
+  return { id: result.id, number: result.number, ...(workflowEmail ? { workflowEmail } : {}) };
 }
 
 async function lockAndLoad(conn: PoolConnection, id: string) {
@@ -418,12 +427,14 @@ async function lockAndLoad(conn: PoolConnection, id: string) {
   return request;
 }
 
-export async function approveRequest(input: unknown): Promise<{ status: Status }> {
+export async function approveRequest(
+  input: unknown,
+): Promise<{ status: Status; workflowEmail?: Awaited<ReturnType<typeof sendWorkflowTestEmail>> }> {
   const viewer = await requireViewer();
   const data = parseInput(approveSchema, input);
   signatureBytes(data.signature.image);
 
-  return withTransaction(async (conn) => {
+  const result = await withTransaction(async (conn) => {
     const request = await lockAndLoad(conn, data.id);
     if (!canSee(viewer, request.requisitionerId)) {
       throw new AppError("You don't have access to this request.");
@@ -536,15 +547,25 @@ export async function approveRequest(input: unknown): Promise<{ status: Status }
       : out.emails;
     await insertNotifications(conn, emails);
 
-    return { status: updated.status };
+    return {
+      status: updated.status,
+      request: updated,
+      email: nextStage ? emails.find((message) => message.stage === nextStage.key) : undefined,
+    };
   });
+  const workflowEmail = result.email
+    ? await sendWorkflowTestEmail(result.email, result.request)
+    : undefined;
+  return { status: result.status, ...(workflowEmail ? { workflowEmail } : {}) };
 }
 
-export async function rejectRequest(input: unknown): Promise<{ status: Status }> {
+export async function rejectRequest(
+  input: unknown,
+): Promise<{ status: Status; workflowEmail?: Awaited<ReturnType<typeof sendWorkflowTestEmail>> }> {
   const viewer = await requireViewer();
   const data = parseInput(rejectSchema, input);
 
-  return withTransaction(async (conn) => {
+  const result = await withTransaction(async (conn) => {
     const request = await lockAndLoad(conn, data.id);
     if (!canSee(viewer, request.requisitionerId)) {
       throw new AppError("You don't have access to this request.");
@@ -590,21 +611,27 @@ export async function rejectRequest(input: unknown): Promise<{ status: Status }>
       conn,
     );
     await insertHistory(conn, updated.id, updated.history.slice(request.history.length));
-    await insertNotifications(
-      conn,
-      await notifyAssistant(conn, out.emails, updated, ctx, "review"),
-    );
+    const notifications = await notifyAssistant(conn, out.emails, updated, ctx, "review");
+    await insertNotifications(conn, notifications);
 
-    return { status: updated.status };
+    return {
+      status: updated.status,
+      request: updated,
+      email: notifications.find((message: EmailMessage) => message.kind === "returned"),
+    };
   });
+  const workflowEmail = await sendWorkflowTestEmail(result.email, result.request);
+  return { status: result.status, ...(workflowEmail ? { workflowEmail } : {}) };
 }
 
-export async function resubmitRequest(input: unknown): Promise<{ id: string }> {
+export async function resubmitRequest(
+  input: unknown,
+): Promise<{ id: string; workflowEmail?: Awaited<ReturnType<typeof sendWorkflowTestEmail>> }> {
   const viewer = await requireViewer();
   const data = parseInput(resubmitSchema, input);
   assertFutureDate(data.input);
 
-  return withTransaction(async (conn) => {
+  const result = await withTransaction(async (conn) => {
     const request = await lockAndLoad(conn, data.id);
     if (request.requisitionerId !== viewer.id) {
       throw new AppError("Only the original requisitioner can resubmit this request.");
@@ -612,7 +639,6 @@ export async function resubmitRequest(input: unknown): Promise<{ id: string }> {
     if (request.status !== "returned") {
       throw new AppError("Only returned requests can be resubmitted.");
     }
-
     const ctx = {
       users: await loadUsers(conn),
       now: new Date().toISOString(),
@@ -652,22 +678,24 @@ export async function resubmitRequest(input: unknown): Promise<{ id: string }> {
     if (result.affectedRows !== 1) {
       throw new AppError("This request changed while you were editing it. Reload and try again.");
     }
-
     await run("DELETE FROM request_destinations WHERE request_id = ?", [updated.id], conn);
     await insertDestinations(conn, updated.id, updated.destinations);
     await insertHistory(conn, updated.id, updated.history.slice(request.history.length));
     await insertNotifications(conn, out.emails);
 
-    return { id: updated.id };
+    return {
+      id: updated.id,
+      request: updated,
+      email: out.emails.find((message: EmailMessage) => message.stage === "review"),
+    };
   });
+  const workflowEmail = await sendWorkflowTestEmail(result.email, result.request);
+  return { id: result.id, ...(workflowEmail ? { workflowEmail } : {}) };
 }
-
-/**
- * Sends the rendered trip ticket (PNG photo) to the requisitioner's inbox.
- * Only roles that can see all requests may send it, and only once the request
- * has final approval, so a requisitioner can never trigger this themselves.
- */
-export async function sendTripTicket(input: unknown): Promise<{ alreadySent: boolean }> {
+export async function sendTripTicket(input: unknown): Promise<{
+  alreadySent: boolean;
+  testEmail?: Awaited<ReturnType<typeof sendTripTicketTestEmail>>;
+}> {
   const viewer = await requireViewer();
   if (!canViewAllRequests(viewer.role)) {
     throw new AppError("Only staff in the approval workflow can send the trip ticket.");
@@ -679,7 +707,7 @@ export async function sendTripTicket(input: unknown): Promise<{ alreadySent: boo
     throw new AppError("The trip ticket photo is not valid.");
   }
 
-  return withTransaction(async (conn) => {
+  const result = await withTransaction(async (conn) => {
     const request = await lockAndLoad(conn, data.id);
     if (!["approved", "dispatched", "completed"].includes(request.status)) {
       throw new AppError("The trip ticket can be sent after final approval.");
@@ -699,7 +727,6 @@ export async function sendTripTicket(input: unknown): Promise<{ alreadySent: boo
     );
     let notificationId = existing[0]?.["id"] ? String(existing[0]["id"]) : "";
     let alreadySent = false;
-    let existingAttachment: Buffer | undefined;
 
     if (existing.length) {
       const notificationIds = existing.map((row) => String(row["id"]));
@@ -708,16 +735,7 @@ export async function sendTripTicket(input: unknown): Promise<{ alreadySent: boo
         [notificationIds],
         conn,
       );
-      const savedAttachment = attachments.find((attachment) =>
-        notificationIds.slice(1).includes(String(attachment["notification_id"])),
-      );
-      const canonicalHasAttachment = attachments.some(
-        (attachment) => String(attachment["notification_id"]) === notificationId,
-      );
       alreadySent = attachments.length > 0;
-      if (!canonicalHasAttachment && savedAttachment) {
-        existingAttachment = Buffer.from(savedAttachment["image"] as Buffer);
-      }
       await run(
         `UPDATE notifications
          SET body = ?, read_at = IF(?, read_at, NULL)
@@ -747,25 +765,17 @@ export async function sendTripTicket(input: unknown): Promise<{ alreadySent: boo
       if (!notificationId) throw new AppError("We couldn't prepare the trip ticket notification.");
     }
 
-    if (!alreadySent) {
-      await run(
-        `INSERT INTO notification_attachments (notification_id, mime, image)
-         VALUES (?, 'image/png', ?)
-         ON DUPLICATE KEY UPDATE image = VALUES(image)`,
-        [notificationId, existingAttachment ?? bytes],
-        conn,
-      );
-    } else if (existingAttachment) {
-      await run(
-        `INSERT INTO notification_attachments (notification_id, mime, image)
-         VALUES (?, 'image/png', ?)
-         ON DUPLICATE KEY UPDATE image = VALUES(image)`,
-        [notificationId, existingAttachment],
-        conn,
-      );
-    }
-    return { alreadySent };
+    await run(
+      `INSERT INTO notification_attachments (notification_id, mime, image)
+       VALUES (?, 'image/png', ?)
+       ON DUPLICATE KEY UPDATE image = VALUES(image)`,
+      [notificationId, bytes],
+      conn,
+    );
+    return { alreadySent, request, ticketImage: bytes };
   });
+  const testEmail = await sendTripTicketTestEmail(result.request, result.ticketImage, viewer.name);
+  return { alreadySent: result.alreadySent, ...(testEmail ? { testEmail } : {}) };
 }
 
 /* ------------------------------ Vehicles ----------------------------- */
@@ -844,11 +854,6 @@ export async function dashboardStats(): Promise<DashboardStats> {
   const byStatus = new Map<string, number>();
   for (const row of counts) byStatus.set(String(row["status"]), Number(row["n"]));
 
-  const avgRows = await all<RowDataPacket[]>(
-    `SELECT AVG(TIMESTAMPDIFF(MINUTE, submitted_at, approved_at)) / 60 AS hours
-     FROM requests ${scoped ? `${where} AND` : "WHERE"} approved_at IS NOT NULL`,
-    params,
-  );
   const monthRows = await all<RowDataPacket[]>(
     `SELECT COUNT(*) AS n FROM requests
      ${scoped ? `${where} AND` : "WHERE"} YEAR(submitted_at) = YEAR(NOW()) AND MONTH(submitted_at) = MONTH(NOW())`,
@@ -891,7 +896,6 @@ export async function dashboardStats(): Promise<DashboardStats> {
   }
 
   const total = [...byStatus.values()].reduce((sum, n) => sum + n, 0);
-  const hours = avgRows[0]?.["hours"];
 
   return {
     total,
@@ -903,7 +907,6 @@ export async function dashboardStats(): Promise<DashboardStats> {
     approved,
     completed: byStatus.get("completed") ?? 0,
     awaitingYou,
-    avgApprovalHours: hours == null ? null : Math.round(Number(hours) * 10) / 10,
     thisMonth: Number(monthRows[0]?.["n"] ?? 0),
     pageViews30d,
   };

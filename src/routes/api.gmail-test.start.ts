@@ -20,7 +20,16 @@ export const Route = createFileRoute("/api/gmail-test/start")({
         const requestUrl = new URL(request.url);
         if (!["localhost", "127.0.0.1"].includes(requestUrl.hostname)) return unavailable();
         const template = requestUrl.searchParams.get("template") ?? "approved-ticket";
-        if (!["approved-ticket", "registration-otp", "gmail-connect"].includes(template)) {
+        if (
+          ![
+            "approved-ticket",
+            "registration-otp",
+            "gmail-connect",
+            "action-review",
+            "action-recommendation",
+            "action-approval",
+          ].includes(template)
+        ) {
           return new Response("Unknown email template preview.", {
             status: 400,
             headers: {

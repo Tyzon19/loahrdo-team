@@ -103,6 +103,7 @@ describe("professional email template", () => {
         passengers: 6,
         dateStart: "Oct 24, 2026",
         dateEnd: "Oct 24, 2026",
+        currentStage: "Reviewed By — Head of Transport Services",
       },
     );
 
@@ -111,22 +112,44 @@ describe("professional email template", () => {
     expect(rendered.html).toContain("&lt;field trip&gt;");
     expect(rendered.text).toContain("The official trip-ticket image is included in this email.");
     expect(rendered.text).toContain("Destination: SMX");
+    expect(rendered.text).toContain("Current Stage: Reviewed By — Head of Transport Services");
   });
 
   it("uses the correct destination for returned and approval-action emails", () => {
     const returned = renderEmailTemplate(
-      { ...message, kind: "returned" },
+      {
+        ...message,
+        kind: "returned",
+        body: "Returned by the Director for Administration. Reason: Please correct the travel dates.",
+      },
       "https://vrtt.example.edu",
     );
     const action = renderEmailTemplate(
       { ...message, kind: "action_approve" },
       "https://vrtt.example.edu",
     );
-
     expect(returned.html).toContain("https://vrtt.example.edu/revise/");
+    expect(returned.html).toContain("background-color:#fef2f2");
+    expect(returned.html).toContain("border-left:4px solid #dc2626");
+    expect(returned.html).toContain("<strong");
+    expect(returned.html).toContain("Reason for return");
+    expect(returned.html).toContain("Please correct the travel dates.");
+    expect(returned.html).not.toContain("Reason: Please correct the travel dates.</p>");
+    expect(returned.text).toContain("Reason: Please correct the travel dates.");
     expect(action.html).toContain("https://vrtt.example.edu/requests/");
   });
-
+  it("escapes the return reason inside the warning block", () => {
+    const returned = renderEmailTemplate(
+      {
+        ...message,
+        kind: "returned",
+        body: "Returned by the Director. Reason: <script>Update the dates</script>",
+      },
+      "https://vrtt.example.edu",
+    );
+    expect(returned.html).toContain("&lt;script&gt;Update the dates&lt;/script&gt;");
+    expect(returned.html).not.toContain("<script>");
+  });
   it("escapes message content before inserting it into HTML", () => {
     const rendered = renderEmailTemplate(
       { ...message, toName: "<script>alert(1)</script>", body: "<img src=x onerror=alert(1)>" },

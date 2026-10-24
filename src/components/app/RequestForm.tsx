@@ -10,9 +10,7 @@ import type { RequestInput } from "@/lib/types";
 import { validateRequestInput } from "@/lib/workflow";
 import { fmtDate, fmtRange, fmtTime, todayISO } from "@/lib/format";
 import { Section } from "./PageHeader";
-
 function Req() { return <span className="text-destructive" aria-hidden> *</span>; }
-
 export function RequestForm({
   initial, header, submitLabel, onSubmit,
 }: {
@@ -29,12 +27,9 @@ export function RequestForm({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const dirty = JSON.stringify(v) !== JSON.stringify(initial);
   const blocker = useBlocker({ shouldBlockFn: () => dirty && !done, withResolver: true, enableBeforeUnload: () => dirty && !done });
-
   useEffect(() => { if (Object.keys(errors).length) setErrors(validateRequestInput(v, todayISO())); }, [v]);
-
   const set = <K extends keyof RequestInput>(k: K, val: RequestInput[K]) => setV((x) => ({ ...x, [k]: val }));
   const err = (k: keyof RequestInput) => errors[k] && <p id={`${k}-err`} className="mt-1 text-sm text-destructive">{errors[k]}</p>;
-
   return (
     <form
       noValidate
@@ -104,7 +99,6 @@ export function RequestForm({
       <div className="flex justify-end gap-2">
         <Button type="submit">Review before submitting</Button>
       </div>
-
       <AlertDialog open={review} onOpenChange={setReview}>
         <AlertDialogContent className="max-h-[92vh] overflow-y-auto">
           <AlertDialogHeader>
@@ -150,7 +144,6 @@ export function RequestForm({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
       <AlertDialog open={blocker.status === "blocked"}>
         <AlertDialogContent>
           <AlertDialogHeader>

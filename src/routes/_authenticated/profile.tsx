@@ -9,7 +9,6 @@ import { SignatoryAssistantSettings } from "@/components/app/SignatoryAssistantS
 import { ROLE_TITLES } from "@/lib/workflow";
 import { updateProfileFn } from "@/server-functions";
 import { SITE } from "@/lib/site";
-
 export const Route = createFileRoute("/_authenticated/profile")({
   head: () => ({
     meta: [
@@ -30,13 +29,10 @@ function Profile() {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
-
   useEffect(() => {
     if (viewer) setForm({ name: viewer.name, department: viewer.department });
   }, [viewer?.id, viewer?.name, viewer?.department]);
-
   if (!viewer) return null;
-
   async function save(event: React.FormEvent) {
     event.preventDefault();
     if (busy) return;
@@ -52,7 +48,6 @@ function Profile() {
     toast.success("Profile saved. New requests will use this name.");
     await router.invalidate();
   }
-
   return (
     <>
       <PageHeader
@@ -101,10 +96,7 @@ function Profile() {
                 readOnly
                 aria-describedby="profile-email-help"
               />
-              <p id="profile-email-help" className="mt-1 text-xs text-muted-foreground">
-                Email changes require PFMO verification. Contact {SITE.contactEmail}.
-              </p>
-            </div>
+              </div>
             <div className="sm:col-span-2">
               <Button type="submit" disabled={busy}>
                 {busy ? "Saving…" : "Save profile"}
@@ -112,7 +104,6 @@ function Profile() {
             </div>
           </form>
         </Section>
-
         <aside className="panel h-fit p-4 text-sm">
           <p className="font-medium">Password</p>
           <p className="mt-1 text-muted-foreground">
