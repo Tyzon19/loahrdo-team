@@ -18,7 +18,6 @@ import { ButtonLoading } from "@/components/app/LoadingPanel";
 import { institutionalEmailAllowed, registerSchema } from "@/lib/validation";
 import { requestRegistrationOtpFn, verifyRegistrationOtpFn } from "@/server-functions";
 import { SITE, canonical } from "@/lib/site";
-
 export const Route = createFileRoute("/register")({
   beforeLoad: ({ context }) => {
     if (context.viewer) throw routerRedirect({ to: "/dashboard" });

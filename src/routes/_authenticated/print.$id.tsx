@@ -364,13 +364,14 @@ function PrintTicket() {
                         signature?.proxySignerName ? "border-r border-foreground/40 px-1" : ""
                       }`}
                     >
-                      <div className="flex h-12 max-w-full items-end justify-center overflow-hidden">
+                      <div className="flex h-[58px] max-w-full items-end justify-center overflow-hidden">
                         {signature && !signature.proxySignerName && (
                           <SignatureMark
                             image={signature.image}
                             method={signature.method}
                             name={signature.signerName}
                             protectedDisplay={false}
+                            scale={1.2}
                           />
                         )}
                       </div>
@@ -405,12 +406,13 @@ function PrintTicket() {
                     </div>
                     {signature?.proxySignerName && (
                       <div className="flex min-w-0 flex-col items-center border-l border-foreground/40 px-1">
-                        <div className="flex h-12 max-w-full items-end justify-center overflow-hidden">
+                        <div className="flex h-[58px] max-w-full items-end justify-center overflow-hidden">
                           <SignatureMark
                             image={signature.image}
                             method={signature.method}
                             name={signature.proxySignerName}
                             protectedDisplay={false}
+                            scale={1.2}
                           />
                         </div>
                         <div

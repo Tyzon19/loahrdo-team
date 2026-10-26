@@ -42,17 +42,19 @@ function cropSignature(canvas: HTMLCanvasElement) {
   const cropped = document.createElement("canvas");
   cropped.width = sourceRight - sourceLeft;
   cropped.height = sourceBottom - sourceTop;
-  cropped.getContext("2d")?.drawImage(
-    canvas,
-    sourceLeft,
-    sourceTop,
-    cropped.width,
-    cropped.height,
-    0,
-    0,
-    cropped.width,
-    cropped.height,
-  );
+  cropped
+    .getContext("2d")
+    ?.drawImage(
+      canvas,
+      sourceLeft,
+      sourceTop,
+      cropped.width,
+      cropped.height,
+      0,
+      0,
+      cropped.width,
+      cropped.height,
+    );
   if (cropped.width >= cropped.height) return cropped.toDataURL("image/png");
 
   const landscape = document.createElement("canvas");
@@ -101,7 +103,8 @@ export function SignaturePad({ onChange }: { onChange: (v: SignatureValue | null
       const width = c.clientWidth;
       const height = c.clientHeight;
       if (!width || !height) return;
-      if (width === fullScreenSize.current.width && height === fullScreenSize.current.height) return;
+      if (width === fullScreenSize.current.width && height === fullScreenSize.current.height)
+        return;
 
       let previous: HTMLCanvasElement | null = null;
       if (fullScreenHasInk.current && c.width && c.height) {
@@ -426,27 +429,30 @@ export function SignatureMark({
   method,
   name,
   protectedDisplay = false,
+  scale = 1,
 }: {
   image?: string | undefined;
   method: string;
   name: string;
   protectedDisplay?: boolean;
+  scale?: number;
 }) {
   if (image && protectedDisplay) {
     return <ProtectedSignatureImage image={image} name={name} />;
   }
-  if (image)
-    return <SignatureImage image={image} method={method} name={name} />;
+  if (image) return <SignatureImage image={image} method={method} name={name} scale={scale} />;
   return <span className="text-xs italic text-muted-foreground">Signature on file ({method})</span>;
 }
 function SignatureImage({
   image,
   method,
   name,
+  scale,
 }: {
   image: string;
   method: string;
   name: string;
+  scale: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
@@ -454,14 +460,15 @@ function SignatureImage({
     if (!canvas) return;
     const signatureImage = new Image();
     signatureImage.onload = () => {
-      const rotate = method === "drawn" && signatureImage.naturalHeight > signatureImage.naturalWidth;
+      const rotate =
+        method === "drawn" && signatureImage.naturalHeight > signatureImage.naturalWidth;
       const width = rotate ? signatureImage.naturalHeight : signatureImage.naturalWidth;
       const height = rotate ? signatureImage.naturalWidth : signatureImage.naturalHeight;
-      const scale = Math.min(180 / width, 48 / height);
+      const imageScale = Math.min((180 * scale) / width, (48 * scale) / height);
       canvas.width = width;
       canvas.height = height;
-      canvas.style.width = `${width * scale}px`;
-      canvas.style.height = `${height * scale}px`;
+      canvas.style.width = `${width * imageScale}px`;
+      canvas.style.height = `${height * imageScale}px`;
       const context = canvas.getContext("2d");
       if (!context) return;
       if (rotate) {
@@ -471,7 +478,7 @@ function SignatureImage({
       context.drawImage(signatureImage, 0, 0);
     };
     signatureImage.src = image;
-  }, [image, method]);
+  }, [image, method, scale]);
   return <canvas ref={canvasRef} role="img" aria-label={`Signature of ${name}`} />;
 }
 function ProtectedSignatureImage({ image, name }: { image: string; name: string }) {
