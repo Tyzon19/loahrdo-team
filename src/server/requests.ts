@@ -49,6 +49,8 @@ import {
 import { requireViewer } from "./auth";
 import { all, getPool, likePattern, run, withTransaction } from "./db";
 import { AppError, isDuplicateKey, parseInput } from "@/lib/errors";
+import { serverEnv } from "./env";
+import { createTicketVerificationToken, ticketDataDigest } from "@/lib/ticket-verification";
 import { sendTripTicketTestEmail, sendWorkflowTestEmail } from "./gmail";
 import {
   loadApproverNames,
@@ -403,6 +405,25 @@ async function requestDetail(
   return {
     request,
     tripTicketAttached: ticketNotifications.length > 0,
+    ...(includeSignatureImages &&
+    request.approvedAt &&
+    ["approved", "dispatched", "completed"].includes(request.status)
+      ? {
+          ticketVerificationToken: createTicketVerificationToken(
+            {
+              requestId: request.id,
+              approvedAt: request.approvedAt,
+              ticketDigest: ticketDataDigest({
+                requestDate: request.createdAt.slice(0, 10),
+                dateStart: request.dateStart,
+                dateEnd: request.dateEnd,
+                destinations: request.destinations,
+              }),
+            },
+            serverEnv("TICKET_VERIFICATION_SECRET"),
+          ),
+        }
+      : {}),
     doc,
     approverNames,
     approverUserIds: canViewAllRequests(viewer.role) ? approverUserIds : {},

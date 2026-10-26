@@ -174,8 +174,8 @@ const EMAIL_COPY: Record<EmailKind, { subject: string; heading: string; cta: str
     cta: "Open Dispatch Record",
   },
   trip_ticket_reminder: {
-    subject: "Trip Ticket Reminder",
-    heading: "Prepare and send the official trip ticket.",
+    subject: "Action Needed: Trip Ticket Not Sent",
+    heading: "The official trip ticket has not been sent to the requisitioner yet.",
     cta: "Prepare Trip Ticket",
   },
 };
@@ -374,7 +374,7 @@ export function approveStage(
         next,
         "trip_ticket_reminder",
         [actor],
-        `You gave final approval for ${r.number}. Prepare the official trip ticket and send it to the requisitioner.`,
+        `You gave final approval for ${r.number}, but the official trip ticket is still waiting to be sent. Please prepare it and send it to the requisitioner.`,
         "approve",
       ),
     ];

@@ -142,11 +142,49 @@ const ICON: Record<HistoryEvent["type"], typeof Circle> = {
   dispatch: Truck,
   completed: Truck,
 };
-export function HistoryList({ r }: { r: VehicleRequest }) {
+export function HistoryList({
+  r,
+  tripTicketPending = false,
+}: {
+  r: VehicleRequest;
+  tripTicketPending?: boolean;
+}) {
   const items = [...r.history].reverse();
+  const finalApprover = tripTicketPending
+    ? currentSignatures(r).find((signature) => signature.stage === "approve")
+    : undefined;
   let lastAttempt = -1;
   return (
     <ol className="space-y-0">
+      {tripTicketPending && (
+        <li>
+          <div
+            className="flex gap-3 border-l border-warning py-2 pl-3"
+            role="status"
+            aria-label="Trip ticket not sent"
+          >
+            <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden />
+            <div className="min-w-0 text-sm">
+              <p className="font-semibold text-warning">Trip ticket not sent</p>
+              <p className="break-words">
+                The official trip ticket has not been sent yet. The final approver may have missed
+                sending it. Please contact the approving office for assistance.
+              </p>
+              {finalApprover && (
+                <p className="mt-1 break-words">
+                  Final approval signed by <strong>{finalApprover.signerName}</strong>
+                  {finalApprover.proxySignerName && " (Alternate Signatory)"}.
+                </p>
+              )}
+              {r.approvedAt && (
+                <p className="text-xs text-muted-foreground">
+                  Since final approval · {fmtDateTime(r.approvedAt)}
+                </p>
+              )}
+            </div>
+          </div>
+        </li>
+      )}
       {items.map((e) => {
         const Icon = ICON[e.type] ?? Circle;
         const header = e.attempt !== lastAttempt;

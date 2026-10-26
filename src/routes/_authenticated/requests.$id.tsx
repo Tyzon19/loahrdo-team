@@ -407,7 +407,14 @@ function RequestDetailPage() {
           </Section>
         </div>
         <Section title="Activity history">
-          <HistoryList r={r} />
+          <HistoryList
+            r={r}
+            tripTicketPending={
+              isOwner &&
+              ["approved", "dispatched", "completed"].includes(r.status) &&
+              !detail.tripTicketAttached
+            }
+          />
         </Section>
       </div>
     </div>

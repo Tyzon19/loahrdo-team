@@ -34,6 +34,8 @@ const existing = readEnvFile(envPath);
 const dbName = existing.DB_NAME || "loa_vrtt";
 const dbUser = existing.DB_USER || "loa_vrtt";
 const dbPassword = existing.DB_PASSWORD || randomBytes(24).toString("base64url");
+const ticketVerificationSecret =
+  existing.TICKET_VERIFICATION_SECRET || randomBytes(32).toString("base64url");
 const dbHost = existing.DB_HOST || "127.0.0.1";
 const dbPort = Number(existing.DB_PORT || 3306);
 
@@ -46,6 +48,12 @@ if (!/^[A-Za-z0-9_]+$/.test(dbName) || !/^[A-Za-z0-9_]+$/.test(dbUser)) {
 }
 if (dbPassword.length < 20) {
   console.error("Refusing to use a weak DB_PASSWORD from .env (minimum 20 characters).");
+  process.exit(1);
+}
+if (ticketVerificationSecret.length < 32) {
+  console.error(
+    "Refusing to use a weak TICKET_VERIFICATION_SECRET from .env (minimum 32 characters).",
+  );
   process.exit(1);
 }
 
@@ -160,6 +168,7 @@ const envContent = [
   `DB_NAME=${dbName}`,
   `DB_USER=${dbUser}`,
   `DB_PASSWORD=${dbPassword}`,
+  `TICKET_VERIFICATION_SECRET=${ticketVerificationSecret}`,
   `SITE_URL=${existing.SITE_URL || "http://localhost:8080"}`,
   `ALLOWED_EMAIL_DOMAINS=${existing.ALLOWED_EMAIL_DOMAINS || "loa.edu.ph,lyceumalabang.edu.ph"}`,
   `GA_MEASUREMENT_ID=${existing.GA_MEASUREMENT_ID || ""}`,

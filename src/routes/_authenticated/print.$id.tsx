@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Download, Send } from "lucide-react";
 import { toPng } from "html-to-image";
+import QRCode from "qrcode";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ButtonLoading, LoadingPanel, LoadingScreen } from "@/components/app/LoadingPanel";
@@ -38,6 +39,9 @@ function PrintTicket() {
   const [downloading, setDownloading] = useState(false);
   const [ticketSent, setTicketSent] = useState(false);
   const [testEmailSent, setTestEmailSent] = useState(false);
+  const [verificationUrl, setVerificationUrl] = useState("");
+  const [verificationQr, setVerificationQr] = useState("");
+  const [verificationQrFailed, setVerificationQrFailed] = useState(false);
   const officialTicket = useQuery({
     queryKey: ["official-trip-ticket", id],
     queryFn: () => unwrap(officialTripTicketImageFn({ data: id })),
@@ -48,6 +52,7 @@ function PrintTicket() {
     queryFn: () => unwrap(getPrintableRequestFn({ data: id })),
     enabled: !!viewer && viewer.role !== "requisitioner",
   });
+  const verificationToken = query.data?.ticketVerificationToken;
   useEffect(() => {
     const number = query.data?.request.number;
     if (!number) return;
@@ -57,6 +62,27 @@ function PrintTicket() {
       document.title = previousTitle;
     };
   }, [query.data?.request.number]);
+  useEffect(() => {
+    let active = true;
+    setVerificationUrl("");
+    setVerificationQr("");
+    setVerificationQrFailed(false);
+    if (!verificationToken) return;
+
+    const url = `${window.location.origin}/verify-ticket/${encodeURIComponent(verificationToken)}`;
+    setVerificationUrl(url);
+    void QRCode.toDataURL(url, { errorCorrectionLevel: "Q", margin: 1, width: 220 })
+      .then((image) => {
+        if (active) setVerificationQr(image);
+      })
+      .catch((error: unknown) => {
+        console.error("[print-ticket] Failed to create verification QR code:", error);
+        if (active) setVerificationQrFailed(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [verificationToken]);
   useEffect(() => {
     if (viewer?.role !== "requisitioner" || !officialTicket.data) return;
     void (async () => {
@@ -141,6 +167,16 @@ function PrintTicket() {
       </div>
     );
   }
+  if (query.isError) {
+    return (
+      <div className="mx-auto max-w-[210mm] p-8" role="alert">
+        <p>We couldn&apos;t load the approved request and its verification details.</p>
+        <Button className="mt-3" variant="outline" onClick={() => void query.refetch()}>
+          Try again
+        </Button>
+      </div>
+    );
+  }
 
   const detail = query.data;
   if (!detail) {
@@ -164,6 +200,12 @@ function PrintTicket() {
   async function captureTicketImage() {
     const node = sheetRef.current;
     if (!node) throw new Error("Ticket preview is not ready.");
+    if (approved && (!verificationUrl || !verificationQr)) {
+      throw new Error("The official ticket verification QR code is not ready.");
+    }
+    const qrImage = node.querySelector<HTMLImageElement>("[data-ticket-verification-qr]");
+    if (approved && !qrImage) throw new Error("The verification QR code is missing.");
+    if (qrImage) await qrImage.decode();
     return toPng(node, {
       pixelRatio: 2,
       backgroundColor: "#ffffff",
@@ -171,7 +213,6 @@ function PrintTicket() {
       skipFonts: true,
     });
   }
-
   async function downloadTicket() {
     setDownloading(true);
     try {
@@ -191,7 +232,6 @@ function PrintTicket() {
   async function sendToRequisitioner() {
     setSending(true);
     try {
-      // Capture the ticket exactly as it renders (2x for a sharp photo).
       const image = await captureTicketImage();
       const result = await sendTripTicketFn({ data: { id: r.id, image } });
       if (!result.ok) {
@@ -236,15 +276,23 @@ function PrintTicket() {
               <Button
                 variant="outline"
                 onClick={() => void downloadTicket()}
-                disabled={downloading}
+                disabled={downloading || !verificationQr}
               >
                 <Download className="h-4 w-4" aria-hidden />
-                {downloading ? <ButtonLoading label="Preparing…" /> : "Download ticket"}
+                {downloading ? (
+                  <ButtonLoading label="Preparing…" />
+                ) : verificationQr ? (
+                  "Download ticket"
+                ) : verificationQrFailed ? (
+                  "Verification QR unavailable"
+                ) : (
+                  <ButtonLoading label="Preparing QR…" />
+                )}
               </Button>
             )}
             <Button
               onClick={() => void sendToRequisitioner()}
-              disabled={!approved || sending || testEmailSent}
+              disabled={!approved || !verificationQr || sending || testEmailSent}
             >
               <Send className="h-4 w-4" aria-hidden />
               {sending
@@ -266,6 +314,10 @@ function PrintTicket() {
             Download a digital copy or attach it to the requisitioner&apos;s in-app notification.
             {import.meta.env.DEV &&
               " Local test email delivery is restricted to mj.turingan@lyceumalabang.edu.ph."}
+            {!verificationQr &&
+              (verificationQrFailed
+                ? " The verification QR could not be created. Reload before sending the ticket."
+                : " Preparing the official verification QR…")}
           </p>
         )}
         {!approved && (
@@ -507,6 +559,21 @@ function PrintTicket() {
                 NOTE: DATE/TIME IN/OUT to be filled by Guard on Duty
               </div>
             </div>
+            {approved && verificationQr && verificationUrl && (
+              <div className="mt-2 flex items-center justify-end gap-2 border-t border-foreground/40 pt-1">
+                <div className="max-w-48 text-right text-[8px] leading-tight">
+                  <p className="font-bold">VERIFY OFFICIAL TICKET</p>
+                  <p>Scan the QR code and compare the official dates and destination.</p>
+                  <p className="break-all">{verificationUrl}</p>
+                </div>
+                <img
+                  data-ticket-verification-qr
+                  src={verificationQr}
+                  alt="QR code to verify official trip ticket dates and destination"
+                  className="h-16 w-16"
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>

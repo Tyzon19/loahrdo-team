@@ -20,6 +20,7 @@ import { Route as AuthenticatedNotificationsRouteImport } from './routes/_authen
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 import { Route as AuthenticatedTripArchiveRouteImport } from './routes/_authenticated/trip-archive'
 import { Route as AuthenticatedVehiclesRouteImport } from './routes/_authenticated/vehicles'
+import { Route as VerifyTicketTokenRouteImport } from './routes/verify-ticket.$token'
 import { Route as AuthenticatedPrintIdRouteImport } from './routes/_authenticated/print.$id'
 import { Route as AuthenticatedRequestsIndexRouteImport } from './routes/_authenticated/requests.index'
 import { Route as AuthenticatedRequestsIdRouteImport } from './routes/_authenticated/requests.$id'
@@ -27,6 +28,7 @@ import { Route as AuthenticatedRequestsNewRouteImport } from './routes/_authenti
 import { Route as AuthenticatedReviseIdRouteImport } from './routes/_authenticated/revise.$id'
 import { Route as ApiGmailTestCallbackRouteImport } from './routes/api.gmail-test.callback'
 import { Route as ApiGmailTestStartRouteImport } from './routes/api.gmail-test.start'
+import { Route as ApiVerifyTicketTokenRouteImport } from './routes/api.verify-ticket.$token'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -85,6 +87,11 @@ const AuthenticatedVehiclesRoute = AuthenticatedVehiclesRouteImport.update({
   path: '/vehicles',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const VerifyTicketTokenRoute = VerifyTicketTokenRouteImport.update({
+  id: '/verify-ticket/$token',
+  path: '/verify-ticket/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedPrintIdRoute = AuthenticatedPrintIdRouteImport.update({
   id: '/print/$id',
   path: '/print/$id',
@@ -122,6 +129,11 @@ const ApiGmailTestStartRoute = ApiGmailTestStartRouteImport.update({
   path: '/api/gmail-test/start',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiVerifyTicketTokenRoute = ApiVerifyTicketTokenRouteImport.update({
+  id: '/api/verify-ticket/$token',
+  path: '/api/verify-ticket/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -134,12 +146,14 @@ export interface FileRoutesByFullPath {
   '/profile': typeof AuthenticatedProfileRoute
   '/trip-archive': typeof AuthenticatedTripArchiveRoute
   '/vehicles': typeof AuthenticatedVehiclesRoute
+  '/verify-ticket/$token': typeof VerifyTicketTokenRoute
   '/print/$id': typeof AuthenticatedPrintIdRoute
   '/requests/$id': typeof AuthenticatedRequestsIdRoute
   '/requests/new': typeof AuthenticatedRequestsNewRoute
   '/revise/$id': typeof AuthenticatedReviseIdRoute
   '/api/gmail-test/callback': typeof ApiGmailTestCallbackRoute
   '/api/gmail-test/start': typeof ApiGmailTestStartRoute
+  '/api/verify-ticket/$token': typeof ApiVerifyTicketTokenRoute
   '/requests/': typeof AuthenticatedRequestsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -153,12 +167,14 @@ export interface FileRoutesByTo {
   '/profile': typeof AuthenticatedProfileRoute
   '/trip-archive': typeof AuthenticatedTripArchiveRoute
   '/vehicles': typeof AuthenticatedVehiclesRoute
+  '/verify-ticket/$token': typeof VerifyTicketTokenRoute
   '/print/$id': typeof AuthenticatedPrintIdRoute
   '/requests/$id': typeof AuthenticatedRequestsIdRoute
   '/requests/new': typeof AuthenticatedRequestsNewRoute
   '/revise/$id': typeof AuthenticatedReviseIdRoute
   '/api/gmail-test/callback': typeof ApiGmailTestCallbackRoute
   '/api/gmail-test/start': typeof ApiGmailTestStartRoute
+  '/api/verify-ticket/$token': typeof ApiVerifyTicketTokenRoute
   '/requests': typeof AuthenticatedRequestsIndexRoute
 }
 export interface FileRoutesById {
@@ -174,12 +190,14 @@ export interface FileRoutesById {
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/trip-archive': typeof AuthenticatedTripArchiveRoute
   '/_authenticated/vehicles': typeof AuthenticatedVehiclesRoute
+  '/verify-ticket/$token': typeof VerifyTicketTokenRoute
   '/_authenticated/print/$id': typeof AuthenticatedPrintIdRoute
   '/_authenticated/requests/$id': typeof AuthenticatedRequestsIdRoute
   '/_authenticated/requests/new': typeof AuthenticatedRequestsNewRoute
   '/_authenticated/revise/$id': typeof AuthenticatedReviseIdRoute
   '/api/gmail-test/callback': typeof ApiGmailTestCallbackRoute
   '/api/gmail-test/start': typeof ApiGmailTestStartRoute
+  '/api/verify-ticket/$token': typeof ApiVerifyTicketTokenRoute
   '/_authenticated/requests/': typeof AuthenticatedRequestsIndexRoute
 }
 export interface FileRouteTypes {
@@ -195,12 +213,14 @@ export interface FileRouteTypes {
     | '/profile'
     | '/trip-archive'
     | '/vehicles'
+    | '/verify-ticket/$token'
     | '/print/$id'
     | '/requests/$id'
     | '/requests/new'
     | '/revise/$id'
     | '/api/gmail-test/callback'
     | '/api/gmail-test/start'
+    | '/api/verify-ticket/$token'
     | '/requests/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -214,12 +234,14 @@ export interface FileRouteTypes {
     | '/profile'
     | '/trip-archive'
     | '/vehicles'
+    | '/verify-ticket/$token'
     | '/print/$id'
     | '/requests/$id'
     | '/requests/new'
     | '/revise/$id'
     | '/api/gmail-test/callback'
     | '/api/gmail-test/start'
+    | '/api/verify-ticket/$token'
     | '/requests'
   id:
     | '__root__'
@@ -234,12 +256,14 @@ export interface FileRouteTypes {
     | '/_authenticated/profile'
     | '/_authenticated/trip-archive'
     | '/_authenticated/vehicles'
+    | '/verify-ticket/$token'
     | '/_authenticated/print/$id'
     | '/_authenticated/requests/$id'
     | '/_authenticated/requests/new'
     | '/_authenticated/revise/$id'
     | '/api/gmail-test/callback'
     | '/api/gmail-test/start'
+    | '/api/verify-ticket/$token'
     | '/_authenticated/requests/'
   fileRoutesById: FileRoutesById
 }
@@ -249,8 +273,10 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   PrivacyRoute: typeof PrivacyRoute
   RegisterRoute: typeof RegisterRoute
+  VerifyTicketTokenRoute: typeof VerifyTicketTokenRoute
   ApiGmailTestCallbackRoute: typeof ApiGmailTestCallbackRoute
   ApiGmailTestStartRoute: typeof ApiGmailTestStartRoute
+  ApiVerifyTicketTokenRoute: typeof ApiVerifyTicketTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -332,6 +358,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedVehiclesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/verify-ticket/$token': {
+      id: '/verify-ticket/$token'
+      path: '/verify-ticket/$token'
+      fullPath: '/verify-ticket/$token'
+      preLoaderRoute: typeof VerifyTicketTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/print/$id': {
       id: '/_authenticated/print/$id'
       path: '/print/$id'
@@ -381,6 +414,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiGmailTestStartRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/verify-ticket/$token': {
+      id: '/api/verify-ticket/$token'
+      path: '/api/verify-ticket/$token'
+      fullPath: '/api/verify-ticket/$token'
+      preLoaderRoute: typeof ApiVerifyTicketTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -422,8 +462,10 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   PrivacyRoute: PrivacyRoute,
   RegisterRoute: RegisterRoute,
+  VerifyTicketTokenRoute: VerifyTicketTokenRoute,
   ApiGmailTestCallbackRoute: ApiGmailTestCallbackRoute,
   ApiGmailTestStartRoute: ApiGmailTestStartRoute,
+  ApiVerifyTicketTokenRoute: ApiVerifyTicketTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

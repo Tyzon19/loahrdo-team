@@ -67,6 +67,24 @@ function cropSignature(canvas: HTMLCanvasElement) {
   landscapeContext.drawImage(cropped, 0, 0);
   return landscape.toDataURL("image/png");
 }
+
+function configureCanvas(canvas: HTMLCanvasElement, lineWidth: number) {
+  const rect = canvas.getBoundingClientRect();
+  const ratio = window.devicePixelRatio || 1;
+  const width = Math.round(rect.width * ratio);
+  const height = Math.round(rect.height * ratio);
+  if (canvas.width !== width) canvas.width = width;
+  if (canvas.height !== height) canvas.height = height;
+
+  const context = canvas.getContext("2d");
+  if (!context) return;
+  context.setTransform(ratio, 0, 0, ratio, 0, 0);
+  context.lineWidth = lineWidth;
+  context.lineCap = "round";
+  context.lineJoin = "round";
+  context.strokeStyle = getComputedStyle(canvas).color;
+}
+
 export function SignaturePad({ onChange }: { onChange: (v: SignatureValue | null) => void }) {
   const [mode, setMode] = useState<"draw" | "upload">("draw");
   const [fullScreenOpen, setFullScreenOpen] = useState(false);
@@ -81,19 +99,6 @@ export function SignaturePad({ onChange }: { onChange: (v: SignatureValue | null
   const hasInk = useRef(false);
   const fullScreenHasInk = useRef(false);
   const fullScreenSize = useRef({ width: 0, height: 0 });
-
-  useEffect(() => {
-    const c = canvas.current;
-    if (!c) return;
-    const ratio = window.devicePixelRatio || 1;
-    c.width = c.offsetWidth * ratio;
-    c.height = c.offsetHeight * ratio;
-    const ctx = c.getContext("2d")!;
-    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-    ctx.lineWidth = 2;
-    ctx.lineCap = "round";
-    ctx.strokeStyle = getComputedStyle(c).color;
-  }, [mode]);
 
   useEffect(() => {
     if (!fullScreenOpen) return;
@@ -273,6 +278,7 @@ export function SignaturePad({ onChange }: { onChange: (v: SignatureValue | null
               onPointerDown={(e) => {
                 const target = canvas.current;
                 if (!target) return;
+                configureCanvas(target, 2);
                 drawing.current = true;
                 const p = pos(e, target);
                 const ctx = target.getContext("2d");
@@ -369,6 +375,7 @@ export function SignaturePad({ onChange }: { onChange: (v: SignatureValue | null
                   onPointerDown={(e) => {
                     const target = fullScreenCanvas.current;
                     if (!target) return;
+                    configureCanvas(target, 3);
                     fullScreenDrawing.current = true;
                     const p = pos(e, target);
                     const ctx = target.getContext("2d");

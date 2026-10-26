@@ -162,6 +162,7 @@ export interface ConflictCandidate {
 export interface RequestDetail {
   request: VehicleRequest;
   tripTicketAttached: boolean;
+  ticketVerificationToken?: string | undefined;
   doc: DocConfig;
   approverNames: Partial<Record<StageKey, string>>;
   approverUserIds: Partial<Record<StageKey, string>>;
