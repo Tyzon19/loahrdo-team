@@ -49,7 +49,7 @@ export const ROLE_TITLES: Record<Role, string> = {
   director: "Director for Administration",
   president: "President",
   transport_staff: "Transport Personnel",
-  assistant: "Assistant",
+  assistant: "Alternate Signatory",
   guard: "Guard on Duty",
   driver: "Driver",
   admin: "System Administrator",
@@ -102,7 +102,7 @@ export function validateRequestInput(
   const e: E = {};
   if (!input.department.trim()) e.department = "Enter your department or office.";
   const dests = input.destinations.map((d) => d.trim()).filter(Boolean);
-  if (dests.length === 0) e.destinations = "Enter at least one destination.";
+  if (dests.length === 0) e.destinations = "Enter your destinations.";
   if (!Number.isInteger(input.passengers) || input.passengers < 1)
     e.passengers = "Enter the number of passengers (at least 1).";
   else if (input.passengers > 60)
@@ -261,7 +261,7 @@ export function approveStage(
   if (!sig.image) throw new WorkflowError("A signature is required.");
   const proxySignerName = sig.proxySignerName?.trim();
   if (sig.proxySignerName !== undefined && !proxySignerName) {
-    throw new WorkflowError("The assistant name is required for an alternate signature.");
+    throw new WorkflowError("The alternate signatory name is required.");
   }
   if (Boolean(proxySignerName) !== authorizedProxy) {
     throw new WorkflowError("Only the assigned alternate may sign as a proxy.");
@@ -365,11 +365,19 @@ export function approveStage(
   return { request: next, emails };
 }
 
-export function rejectStage(ctx: Ctx, r: VehicleRequest, actor: User, reason: string) {
+export function rejectStage(
+  ctx: Ctx,
+  r: VehicleRequest,
+  actor: User,
+  reason: string,
+  authorizedProxy = false,
+) {
   const stage = stageForStatus(r.status);
   if (!stage) throw new WorkflowError("This request is not waiting for an approval decision.");
-  if (stage.role !== actor.role)
-    throw new WorkflowError(`This step must be completed by the ${stage.title}.`);
+  if (stage.role !== actor.role && !authorizedProxy)
+    throw new WorkflowError(
+      `This step must be completed by the ${stage.title} or assigned alternate.`,
+    );
   const why = reason.trim();
   if (why.length < 5) throw new WorkflowError("Please give a reason for returning the request.");
   const next: VehicleRequest = {
@@ -386,7 +394,16 @@ export function rejectStage(ctx: Ctx, r: VehicleRequest, actor: User, reason: st
     },
   };
   next.history.push(
-    ev(ctx, next, actor, "returned", `Returned the request to the requisitioner.`, why),
+    ev(
+      ctx,
+      next,
+      actor,
+      "returned",
+      authorizedProxy
+        ? `Returned the request to the requisitioner as the assigned alternate for the ${stage.title}.`
+        : "Returned the request to the requisitioner.",
+      why,
+    ),
   );
   const requester = ctx.users.filter((u) => u.id === r.requisitionerId);
   const emails = makeEmails(
@@ -394,7 +411,7 @@ export function rejectStage(ctx: Ctx, r: VehicleRequest, actor: User, reason: st
     next,
     "returned",
     requester,
-    `Returned by the ${stage.title}. Reason: ${why}`,
+    `${authorizedProxy ? `Returned by the assigned alternate for the ${stage.title}` : `Returned by the ${stage.title}`}. Reason: ${why}`,
   );
   return { request: next, emails };
 }
@@ -436,6 +453,33 @@ export function resubmit(ctx: Ctx, r: VehicleRequest, actor: User, input: Reques
   );
   return { request: next, emails };
 }
+
+export function updatePendingRequest(
+  ctx: Ctx,
+  r: VehicleRequest,
+  actor: User,
+  input: RequestInput,
+) {
+  if (r.status !== "pending_review" || currentSignatures(r).length > 0) {
+    throw new WorkflowError(
+      "This request can no longer be edited because the Head of Transport Services has signed it.",
+    );
+  }
+  if (actor.id !== r.requisitionerId) {
+    throw new WorkflowError("Only the original requisitioner can edit this request.");
+  }
+  const next: VehicleRequest = {
+    ...r,
+    ...input,
+    destinations: input.destinations.map((destination) => destination.trim()).filter(Boolean),
+    history: [...r.history],
+  };
+  next.history.push(
+    ev(ctx, next, actor, "updated", "Updated the request before the initial transport review."),
+  );
+  return next;
+}
+
 function overlaps(a1: string, a2: string, b1: string, b2: string) {
   return a1 <= b2 && b1 <= a2;
 }

@@ -4,7 +4,9 @@ import {
   createRequest,
   rejectStage,
   resubmit,
+  ROLE_TITLES,
   STAGES,
+  updatePendingRequest,
   WorkflowError,
   type Ctx,
 } from "@/lib/workflow";
@@ -16,6 +18,7 @@ const users: User[] = [
   { id: "d", name: "Dir", role: "director", department: "", email: "d@x" },
   { id: "p", name: "Pres", role: "president", department: "", email: "p@x" },
   { id: "t", name: "Staff", role: "transport_staff", department: "", email: "t@x" },
+  { id: "a", name: "Admin", role: "admin", department: "", email: "a@x" },
 ];
 let i = 0;
 const ctx: Ctx = { users, now: "2026-10-22T00:00:00.000Z", newId: () => `x${i++}` };
@@ -34,6 +37,7 @@ const input = {
 describe("approval workflow", () => {
   it("keeps the President's title separate from the configured approver name", () => {
     expect(STAGES.find((stage) => stage.key === "approve")?.title).toBe("President");
+    expect(ROLE_TITLES.assistant).toBe("Alternate Signatory");
   });
 
   it("follows Head of Transport → Director → President order", () => {
@@ -67,6 +71,12 @@ describe("approval workflow", () => {
     const r = createRequest(ctx, input, u("r"), "VR-2").request;
     expect(() => rejectStage(ctx, r, u("h"), "  ")).toThrow(WorkflowError);
   });
+  it("keeps administrators out of the approval and rejection workflow", () => {
+    const r = createRequest(ctx, input, u("r"), "VR-ADMIN").request;
+
+    expect(() => approveStage(ctx, r, u("a"), sig)).toThrow(WorkflowError);
+    expect(() => rejectStage(ctx, r, u("a"), "Not authorized")).toThrow(WorkflowError);
+  });
   it("creates a return email for the original requisitioner", () => {
     const r = createRequest(ctx, input, u("r"), "VR-RETURN").request;
     const result = rejectStage(ctx, r, u("h"), "Missing travel details");
@@ -78,6 +88,38 @@ describe("approval workflow", () => {
       kind: "returned",
       requestId: r.id,
     });
+  });
+  it("allows the assigned alternate to return a request with their own identity", () => {
+    const r = createRequest(ctx, input, u("r"), "VR-ALT-RETURN").request;
+    expect(() => rejectStage(ctx, r, u("t"), "Missing details")).toThrow(WorkflowError);
+
+    const result = rejectStage(ctx, r, u("t"), "Missing details", true);
+    expect(result.request).toMatchObject({
+      status: "returned",
+      lastReturn: { byName: "Staff", byRole: "transport_staff", stage: "review" },
+    });
+    expect(result.request.history.at(-1)?.message).toContain("assigned alternate");
+    expect(result.emails[0]?.body).toContain("assigned alternate");
+  });
+  it("allows the requisitioner to edit a request only before initial transport review", () => {
+    const r = createRequest(ctx, input, u("r"), "VR-EDIT").request;
+    const editedInput = { ...input, purpose: "Updated field trip purpose" };
+    const updated = updatePendingRequest(ctx, r, u("r"), editedInput);
+
+    expect(updated).toMatchObject({
+      status: "pending_review",
+      attempt: r.attempt,
+      submittedAt: r.submittedAt,
+      purpose: editedInput.purpose,
+    });
+    expect(updated.history.at(-1)).toMatchObject({
+      type: "updated",
+      actorName: "Req",
+    });
+    expect(() => updatePendingRequest(ctx, r, u("h"), editedInput)).toThrow(WorkflowError);
+
+    const signed = approveStage(ctx, r, u("h"), sig).request;
+    expect(() => updatePendingRequest(ctx, signed, u("r"), editedInput)).toThrow(WorkflowError);
   });
   it("allows an assigned alternate to sign with their own authenticated identity", () => {
     const r = createRequest(ctx, input, u("r"), "VR-4").request;

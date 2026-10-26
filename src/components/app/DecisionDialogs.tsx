@@ -86,12 +86,13 @@ export function ApproveDialog({
   );
 }
 export function RejectDialog({
-  open, onOpenChange, onConfirm, stageTitle,
+  open, onOpenChange, onConfirm, stageTitle, proxySigner = false,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   onConfirm: (reason: string) => Promise<void> | void;
   stageTitle: string;
+  proxySigner?: boolean;
 }) {
   const [reason, setReason] = useState("");
   const [err, setErr] = useState<string | null>(null);
@@ -107,7 +108,11 @@ export function RejectDialog({
           <Label htmlFor="reason">Reason for returning <span className="text-destructive">*</span></Label>
           <Textarea id="reason" rows={4} value={reason} onChange={(e) => setReason(e.target.value)} className="mt-1" placeholder="Explain what the requisitioner should change." aria-invalid={!!err} />
           {err && <p className="mt-1 text-sm text-destructive">{err}</p>}
-          <p className="mt-1 text-xs text-muted-foreground">Recorded as returned by the {stageTitle}.</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {proxySigner
+              ? `Recorded as returned by you, the assigned alternate for the ${stageTitle}.`
+              : `Recorded as returned by the ${stageTitle}.`}
+          </p>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>

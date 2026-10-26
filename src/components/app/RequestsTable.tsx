@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowUpRight } from "lucide-react";
-import type { VehicleRequest } from "@/lib/types";
+import type { RequestRow } from "@/lib/types";
 import { fmtDate, fmtRange } from "@/lib/format";
 import { pendingWith } from "@/lib/workflow";
 import { StatusBadge } from "./StatusBadge";
@@ -10,7 +10,7 @@ export function RequestsTable({
   empty = "No requests to show.",
   showRequester = false,
 }: {
-  rows: VehicleRequest[];
+  rows: RequestRow[];
   empty?: string;
   showRequester?: boolean;
 }) {

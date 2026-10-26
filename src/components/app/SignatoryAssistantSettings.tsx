@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { User } from "@/lib/types";
+import { ROLE_TITLES } from "@/lib/workflow";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -98,7 +99,7 @@ export function SignatoryAssistantSettings() {
         toast.error(resultError(result, "We couldn't save the alternate signatories."));
         return;
       }
-      toast.success("Signatory assistant names saved.");
+      toast.success("Alternate signatories saved.");
       await queryClient.invalidateQueries({ queryKey: ["signatory-assistants"] });
       await queryClient.invalidateQueries({ queryKey: ["request"] });
     } catch {
@@ -123,7 +124,7 @@ export function SignatoryAssistantSettings() {
         typeof email !== "string" ||
         typeof temporaryPassword !== "string"
       ) {
-        toast.error(resultError(result, "We couldn't create the assistant account."));
+        toast.error(resultError(result, "We couldn't create the alternate signatory account."));
         return;
       }
       setCreatedAccount({
@@ -135,10 +136,10 @@ export function SignatoryAssistantSettings() {
         email: "",
         department: "",
       });
-      toast.success("Assistant account created. Copy the temporary password now.");
+      toast.success("Alternate signatory account created. Copy the temporary password now.");
       await queryClient.invalidateQueries({ queryKey: ["signatory-assistants"] });
     } catch {
-      toast.error("We couldn't create the assistant account. Please try again.");
+      toast.error("We couldn't create the alternate signatory account. Please try again.");
     } finally {
       setAccountBusy(false);
     }
@@ -175,11 +176,11 @@ export function SignatoryAssistantSettings() {
   }
   return (
     <div className="space-y-4">
-      <Section title="Create Assistant Account">
+      <Section title="Create Alternate Signatory Account">
         <p className="mb-4 text-sm text-muted-foreground">
-          Create an individual institutional account for an assistant. The temporary password is
-          shown once; share it securely. New accounts have the Assistant role and must change their
-          password at first sign-in.
+          Create an individual institutional account for an alternate signatory. The temporary
+          password is shown once; share it securely. New accounts must change their password at
+          first sign-in.
         </p>
         <form className="grid max-w-3xl gap-4 sm:grid-cols-2" onSubmit={createAccount}>
           <div>
@@ -223,7 +224,11 @@ export function SignatoryAssistantSettings() {
             />
           </div>
           <Button className="sm:col-span-2" type="submit" disabled={accountBusy}>
-            {accountBusy ? <ButtonLoading label="Creating…" /> : "Create assistant account"}
+            {accountBusy ? (
+              <ButtonLoading label="Creating…" />
+            ) : (
+              "Create alternate signatory account"
+            )}
           </Button>
         </form>
         {createdAccount && (
@@ -240,7 +245,7 @@ export function SignatoryAssistantSettings() {
               onFocus={(event) => event.currentTarget.select()}
             />
             <p className="mt-2 text-xs">
-              This password is shown only in this result. The assistant must change it on first
+              This password is shown only in this result. The account holder must change it on first
               sign-in.
             </p>
           </div>
@@ -277,7 +282,7 @@ export function SignatoryAssistantSettings() {
                 <option value="">Choose a user</option>
                 {query.data.resettableUsers.map((user: User) => (
                   <option key={user.id} value={user.id}>
-                    {user.name} — {user.email} ({user.role.replaceAll("_", " ")})
+                    {user.name} — {user.email} ({ROLE_TITLES[user.role]})
                   </option>
                 ))}
               </select>
@@ -308,54 +313,54 @@ export function SignatoryAssistantSettings() {
       </Section>
       <Section title="Assign Alternate Signatories">
         <p className="mb-4 text-sm text-muted-foreground">
-          Choose an assistant account for each signatory. The assigned assistant signs in with
-          their own account when needed; their signature, name, and actual signing time are recorded
-          separately beside the primary signatory.
+          Choose an alternate signatory account for each stage. When needed, the assigned person
+          signs in with their own account; their name, signature, and signing time are recorded
+          separately from the primary signatory.
         </p>
-      {query.isPending ? (
-        <LoadingPanel label="Loading assistant names" rows={3} />
-      ) : query.isError ? (
-        <div className="p-4 text-sm" role="alert">
-          <p className="font-medium">We couldn&apos;t load signatory assistant names.</p>
-          <Button className="mt-3" variant="outline" onClick={() => void query.refetch()}>
-            Try again
-          </Button>
-        </div>
-      ) : (
-        <form className="max-w-xl space-y-4" onSubmit={save}>
-          {FIELDS.map(({ key, label }) => (
-            <div key={key}>
-              <Label htmlFor={`assistant-${key}`}>{label} assistant account</Label>
-              <select
-                id={`assistant-${key}`}
-                className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={form[key].userId}
-                onChange={(event) => {
-                  const userId = event.target.value;
-                  const user = query.data.users.find((entry: User) => entry.id === userId);
-                  setForm((current) => ({
-                    ...current,
-                    [key]: { userId, name: user?.name ?? "" },
-                  }));
-                }}
-              >
-                <option value="">No alternate signer</option>
-                {query.data.users.map((user: User) => (
-                  <option key={user.id} value={user.id}>
-                    {user.name} — {user.role.replaceAll("_", " ")}
-                  </option>
-                ))}
-              </select>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Assistant name: {form[key].name || "Not assigned"}
-              </p>
-            </div>
-          ))}
-          <Button type="submit" disabled={busy}>
-            {busy ? <ButtonLoading label="Saving…" /> : "Save alternate signatories"}
-          </Button>
-        </form>
-      )}
+        {query.isPending ? (
+          <LoadingPanel label="Loading alternate signatories" rows={3} />
+        ) : query.isError ? (
+          <div className="p-4 text-sm" role="alert">
+            <p className="font-medium">We couldn&apos;t load alternate signatories.</p>
+            <Button className="mt-3" variant="outline" onClick={() => void query.refetch()}>
+              Try again
+            </Button>
+          </div>
+        ) : (
+          <form className="max-w-xl space-y-4" onSubmit={save}>
+            {FIELDS.map(({ key, label }) => (
+              <div key={key}>
+                <Label htmlFor={`assistant-${key}`}>{label} alternate signatory</Label>
+                <select
+                  id={`assistant-${key}`}
+                  className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={form[key].userId}
+                  onChange={(event) => {
+                    const userId = event.target.value;
+                    const user = query.data.users.find((entry: User) => entry.id === userId);
+                    setForm((current) => ({
+                      ...current,
+                      [key]: { userId, name: user?.name ?? "" },
+                    }));
+                  }}
+                >
+                  <option value="">No alternate signer</option>
+                  {query.data.users.map((user: User) => (
+                    <option key={user.id} value={user.id}>
+                      {user.name} — {ROLE_TITLES[user.role]}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Alternate signatory: {form[key].name || "Not assigned"}
+                </p>
+              </div>
+            ))}
+            <Button type="submit" disabled={busy}>
+              {busy ? <ButtonLoading label="Saving…" /> : "Save alternate signatories"}
+            </Button>
+          </form>
+        )}
       </Section>
     </div>
   );

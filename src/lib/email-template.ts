@@ -64,6 +64,15 @@ function absoluteActionUrl(baseUrl: string, path: string): string {
   return new URL(path, base.origin).toString();
 }
 
+export function splitReturnedReason(body: string) {
+  const match = /Reason:\s*([\s\S]*)$/i.exec(body);
+  if (!match) return { body, reason: undefined };
+  return {
+    body: body.slice(0, match.index).trim(),
+    reason: match[1]?.trim() || undefined,
+  };
+}
+
 export function renderEmailTemplate(
   message: EmailMessage,
   baseUrl: string,
@@ -76,12 +85,10 @@ export function renderEmailTemplate(
     throw new Error("The email action path must be an application-relative path.");
   }
   const actionUrl = absoluteActionUrl(baseUrl, actionPath);
-  const returnedReasonMatch =
-    message.kind === "returned" ? /Reason:\s*([\s\S]*)$/i.exec(message.body) : null;
-  const returnedReason = returnedReasonMatch?.[1]?.trim();
-  const bodyBeforeReason = returnedReasonMatch
-    ? message.body.slice(0, returnedReasonMatch.index).trim()
-    : message.body;
+  const { body: bodyBeforeReason, reason: returnedReason } =
+    message.kind === "returned"
+      ? splitReturnedReason(message.body)
+      : { body: message.body, reason: undefined };
   const safe = {
     actionUrl: escapeHtml(actionUrl),
     body: escapeHtml(bodyBeforeReason).replace(/\r?\n/g, "<br>"),

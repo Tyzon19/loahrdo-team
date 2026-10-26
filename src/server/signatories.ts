@@ -25,7 +25,7 @@ interface AssistantAccountRow extends RowDataPacket {
 
 function requireAdmin(role: Role) {
   if (role !== "admin") {
-    throw new AppError("Only administrators can manage signatory assistant names.");
+    throw new AppError("Only administrators can manage alternate signatories.");
   }
 }
 
@@ -58,7 +58,7 @@ export async function saveSignatoryAssistants(input: unknown) {
       const assistant = assistants[stage];
       if (assistant.userId) {
         if (assignedUsers.has(assistant.userId)) {
-          throw new AppError("Choose a different assistant account for each signatory.");
+          throw new AppError("Choose a different account for each alternate signatory.");
         }
         assignedUsers.add(assistant.userId);
         const rows = await all<AssistantAccountRow[]>(
@@ -68,7 +68,7 @@ export async function saveSignatoryAssistants(input: unknown) {
         );
         const account = rows[0];
         if (!account || !ASSISTANT_ROLES.includes(account.role)) {
-          throw new AppError("Choose an eligible registered assistant account.");
+          throw new AppError("Choose an eligible registered account for the alternate signatory.");
         }
         const stageRole: Record<StageKey, Role> = {
           review: "transport_head",
@@ -79,10 +79,10 @@ export async function saveSignatoryAssistants(input: unknown) {
           throw new AppError("Choose an account other than the primary signatory.");
         }
         if (assistant.name !== account.name.trim()) {
-          throw new AppError("The assistant name must match the selected account name.");
+          throw new AppError("The alternate signatory name must match the selected account name.");
         }
       } else if (assistant.name) {
-        throw new AppError("Select a registered account for each assistant name.");
+        throw new AppError("Select a registered account for each alternate signatory.");
       }
       await run(
         `INSERT INTO signatory_assistants (stage_key, assistant_name, assistant_user_id)

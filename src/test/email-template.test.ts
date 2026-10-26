@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { renderEmailTemplate, renderRegistrationOtpEmail } from "@/lib/email-template";
+import {
+  renderEmailTemplate,
+  renderRegistrationOtpEmail,
+  splitReturnedReason,
+} from "@/lib/email-template";
 import type { EmailMessage } from "@/lib/types";
 
 const message: EmailMessage = {
@@ -19,6 +23,21 @@ const message: EmailMessage = {
 };
 
 describe("professional email template", () => {
+  it("separates return reasons from the notification body", () => {
+    expect(
+      splitReturnedReason(
+        "Returned by the assigned alternate for the Director. Reason: cancelled due to bad weather",
+      ),
+    ).toEqual({
+      body: "Returned by the assigned alternate for the Director.",
+      reason: "cancelled due to bad weather",
+    });
+    expect(splitReturnedReason("A request is waiting for your review.")).toEqual({
+      body: "A request is waiting for your review.",
+      reason: undefined,
+    });
+  });
+
   it("renders a responsive HTML email and a plain-text alternative", () => {
     const rendered = renderEmailTemplate(
       message,

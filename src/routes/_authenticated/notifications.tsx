@@ -14,6 +14,7 @@ import {
 } from "@/server-functions";
 import { unwrap } from "@/lib/api";
 import { fmtDateTime, fmtRange } from "@/lib/format";
+import { splitReturnedReason } from "@/lib/email-template";
 import { STAGES, STATUS_LABELS } from "@/lib/workflow";
 import type { EmailMessage } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -187,6 +188,7 @@ function NotificationPreview({ email }: { email: EmailMessage }) {
   const photo = image.data ?? null;
   const stage = email.stage ? STAGES.find((item) => item.key === email.stage) : undefined;
   const r = request.data?.request;
+  const returnedMessage = email.kind === "returned" ? splitReturnedReason(email.body) : undefined;
 
   function openRequest() {
     const target =
@@ -228,8 +230,19 @@ function NotificationPreview({ email }: { email: EmailMessage }) {
         <p className="mt-2 break-words text-base font-semibold [overflow-wrap:anywhere]">
           {email.heading}
         </p>
-        {!photo && (
-          <p className="mt-2 break-words text-sm [overflow-wrap:anywhere]">{email.body}</p>
+        {!photo && returnedMessage ? (
+          <div className="mt-2 space-y-1 break-words text-sm [overflow-wrap:anywhere]">
+            {returnedMessage.body && <p>{returnedMessage.body}</p>}
+            {returnedMessage.reason && (
+              <p className="text-[13px] font-bold text-[#ff3333]">
+                Reason: {returnedMessage.reason}
+              </p>
+            )}
+          </div>
+        ) : (
+          !photo && (
+            <p className="mt-2 break-words text-sm [overflow-wrap:anywhere]">{email.body}</p>
+          )
         )}
         {photo && (
           <img

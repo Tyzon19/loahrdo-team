@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { PageHeader, Section, EmptyState } from "@/components/app/PageHeader";
 import { RequestForm } from "@/components/app/RequestForm";
 import { LoadingPanel } from "@/components/app/LoadingPanel";
-import { getRequestFn, resubmitRequestFn } from "@/server-functions";
+import { getRequestFn, resubmitRequestFn, updatePendingRequestFn } from "@/server-functions";
 import { unwrap } from "@/lib/api";
 import { STAGES } from "@/lib/workflow";
 import { todayISO } from "@/lib/format";
@@ -45,11 +45,14 @@ function Revise() {
 
   const detail = query.data;
   const r = detail?.request;
-  if (!r || r.requisitionerId !== viewer.id || r.status !== "returned") {
+  const canEditPending = r?.status === "pending_review";
+  const canReviseReturned = r?.status === "returned";
+  if (!r || r.requisitionerId !== viewer.id || (!canEditPending && !canReviseReturned)) {
     return (
       <Section title="Revision not available">
-        <EmptyState title="This request can't be revised right now.">
-          Only the original requisitioner can revise a request after it has been returned.{" "}
+        <EmptyState title="This request can't be edited right now.">
+          Only the original requisitioner can edit a request while it is awaiting the Head of
+          Transport Services, or revise it after it has been returned.{" "}
           {r && (
             <Link to="/requests/$id" params={{ id: r.id }} className="text-primary underline">
               View request
@@ -60,9 +63,23 @@ function Revise() {
     );
   }
 
-  const lastReturn = r.lastReturn!;
-
   async function onSubmit(input: RequestInput) {
+    if (canEditPending) {
+      const result = await updatePendingRequestFn({ data: { id: r!.id, input } });
+      if (!result.ok) {
+        toast.error(result.error);
+        throw new Error(result.error);
+      }
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["request", r!.id] }),
+        queryClient.invalidateQueries({ queryKey: ["requests"] }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] }),
+      ]);
+      toast.success("Request changes saved.");
+      await navigate({ to: "/requests/$id", params: { id: r!.id }, search: { notice: "edited" } });
+      return;
+    }
+
     const result = await resubmitRequestFn({ data: { id: r!.id, input } });
     if (!result.ok) {
       toast.error(result.error);
@@ -92,17 +109,21 @@ function Revise() {
   return (
     <>
       <PageHeader
-        title={`Revise ${r.number}`}
-        description="Update the details, then resubmit. Approval will start again with the Head of Transport Services."
+        title={canEditPending ? `Edit ${r.number}` : `Revise ${r.number}`}
+        description={
+          canEditPending
+            ? "Save your changes before the Head of Transport Services signs. Editing closes as soon as the request is signed."
+            : "Update the details, then resubmit. Approval will start again with the Head of Transport Services."
+        }
       />
-      <div className="mb-4 rounded-sm border border-destructive/40 bg-danger-soft p-3 text-sm">
-        <p className="font-semibold">
-          Returned by the {STAGES.find((x) => x.key === lastReturn.stage)!.title}
-        </p>
-        <p>
-          <strong>Reason:</strong> {lastReturn.reason}
-        </p>
-      </div>
+      {!canEditPending && r.lastReturn && (
+        <div className="mb-4 rounded-sm border border-destructive/40 bg-danger-soft p-3 text-sm">
+          <p className="font-semibold">
+            Returned by the {STAGES.find((x) => x.key === r.lastReturn!.stage)!.title}
+          </p>
+          <p className="text-[13px] font-bold text-[#ff3333]">Reason: {r.lastReturn.reason}</p>
+        </div>
+      )}
       <RequestForm
         key={r.id + r.attempt}
         header={{ number: r.number, date: todayISO(), requisitioner: r.requisitionerName }}
@@ -115,7 +136,8 @@ function Revise() {
           timeNeeded: r.timeNeeded,
           purpose: r.purpose,
         }}
-        submitLabel="Resubmit Request"
+        submitLabel={canEditPending ? "Save Changes" : "Resubmit Request"}
+        allowExistingPastStartDate={canEditPending}
         onSubmit={onSubmit}
       />
     </>

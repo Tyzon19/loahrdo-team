@@ -10,6 +10,7 @@ import {
   Mail,
   ArrowDownToLine,
   RefreshCw,
+  Send,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -35,13 +36,16 @@ import { currentSignatures, STAGES, stageForStatus, vehicleWarnings } from "@/li
 import type { RequestDetail, StageKey, Viewer } from "@/lib/types";
 import { fmtDate, fmtDateTime, fmtRange, fmtTime } from "@/lib/format";
 import { SITE } from "@/lib/site";
+import { canViewAllRequests } from "@/lib/access";
 
-type Search = { notice?: "submitted" | "resubmitted" | undefined };
+type Search = { notice?: "submitted" | "resubmitted" | "edited" | undefined };
 
 export const Route = createFileRoute("/_authenticated/requests/$id")({
   validateSearch: (search: Record<string, unknown>): Search => ({
     notice:
-      search["notice"] === "submitted" || search["notice"] === "resubmitted"
+      search["notice"] === "submitted" ||
+      search["notice"] === "resubmitted" ||
+      search["notice"] === "edited"
         ? search["notice"]
         : undefined,
   }),
@@ -143,6 +147,7 @@ function RequestDetailPage() {
   const isProxySigner = Boolean(stage && detail.assistantUserIds[stage.key] === viewer.id);
   const myTurn = Boolean(stage && (stage.role === viewer.role || isProxySigner));
   const isOwner = r.requisitionerId === viewer.id;
+  const canSendTripTicket = canViewAllRequests(viewer.role);
   const sigs = currentSignatures(r);
 
   return (
@@ -157,15 +162,58 @@ function RequestDetailPage() {
           </span>
         }
         actions={
-          ["approved", "dispatched", "completed"].includes(r.status) ? (
-            <Button asChild variant="outline">
-              <Link to="/print/$id" params={{ id: r.id }}>
-                <ArrowDownToLine className="h-4 w-4" aria-hidden /> Download Trip Ticket
-              </Link>
-            </Button>
-          ) : undefined
+          <div className="flex flex-wrap gap-2">
+            {isOwner && r.status === "pending_review" && (
+              <Button asChild variant="outline">
+                <Link to="/revise/$id" params={{ id: r.id }}>
+                  Edit Request
+                </Link>
+              </Button>
+            )}
+            {["approved", "dispatched", "completed"].includes(r.status) && (
+              <Button
+                asChild
+                variant={canSendTripTicket && !detail.tripTicketAttached ? "default" : "outline"}
+              >
+                <Link to="/print/$id" params={{ id: r.id }}>
+                  {canSendTripTicket ? (
+                    <Send className="h-4 w-4" aria-hidden />
+                  ) : (
+                    <ArrowDownToLine className="h-4 w-4" aria-hidden />
+                  )}
+                  {canSendTripTicket
+                    ? detail.tripTicketAttached
+                      ? "Trip Ticket Sent"
+                      : "Send Trip Ticket"
+                    : "Download Trip Ticket"}
+                </Link>
+              </Button>
+            )}
+          </div>
         }
       />
+
+      {["approved", "dispatched", "completed"].includes(r.status) && canSendTripTicket && (
+        <Notice
+          tone={detail.tripTicketAttached ? "success" : "info"}
+          icon={detail.tripTicketAttached ? CheckCircle2 : Info}
+          title={
+            detail.tripTicketAttached
+              ? "Trip Ticket successfully sent to the requisitioner's email."
+              : "Trip ticket is ready to send."
+          }
+        >
+          {detail.tripTicketAttached
+            ? "The requisitioner can open the notification to view and download the ticket."
+            : "Use Send Trip Ticket above to attach the ticket to the requisitioner's notification."}
+        </Notice>
+      )}
+
+      {search.notice === "edited" && isOwner && r.status === "pending_review" && (
+        <Notice tone="success" icon={CheckCircle2} title="Your request changes have been saved.">
+          You can continue editing until the Head of Transport Services signs the request.
+        </Notice>
+      )}
 
       {search.notice === "submitted" && isOwner && r.status === "pending_review" && (
         <Notice
@@ -291,7 +339,9 @@ function RequestDetailPage() {
                 const signature = sigs.find((x) => x.stage === st.key);
                 return (
                   <div key={st.key} className="min-w-0 rounded-sm border p-3">
-                    <p className="break-words text-[13px] font-semibold uppercase tracking-wide">{st.label}</p>
+                    <p className="break-words text-[13px] font-semibold uppercase tracking-wide">
+                      {st.label}
+                    </p>
                     <p className="break-words text-[13px] text-muted-foreground">{st.title}</p>
                     <div className="mt-2 flex min-h-12 items-center">
                       {signature ? (
@@ -419,7 +469,7 @@ function ActionPanel({
     setApproveOpen(false);
     toast.success(
       stageKey === "approve"
-        ? "Request approved. The trip ticket is ready to download."
+        ? "Request approved. The trip ticket is ready to send."
         : "Signed and forwarded to the next approver.",
     );
     if (result.data.workflowEmail?.sent) {
@@ -460,15 +510,16 @@ function ActionPanel({
       <div className="min-w-0 space-y-4 p-4">
         {isProxySigner ? (
           <p className="rounded-sm border border-primary/30 bg-info-soft p-3 text-sm">
-            You are the assigned alternate signatory for the {stage.title}. Sign with your own
-            account; your name and signing time will be recorded on the trip ticket.
+            You are the assigned alternate for the {stage.title}. You may sign or return this
+            request using your own account; your name and action will be recorded in the request
+            history.
           </p>
         ) : (
           <p className="rounded-sm border p-3 text-sm">
             <strong>Alternate signatory:</strong>{" "}
             {detail.assistantNames[stageKey] ?? "No alternate is assigned."}
             {detail.assistantNames[stageKey] &&
-              " If you are unavailable, the assigned assistant must sign in with their own account to sign this stage."}
+              " If you are unavailable, the assigned alternate signatory must use their own account to complete this stage."}
           </p>
         )}
         {stageKey === "approve" && (
@@ -594,11 +645,14 @@ function ActionPanel({
         )}
 
         <div className="flex flex-col gap-2 border-t pt-4 sm:flex-row">
-          <Button size="lg" className="w-full whitespace-normal leading-snug sm:w-auto sm:min-w-56" onClick={() => setApproveOpen(true)}>
+          <Button
+            size="lg"
+            className="w-full whitespace-normal leading-snug sm:w-auto sm:min-w-56"
+            onClick={() => setApproveOpen(true)}
+          >
             <CheckCircle2 className="h-4 w-4" aria-hidden /> {ACTION_LABEL[stageKey]}
           </Button>
           <Button
-            hidden={isProxySigner}
             size="lg"
             variant="outline"
             className="w-full whitespace-normal leading-snug border-destructive/50 text-destructive hover:bg-danger-soft hover:text-destructive sm:w-auto"
@@ -629,6 +683,7 @@ function ActionPanel({
         open={rejectOpen}
         onOpenChange={setRejectOpen}
         stageTitle={stage.title}
+        proxySigner={isProxySigner}
         onConfirm={onReject}
       />
     </section>

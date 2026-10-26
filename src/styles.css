@@ -218,6 +218,12 @@
     display: none;
   }
 
+  .official-ticket-view {
+    box-sizing: border-box;
+    width: 100%;
+    overflow-x: hidden;
+  }
+
   .print-half {
     position: relative;
     width: 148.5mm;
@@ -246,8 +252,9 @@
   }
 
   .official-ticket-image {
-    width: 148.5mm !important;
-    max-width: none !important;
+    width: 100% !important;
+    max-width: 148.5mm !important;
+    height: auto !important;
   }
 }
 

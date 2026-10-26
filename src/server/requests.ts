@@ -24,6 +24,7 @@ import {
 } from "@/lib/access";
 import {
   approveSchema,
+  destinationSearchSchema,
   rejectSchema,
   requestFilterSchema,
   requestIdSchema,
@@ -31,6 +32,7 @@ import {
   resubmitSchema,
   sendTripTicketSchema,
   todayISO,
+  updatePendingRequestSchema,
   vehicleSchema,
 } from "@/lib/validation";
 import {
@@ -40,6 +42,7 @@ import {
   rejectStage,
   resubmit as resubmitWorkflow,
   stageForStatus,
+  updatePendingRequest as updatePendingRequestWorkflow,
   WorkflowError,
   type Ctx,
 } from "@/lib/workflow";
@@ -265,6 +268,41 @@ export async function listRequests(input: unknown): Promise<RequestRow[]> {
   }));
 }
 
+export async function getDestinationSuggestions(input: unknown): Promise<string[]> {
+  const viewer = await requireViewer();
+  if (viewer.role !== "requisitioner") {
+    throw new AppError("Only requisitioners can search their previous destinations.");
+  }
+  const query = parseInput(destinationSearchSchema, input);
+  const searchPattern = `%${query
+    .split(/\s+/)
+    .map((term) => likePattern(term).slice(1, -1))
+    .join("%")}%`;
+  const rows = await all<RowDataPacket[]>(
+    `SELECT d.destination
+     FROM request_destinations d
+     JOIN requests r ON r.id = d.request_id
+     WHERE r.requisitioner_id = ? AND d.destination LIKE ?
+     ORDER BY r.submitted_at DESC
+     LIMIT 50`,
+    [viewer.id, searchPattern],
+  );
+  const normalized = new Set<string>();
+  const matches: string[] = [];
+  const lowerQuery = query.replace(/\s+/g, " ").toLocaleLowerCase();
+  for (const row of rows) {
+    const storedDestination = String(row["destination"]).trim().replace(/\s+/g, " ");
+    if (!storedDestination.toLocaleLowerCase().includes(lowerQuery)) continue;
+    const destination = storedDestination.split(",")[0]?.trim().replace(/\s+/g, " ") ?? "";
+    const key = destination.toLocaleLowerCase();
+    if (!destination || normalized.has(key)) continue;
+    normalized.add(key);
+    matches.push(destination);
+    if (matches.length === 5) break;
+  }
+  return matches;
+}
+
 async function requestDetail(
   id: unknown,
   includeSignatureImages: boolean,
@@ -452,8 +490,8 @@ export async function approveRequest(
     if (data.proxySigner !== isProxySigner) {
       throw new AppError(
         isProxySigner
-          ? "Assigned assistants must sign using the alternate-signatory action."
-          : "Only the assigned assistant account can sign as an alternate.",
+          ? "Assigned alternate signatories must use the alternate-signatory action."
+          : "Only the assigned alternate signatory account can sign at this stage.",
       );
     }
     const proxySignerName = isProxySigner ? viewer.name : undefined;
@@ -571,6 +609,9 @@ export async function rejectRequest(
       throw new AppError("You don't have access to this request.");
     }
 
+    const stage = stageForStatus(request.status);
+    const assistantUserId = stage ? (await loadAssistantUserIds(conn))[stage.key] : undefined;
+    const isProxySigner = assistantUserId === viewer.id;
     const ctx = {
       users: await loadUsers(conn),
       now: new Date().toISOString(),
@@ -578,7 +619,7 @@ export async function rejectRequest(
     };
     let out;
     try {
-      out = rejectStage(ctx, request, viewer, data.reason);
+      out = rejectStage(ctx, request, viewer, data.reason, isProxySigner);
     } catch (error) {
       if (error instanceof WorkflowError) throw new AppError(error.message);
       throw error;
@@ -692,6 +733,64 @@ export async function resubmitRequest(
   const workflowEmail = await sendWorkflowTestEmail(result.email, result.request);
   return { id: result.id, ...(workflowEmail ? { workflowEmail } : {}) };
 }
+
+export async function updatePendingRequest(input: unknown): Promise<{ id: string }> {
+  const viewer = await requireViewer();
+  if (viewer.role !== "requisitioner") {
+    throw new AppError("Only requisitioners can edit vehicle requests.");
+  }
+  const data = parseInput(updatePendingRequestSchema, input);
+
+  return withTransaction(async (conn) => {
+    const request = await lockAndLoad(conn, data.id);
+    if (request.requisitionerId !== viewer.id) {
+      throw new AppError("Only the original requisitioner can edit this request.");
+    }
+    if (request.status !== "pending_review") {
+      throw new AppError(
+        "This request can no longer be edited because the Head of Transport Services has signed it.",
+      );
+    }
+    if (data.input.dateStart !== request.dateStart) assertFutureDate(data.input);
+    const ctx = {
+      users: [],
+      now: new Date().toISOString(),
+      newId: () => randomUUID(),
+    };
+    let updated: VehicleRequest;
+    try {
+      updated = updatePendingRequestWorkflow(ctx, request, viewer, data.input);
+    } catch (error) {
+      if (error instanceof WorkflowError) throw new AppError(error.message);
+      throw error;
+    }
+
+    const result = await run(
+      `UPDATE requests
+       SET department = ?, passengers = ?, date_start = ?, date_end = ?, time_needed = ?, purpose = ?
+       WHERE id = ? AND status = 'pending_review' AND attempt = ?`,
+      [
+        updated.department,
+        updated.passengers,
+        updated.dateStart,
+        updated.dateEnd,
+        updated.timeNeeded,
+        updated.purpose,
+        updated.id,
+        request.attempt,
+      ],
+      conn,
+    );
+    if (result.affectedRows !== 1) {
+      throw new AppError("This request changed while you were editing it. Reload and try again.");
+    }
+    await run("DELETE FROM request_destinations WHERE request_id = ?", [updated.id], conn);
+    await insertDestinations(conn, updated.id, updated.destinations);
+    await insertHistory(conn, updated.id, updated.history.slice(request.history.length));
+    return { id: updated.id };
+  });
+}
+
 export async function sendTripTicket(input: unknown): Promise<{
   alreadySent: boolean;
   testEmail?: Awaited<ReturnType<typeof sendTripTicketTestEmail>>;

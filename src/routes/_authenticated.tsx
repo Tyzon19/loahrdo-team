@@ -1,5 +1,15 @@
-import { createFileRoute, Outlet, redirect, useRouterState } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Outlet,
+  redirect,
+  useRouter,
+  useRouterState,
+  type ErrorComponentProps,
+} from "@tanstack/react-router";
+import { useEffect } from "react";
 import { AppShell } from "@/components/app/AppShell";
+import NotFound from "@/components/NotFound";
+import { SITE } from "@/lib/site";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: ({ context, location }) => {
@@ -14,7 +24,29 @@ export const Route = createFileRoute("/_authenticated")({
     }
   },
   component: AuthenticatedLayout,
+  errorComponent: AuthenticatedErrorComponent,
 });
+
+function AuthenticatedErrorComponent({ error, reset }: ErrorComponentProps) {
+  const router = useRouter();
+
+  useEffect(() => {
+    document.title = `This page didn't load — ${SITE.name}`;
+    if (import.meta.env.DEV) console.error(error);
+  }, [error]);
+
+  return (
+    <NotFound
+      variant="error"
+      homePath="/dashboard"
+      homeLabel="Go to dashboard"
+      onRetry={() => {
+        router.invalidate();
+        reset();
+      }}
+    />
+  );
+}
 
 function AuthenticatedLayout() {
   const { viewer } = Route.useRouteContext();

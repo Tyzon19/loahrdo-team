@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { PageHeader, Section } from "@/components/app/PageHeader";
 import { RequestsTable } from "@/components/app/RequestsTable";
 import { StatsCards } from "@/components/app/StatsCards";
+import { AdminAnalytics } from "@/components/app/AdminAnalytics";
 import { LoadingPanel, LoadingScreen } from "@/components/app/LoadingPanel";
 import { dashboardStatsFn, listNotificationsFn, listRequestsFn } from "@/server-functions";
 import { unwrap } from "@/lib/api";
@@ -15,14 +16,13 @@ import type { EmailMessage } from "@/lib/types";
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
     meta: [
-      { title: `Dashboard — ${SITE.name}` },
+      { title: `Dashboard  ${SITE.name}` },
       { name: "description", content: "Your vehicle request overview and pending actions." },
       { name: "robots", content: "noindex, nofollow" },
     ],
   }),
   component: Dashboard,
 });
-
 function Dashboard() {
   const { viewer } = Route.useRouteContext();
   const stats = useQuery({
@@ -55,12 +55,16 @@ function Dashboard() {
           ? `Welcome, ${viewer.name.split(" ")[0]}`
           : viewer.role === "president"
             ? "Requests awaiting your final approval"
-            : `${ROLE_TITLES[viewer.role]} dashboard`
+            : viewer.role === "admin"
+              ? "System monitoring dashboard"
+              : `${ROLE_TITLES[viewer.role]} dashboard`
       }
       description={
         viewer.role === "requisitioner"
           ? "Request a school vehicle and follow every approval."
-          : `${ROLE_TITLES[viewer.role]} · ${rows.length} request${rows.length === 1 ? "" : "s"} visible`
+          : viewer.role === "admin"
+            ? "Monitor system-wide requests, vehicle activity, and trip trends."
+            : `${ROLE_TITLES[viewer.role]} · ${rows.length} request${rows.length === 1 ? "" : "s"} visible`
       }
       actions={
         viewer.role === "requisitioner" ? (
@@ -114,8 +118,9 @@ function Dashboard() {
           hasError={notifications.isError}
         />
       )}
-      <StatsCards stats={stats.data} loading={stats.isPending} />
+      <StatsCards stats={stats.data} loading={stats.isPending} role={viewer.role} />
 
+      {viewer.role === "admin" && <AdminAnalytics />}
       {viewer.role === "requisitioner" ? (
         <div className="space-y-4">
           {returned.length > 0 && (
@@ -156,7 +161,9 @@ function Dashboard() {
               )}
             </Section>
           )}
-          <Section title="Recent requests">
+          <Section
+            title={viewer.role === "admin" ? "System-wide recent requests" : "Recent requests"}
+          >
             {requests.isPending ? (
               <LoadingPanel label="Loading recent requests" />
             ) : (

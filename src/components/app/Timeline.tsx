@@ -5,6 +5,7 @@ import {
   Clock3,
   CornerUpLeft,
   FileText,
+  Pencil,
   RotateCcw,
   Truck,
   Workflow,
@@ -133,6 +134,7 @@ export function StageStepper({ r }: { r: VehicleRequest }) {
 }
 const ICON: Record<HistoryEvent["type"], typeof Circle> = {
   submitted: FileText,
+  updated: Pencil,
   signed: CheckCircle2,
   approved: CheckCircle2,
   returned: CornerUpLeft,
@@ -140,13 +142,13 @@ const ICON: Record<HistoryEvent["type"], typeof Circle> = {
   dispatch: Truck,
   completed: Truck,
 };
-  export function HistoryList({ r }: { r: VehicleRequest }) {
+export function HistoryList({ r }: { r: VehicleRequest }) {
   const items = [...r.history].reverse();
   let lastAttempt = -1;
   return (
     <ol className="space-y-0">
       {items.map((e) => {
-        const Icon = ICON[e.type];
+        const Icon = ICON[e.type] ?? Circle;
         const header = e.attempt !== lastAttempt;
         lastAttempt = e.attempt;
         return (
@@ -173,7 +175,9 @@ const ICON: Record<HistoryEvent["type"], typeof Circle> = {
                   <span className="text-muted-foreground">· {ROLE_TITLES[e.actorRole]}</span>
                 </p>
                 <p className="break-words">{e.message}</p>
-                {e.reason && <p className="mt-0.5 break-words text-destructive">Reason: {e.reason}</p>}
+                {e.reason && (
+                  <p className="mt-0.5 break-words text-destructive">Reason: {e.reason}</p>
+                )}
                 <p className="text-xs text-muted-foreground">{fmtDateTime(e.at)}</p>
               </div>
             </div>
