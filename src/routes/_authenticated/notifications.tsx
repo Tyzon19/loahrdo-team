@@ -51,7 +51,7 @@ function Notifications() {
   async function openEmail(item: EmailMessage) {
     setSelectedId(item.id);
     await navigate({ search: { view: "detail" }, resetScroll: false });
-    if (item.read) return;
+    if (item.read || item.kind === "trip_ticket_reminder") return;
 
     try {
       const result = await markNotificationReadFn({ data: item.id });
@@ -194,7 +194,7 @@ function NotificationPreview({ email }: { email: EmailMessage }) {
     const target =
       email.kind === "returned"
         ? `/revise/${email.requestId}`
-        : email.kind === "approved_requester"
+        : email.kind === "approved_requester" || email.kind === "trip_ticket_reminder"
           ? `/print/${email.requestId}`
           : `/requests/${email.requestId}`;
     window.location.assign(target);

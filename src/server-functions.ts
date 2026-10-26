@@ -61,6 +61,12 @@ export const listRequestsFn = createServerFn({ method: "POST" })
     runSafely(async () => (await import("./server/requests")).listRequests(data)),
   );
 
+export const getDestinationSuggestionsFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/requests")).getDestinationSuggestions(data)),
+  );
+
 export const getRequestFn = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) =>
@@ -97,6 +103,12 @@ export const resubmitRequestFn = createServerFn({ method: "POST" })
     runSafely(async () => (await import("./server/requests")).resubmitRequest(data)),
   );
 
+export const updatePendingRequestFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/requests")).updatePendingRequest(data)),
+  );
+
 export const sendTripTicketFn = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) =>
@@ -113,10 +125,22 @@ export const saveSignatoryAssistantsFn = createServerFn({ method: "POST" })
     runSafely(async () => (await import("./server/signatories")).saveSignatoryAssistants(data)),
   );
 
+export const saveMainSignatoriesFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/signatories")).saveMainSignatories(data)),
+  );
+
 export const createAssistantAccountFn = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) =>
     runSafely(async () => (await import("./server/signatories")).createAssistantAccount(data)),
+  );
+
+export const createMainSignatoryAccountFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/signatories")).createMainSignatoryAccount(data)),
   );
 
 export const resetUserPasswordFn = createServerFn({ method: "POST" })

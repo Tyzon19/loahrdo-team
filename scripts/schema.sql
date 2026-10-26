@@ -133,7 +133,7 @@ CREATE TABLE IF NOT EXISTS request_history (
   attempt INT NOT NULL,
   actor_name VARCHAR(120) NOT NULL,
   actor_role ENUM('requisitioner','transport_head','director','president','transport_staff','assistant','guard','driver','admin') NOT NULL,
-  type ENUM('submitted','signed','returned','resubmitted','approved','dispatch','completed') NOT NULL,
+  type ENUM('submitted','updated','signed','returned','resubmitted','approved','dispatch','completed') NOT NULL,
   message VARCHAR(500) NOT NULL,
   reason TEXT NULL,
   happened_at DATETIME NOT NULL,
@@ -178,7 +178,7 @@ CREATE TABLE IF NOT EXISTS notifications (
   to_name VARCHAR(120) NOT NULL,
   to_email VARCHAR(190) NOT NULL,
   subject VARCHAR(255) NOT NULL,
-  kind ENUM('action_review','action_recommend','action_approve','returned','approved_requester','approved_transport') NOT NULL,
+  kind ENUM('action_review','action_recommend','action_approve','returned','approved_requester','approved_transport','trip_ticket_reminder') NOT NULL,
   stage ENUM('review','recommend','approve') NULL,
   heading VARCHAR(255) NOT NULL,
   body TEXT NOT NULL,
@@ -220,6 +220,15 @@ CREATE TABLE IF NOT EXISTS signatory_assistants (
   PRIMARY KEY (stage_key),
   CONSTRAINT signatory_assistants_stage_ck CHECK (stage_key IN ('review','recommend','approve')),
   CONSTRAINT signatory_assistants_user_fk FOREIGN KEY (assistant_user_id) REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS main_signatory_assignments (
+  stage_key VARCHAR(16) NOT NULL,
+  user_id CHAR(36) NOT NULL,
+  PRIMARY KEY (stage_key),
+  UNIQUE KEY main_signatory_assignments_user_uq (user_id),
+  CONSTRAINT main_signatory_assignments_stage_ck CHECK (stage_key IN ('review','recommend','approve')),
+  CONSTRAINT main_signatory_assignments_user_fk FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS analytics_pageviews (

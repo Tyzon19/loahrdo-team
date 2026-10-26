@@ -46,6 +46,9 @@ function requestPath(message: EmailMessage): string {
   if (message.kind === "approved_requester") {
     return `/print/${encodeURIComponent(message.requestId)}`;
   }
+  if (message.kind === "trip_ticket_reminder") {
+    return `/print/${encodeURIComponent(message.requestId)}`;
+  }
   return `/requests/${encodeURIComponent(message.requestId)}`;
 }
 

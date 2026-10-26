@@ -35,9 +35,7 @@ export interface RequestRow {
 }
 
 export type ApiResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: string; fieldErrors?: Record<string, string> };
-
+  { ok: true; data: T } | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
 export type Status =
   | "pending_review"
@@ -69,7 +67,15 @@ export interface HistoryEvent {
   attempt: number;
   actorName: string;
   actorRole: Role;
-  type: "submitted" | "signed" | "returned" | "resubmitted" | "approved" | "dispatch" | "completed";
+  type:
+    | "submitted"
+    | "updated"
+    | "signed"
+    | "returned"
+    | "resubmitted"
+    | "approved"
+    | "dispatch"
+    | "completed";
   message: string;
   reason?: string | undefined;
 }
@@ -158,6 +164,7 @@ export interface RequestDetail {
   tripTicketAttached: boolean;
   doc: DocConfig;
   approverNames: Partial<Record<StageKey, string>>;
+  approverUserIds: Partial<Record<StageKey, string>>;
   assistantNames: Partial<Record<StageKey, string>>;
   assistantUserIds: Partial<Record<StageKey, string>>;
   vehicles: Vehicle[];
@@ -171,14 +178,14 @@ export interface VehicleReservation {
   dateEnd: string;
 }
 
-
 export type EmailKind =
   | "action_review"
   | "action_recommend"
   | "action_approve"
   | "returned"
   | "approved_requester"
-  | "approved_transport";
+  | "approved_transport"
+  | "trip_ticket_reminder";
 
 export interface EmailMessage {
   id: string;

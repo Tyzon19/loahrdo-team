@@ -52,6 +52,10 @@ export const listRequestsFn = createServerFn({ method: "POST" }).handler(async (
   runSafely(async () => (await import("./requests")).listRequests(data)),
 );
 
+export const getDestinationSuggestionsFn = createServerFn({ method: "POST" }).handler(
+  async ({ data }) => runSafely(async () => (await import("./requests")).getDestinationSuggestions(data)),
+);
+
 export const getRequestFn = createServerFn({ method: "POST" }).handler(async ({ data }) =>
   runSafely(async () => (await import("./requests")).getRequestDetail(data)),
 );
@@ -74,6 +78,10 @@ export const rejectRequestFn = createServerFn({ method: "POST" }).handler(async 
 
 export const resubmitRequestFn = createServerFn({ method: "POST" }).handler(async ({ data }) =>
   runSafely(async () => (await import("./requests")).resubmitRequest(data)),
+);
+
+export const updatePendingRequestFn = createServerFn({ method: "POST" }).handler(async ({ data }) =>
+  runSafely(async () => (await import("./requests")).updatePendingRequest(data)),
 );
 
 export const dashboardStatsFn = createServerFn({ method: "GET" }).handler(async () =>

@@ -143,20 +143,6 @@ function ChangePassword() {
             </Button>
           </form>
         </Section>
-
-        <aside className="panel h-fit p-4 text-sm">
-          <p className="flex items-center gap-2 font-medium">
-            <ShieldCheck className="h-4 w-4 text-primary" aria-hidden /> Session security
-          </p>
-          <ul className="mt-2 space-y-2 text-muted-foreground">
-            <li className="flex gap-2">
-              <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
-              Changing your password signs out your other devices.
-            </li>
-            <li>Your password is stored only as a salted scrypt hash.</li>
-            <li>PFMO staff will never ask you to share your password.</li>
-          </ul>
-        </aside>
       </div>
     </>
   );

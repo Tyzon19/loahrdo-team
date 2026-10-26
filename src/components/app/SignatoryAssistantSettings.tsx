@@ -10,8 +10,10 @@ import { Section } from "@/components/app/PageHeader";
 import { ButtonLoading, LoadingPanel } from "@/components/app/LoadingPanel";
 import {
   createAssistantAccountFn,
+  createMainSignatoryAccountFn,
   getSignatoryAssistantsFn,
   resetUserPasswordFn,
+  saveMainSignatoriesFn,
   saveSignatoryAssistantsFn,
 } from "@/server-functions";
 import { unwrap } from "@/lib/api";
@@ -25,11 +27,13 @@ const FIELDS: { key: StageKey; label: string }[] = [
 
 type AssistantEntry = { name: string; userId: string };
 type AssistantForm = Record<StageKey, AssistantEntry>;
+type MainSignatoryForm = Record<StageKey, string>;
 type NewAssistantAccount = {
   name: string;
   email: string;
   department: string;
 };
+type NewMainSignatoryAccount = NewAssistantAccount & { stage: StageKey };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -46,6 +50,12 @@ const EMPTY_FORM: AssistantForm = {
   recommend: { name: "", userId: "" },
   approve: { name: "", userId: "" },
 };
+const EMPTY_MAIN_SIGNATORIES: MainSignatoryForm = {
+  review: "",
+  recommend: "",
+  approve: "",
+};
+
 export function SignatoryAssistantSettings() {
   const queryClient = useQueryClient();
   const query = useQuery({
@@ -54,6 +64,20 @@ export function SignatoryAssistantSettings() {
   });
   const [form, setForm] = useState<AssistantForm>(EMPTY_FORM);
   const [busy, setBusy] = useState(false);
+  const [mainForm, setMainForm] = useState<MainSignatoryForm>(EMPTY_MAIN_SIGNATORIES);
+  const [mainBusy, setMainBusy] = useState(false);
+  const [mainAccountForm, setMainAccountForm] = useState<NewMainSignatoryAccount>({
+    stage: "approve",
+    name: "",
+    email: "",
+    department: "",
+  });
+  const [mainAccountBusy, setMainAccountBusy] = useState(false);
+  const [createdMainAccount, setCreatedMainAccount] = useState<{
+    name: string;
+    email: string;
+    temporaryPassword: string;
+  } | null>(null);
   const [accountForm, setAccountForm] = useState<NewAssistantAccount>({
     name: "",
     email: "",
@@ -87,14 +111,89 @@ export function SignatoryAssistantSettings() {
         userId: query.data.userIds.approve ?? "",
       },
     });
+    setMainForm({
+      review: query.data.configuredMainSignatoryUserIds.review ?? "",
+      recommend: query.data.configuredMainSignatoryUserIds.recommend ?? "",
+      approve: query.data.configuredMainSignatoryUserIds.approve ?? "",
+    });
   }, [query.data]);
+
+  async function saveMainSignatories(event: React.FormEvent) {
+    event.preventDefault();
+    if (mainBusy) return;
+    setMainBusy(true);
+    try {
+      const result: unknown = await saveMainSignatoriesFn({
+        data: {
+          review: mainForm.review || null,
+          recommend: mainForm.recommend || null,
+          approve: mainForm.approve || null,
+        },
+      });
+      if (!isRecord(result) || result["ok"] !== true) {
+        toast.error(resultError(result, "We couldn't save the main signatories."));
+        return;
+      }
+      toast.success("Main signatories saved.");
+      await queryClient.invalidateQueries({ queryKey: ["signatory-assistants"] });
+      await queryClient.invalidateQueries({ queryKey: ["request"] });
+      await queryClient.invalidateQueries({ queryKey: ["requests"] });
+    } catch {
+      toast.error("We couldn't save the main signatories. Please try again.");
+    } finally {
+      setMainBusy(false);
+    }
+  }
+
+  async function createMainAccount(event: React.FormEvent) {
+    event.preventDefault();
+    if (mainAccountBusy) return;
+    setMainAccountBusy(true);
+    setCreatedMainAccount(null);
+    try {
+      const result: unknown = await createMainSignatoryAccountFn({ data: mainAccountForm });
+      const data = isRecord(result) ? result["data"] : undefined;
+      const id = isRecord(data) ? data["id"] : undefined;
+      const email = isRecord(data) ? data["email"] : undefined;
+      const name = isRecord(data) ? data["name"] : undefined;
+      const temporaryPassword = isRecord(data) ? data["temporaryPassword"] : undefined;
+      if (
+        !isRecord(result) ||
+        result["ok"] !== true ||
+        typeof id !== "string" ||
+        typeof name !== "string" ||
+        typeof email !== "string" ||
+        typeof temporaryPassword !== "string"
+      ) {
+        toast.error(resultError(result, "We couldn't create the main signatory account."));
+        return;
+      }
+      setCreatedMainAccount({ name, email, temporaryPassword });
+      setMainForm((current) => ({ ...current, [mainAccountForm.stage]: id }));
+      setMainAccountForm((current) => ({ ...current, name: "", email: "", department: "" }));
+      toast.success("Main signatory account created and assigned.");
+      await queryClient.invalidateQueries({ queryKey: ["signatory-assistants"] });
+      await queryClient.invalidateQueries({ queryKey: ["request"] });
+      await queryClient.invalidateQueries({ queryKey: ["requests"] });
+    } catch {
+      toast.error("We couldn't create the main signatory account. Please try again.");
+    } finally {
+      setMainAccountBusy(false);
+    }
+  }
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
     if (busy) return;
     setBusy(true);
     try {
-      const result: unknown = await saveSignatoryAssistantsFn({ data: form });
+      const result: unknown = await saveSignatoryAssistantsFn({
+        data: {
+          review: { ...form.review, userId: form.review.userId || null },
+          recommend: { ...form.recommend, userId: form.recommend.userId || null },
+          approve: { ...form.approve, userId: form.approve.userId || null },
+        },
+      });
       if (!isRecord(result) || result["ok"] !== true) {
         toast.error(resultError(result, "We couldn't save the alternate signatories."));
         return;
@@ -176,6 +275,154 @@ export function SignatoryAssistantSettings() {
   }
   return (
     <div className="space-y-4">
+      <Section title="Assign Main Signatories">
+        <p className="mb-4 max-w-3xl text-sm text-muted-foreground">
+          Choose the account responsible for each approval stage. Existing accounts keep their
+          system role and permissions; changing this assignment replaces who may sign for that
+          stage. The approval order remains unchanged.
+        </p>
+        {query.isPending ? (
+          <LoadingPanel label="Loading main signatories" rows={3} />
+        ) : query.isError ? (
+          <div className="p-4 text-sm" role="alert">
+            <p className="font-medium">We couldn&apos;t load main signatories.</p>
+            <Button className="mt-3" variant="outline" onClick={() => void query.refetch()}>
+              Try again
+            </Button>
+          </div>
+        ) : (
+          <form className="max-w-xl space-y-4" onSubmit={saveMainSignatories}>
+            {FIELDS.map(({ key, label }) => {
+              const selected = query.data.mainSignatoryUsers.find(
+                (user: User) => user.id === mainForm[key],
+              );
+              return (
+                <div key={key}>
+                  <Label htmlFor={`main-signatory-${key}`}>{label} main signatory</Label>
+                  <select
+                    id={`main-signatory-${key}`}
+                    className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={mainForm[key]}
+                    onChange={(event) =>
+                      setMainForm((current) => ({ ...current, [key]: event.target.value }))
+                    }
+                  >
+                    <option value="">Use the account with this system role</option>
+                    {query.data.mainSignatoryUsers.map((user: User) => (
+                      <option key={user.id} value={user.id}>
+                        {user.name} — {user.email} ({ROLE_TITLES[user.role]})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Current main signatory:{" "}
+                    {selected?.name ?? query.data.mainSignatoryNames[key] ?? "No account found"}
+                  </p>
+                </div>
+              );
+            })}
+            <Button type="submit" disabled={mainBusy}>
+              {mainBusy ? <ButtonLoading label="Saving…" /> : "Save main signatories"}
+            </Button>
+          </form>
+        )}
+      </Section>
+      <Section title="Create Main Signatory Account">
+        <p className="mb-4 max-w-3xl text-sm text-muted-foreground">
+          Create an institutional account for a new Head of Transport Services, Director, or
+          President. Creating it assigns that account as the main signatory for the selected stage
+          and replaces the current assignment. The temporary password is shown once; the account
+          holder must change it at first sign-in.
+        </p>
+        <form className="grid max-w-3xl gap-4 sm:grid-cols-2" onSubmit={createMainAccount}>
+          <div>
+            <Label htmlFor="main-account-stage">Approval position</Label>
+            <select
+              id="main-account-stage"
+              className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={mainAccountForm.stage}
+              onChange={(event) => {
+                const stage = FIELDS.find(({ key }) => key === event.target.value)?.key;
+                if (stage) setMainAccountForm((current) => ({ ...current, stage }));
+              }}
+            >
+              {FIELDS.map(({ key, label }) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <Label htmlFor="main-account-name">Full name</Label>
+            <Input
+              id="main-account-name"
+              className="mt-1"
+              maxLength={120}
+              required
+              value={mainAccountForm.name}
+              onChange={(event) =>
+                setMainAccountForm((current) => ({ ...current, name: event.target.value }))
+              }
+            />
+          </div>
+          <div>
+            <Label htmlFor="main-account-email">Institutional email</Label>
+            <Input
+              id="main-account-email"
+              type="email"
+              className="mt-1"
+              maxLength={190}
+              required
+              value={mainAccountForm.email}
+              onChange={(event) =>
+                setMainAccountForm((current) => ({ ...current, email: event.target.value }))
+              }
+            />
+          </div>
+          <div>
+            <Label htmlFor="main-account-department">Department / Office</Label>
+            <Input
+              id="main-account-department"
+              className="mt-1"
+              maxLength={190}
+              required
+              value={mainAccountForm.department}
+              onChange={(event) =>
+                setMainAccountForm((current) => ({ ...current, department: event.target.value }))
+              }
+            />
+          </div>
+          <Button className="sm:col-span-2" type="submit" disabled={mainAccountBusy}>
+            {mainAccountBusy ? (
+              <ButtonLoading label="Creating account…" />
+            ) : (
+              "Create and assign main signatory"
+            )}
+          </Button>
+        </form>
+        {createdMainAccount && (
+          <div className="mt-4 rounded-sm border border-success/40 bg-success-soft p-4">
+            <p className="font-semibold">
+              Account created for {createdMainAccount.name}: {createdMainAccount.email}
+            </p>
+            <Label htmlFor="main-temporary-password" className="mt-3 block">
+              Temporary password — copy and share securely now
+            </Label>
+            <Input
+              id="main-temporary-password"
+              className="mt-1 select-all font-mono"
+              value={createdMainAccount.temporaryPassword}
+              readOnly
+              onFocus={(event) => event.currentTarget.select()}
+            />
+            <p className="mt-2 text-xs">
+              This password is shown only in this result. The account holder must change it at first
+              sign-in.
+            </p>
+          </div>
+        )}
+      </Section>
       <Section title="Create Alternate Signatory Account">
         <p className="mb-4 text-sm text-muted-foreground">
           Create an individual institutional account for an alternate signatory. The temporary

@@ -173,6 +173,11 @@ const EMAIL_COPY: Record<EmailKind, { subject: string; heading: string; cta: str
     heading: "An approved trip is ready for dispatch preparation.",
     cta: "Open Dispatch Record",
   },
+  trip_ticket_reminder: {
+    subject: "Trip Ticket Reminder",
+    heading: "Prepare and send the official trip ticket.",
+    cta: "Prepare Trip Ticket",
+  },
 };
 
 export function makeEmails(
@@ -250,10 +255,11 @@ export function approveStage(
   },
   extras: ReviewExtras = {},
   authorizedProxy = false,
+  authorizedMainSignatory = false,
 ) {
   const stage = stageForStatus(r.status);
   if (!stage) throw new WorkflowError("This request is not waiting for an approval decision.");
-  if (stage.role !== actor.role && !authorizedProxy) {
+  if (stage.role !== actor.role && !authorizedProxy && !authorizedMainSignatory) {
     throw new WorkflowError(
       `This step must be completed by the ${stage.title} or assigned alternate.`,
     );
@@ -265,6 +271,9 @@ export function approveStage(
   }
   if (Boolean(proxySignerName) !== authorizedProxy) {
     throw new WorkflowError("Only the assigned alternate may sign as a proxy.");
+  }
+  if (authorizedProxy && authorizedMainSignatory) {
+    throw new WorkflowError("The same account cannot be both the main and alternate signatory.");
   }
 
   const next: VehicleRequest = { ...r, signatures: [...r.signatures], history: [...r.history] };
@@ -360,6 +369,14 @@ export function approveStage(
         usersByRole(ctx, "transport_staff"),
         "Please prepare the vehicle and dispatch record for this approved trip.",
       ),
+      ...makeEmails(
+        ctx,
+        next,
+        "trip_ticket_reminder",
+        [actor],
+        `You gave final approval for ${r.number}. Prepare the official trip ticket and send it to the requisitioner.`,
+        "approve",
+      ),
     ];
   }
   return { request: next, emails };
@@ -371,10 +388,11 @@ export function rejectStage(
   actor: User,
   reason: string,
   authorizedProxy = false,
+  authorizedMainSignatory = false,
 ) {
   const stage = stageForStatus(r.status);
   if (!stage) throw new WorkflowError("This request is not waiting for an approval decision.");
-  if (stage.role !== actor.role && !authorizedProxy)
+  if (stage.role !== actor.role && !authorizedProxy && !authorizedMainSignatory)
     throw new WorkflowError(
       `This step must be completed by the ${stage.title} or assigned alternate.`,
     );

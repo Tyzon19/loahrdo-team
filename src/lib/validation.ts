@@ -89,7 +89,7 @@ export const requestInputSchema = z
     department,
     destinations: z
       .array(destination)
-      .min(1, "Enter at least one destination.")
+      .min(1, "Enter your destinations.")
       .max(10, "You can add up to 10 destinations."),
     passengers: z
       .number({ invalid_type_error: "Enter the number of passengers." })
@@ -112,6 +112,12 @@ export const requestInputSchema = z
     path: ["dateEnd"],
     message: "The end date must be on or after the start date.",
   });
+
+export const destinationSearchSchema = z
+  .string()
+  .trim()
+  .min(3, "Enter at least 3 characters to search previous destinations.")
+  .max(100, "Search text must be 100 characters or fewer.");
 
 export const requestIdSchema = z.string().uuid("Invalid request reference.");
 
@@ -158,6 +164,11 @@ export const resubmitSchema = z.object({
   input: requestInputSchema,
 });
 
+export const updatePendingRequestSchema = z.object({
+  id: requestIdSchema,
+  input: requestInputSchema,
+});
+
 export const vehicleSchema = z.object({
   type: z.string().trim().min(2, "Enter the vehicle type.").max(80),
   plateNo: z
@@ -173,16 +184,29 @@ export const vehicleSchema = z.object({
 export const signatoryAssistantsSchema = z.object({
   review: z.object({
     name: z.string().trim().max(120, "Names must be 120 characters or fewer."),
-    userId: z.preprocess((value) => (value === "" ? null : value), z.string().uuid().nullable()),
+    userId: z.string().uuid().nullable(),
   }),
   recommend: z.object({
     name: z.string().trim().max(120, "Names must be 120 characters or fewer."),
-    userId: z.preprocess((value) => (value === "" ? null : value), z.string().uuid().nullable()),
+    userId: z.string().uuid().nullable(),
   }),
   approve: z.object({
     name: z.string().trim().max(120, "Names must be 120 characters or fewer."),
-    userId: z.preprocess((value) => (value === "" ? null : value), z.string().uuid().nullable()),
+    userId: z.string().uuid().nullable(),
   }),
+});
+
+export const mainSignatoriesSchema = z.object({
+  review: z.string().uuid().nullable(),
+  recommend: z.string().uuid().nullable(),
+  approve: z.string().uuid().nullable(),
+});
+
+export const createMainSignatoryAccountSchema = z.object({
+  stage: z.enum(["review", "recommend", "approve"]),
+  name: personName,
+  email,
+  department,
 });
 
 export const createAssistantAccountSchema = z.object({

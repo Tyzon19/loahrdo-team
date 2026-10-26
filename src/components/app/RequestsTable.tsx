@@ -52,6 +52,7 @@ export function RequestsTable({
                 <dd className="break-words">{fmtDate(request.submittedAt)}</dd>
               </div>
             </dl>
+        
             <Link
               to="/requests/$id"
               params={{ id: request.id }}

@@ -59,13 +59,11 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     if (busy) return;
     setBusy(true);
     setError(null);
-
     try {
       const result = await loginFn({ data: { email, password } });
       if (!result.ok) {
@@ -87,7 +85,6 @@ function LoginPage() {
       setBusy(false);
     }
   }
-
   return (
     <PublicShell>
       {busy && <LoadingScreen label="Signing in" mode="overlay" />}
@@ -113,7 +110,6 @@ function LoginPage() {
             </li>
           </ul>
         </div>
-
         <div className="panel mx-auto w-full max-w-[34rem] p-5 sm:p-8 lg:p-9">
           <h2 className="font-serif text-3xl font-bold sm:text-4xl">Sign in</h2>
           <p className="mt-2 text-base leading-relaxed text-muted-foreground sm:text-lg">
@@ -169,7 +165,6 @@ function LoginPage() {
               {busy ? "Signing in…" : "Sign in"}
             </Button>
           </form>
-
           <p className="mt-5 text-base leading-relaxed text-muted-foreground sm:text-lg">
             New requisitioner?{" "}
             <Link to="/register" className="font-medium text-primary underline underline-offset-2">

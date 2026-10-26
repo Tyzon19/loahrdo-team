@@ -65,7 +65,12 @@ describe("approval workflow", () => {
     });
     const out = approveStage(ctx, r, u("p"), sig);
     expect(out.request.status).toBe("approved");
-    expect(out.emails.map((e) => e.toUserId).sort()).toEqual(["r", "t"]);
+    expect(out.emails.map((e) => e.toUserId).sort()).toEqual(["p", "r", "t"]);
+    expect(out.emails.find((email) => email.kind === "trip_ticket_reminder")).toMatchObject({
+      toUserId: "p",
+      stage: "approve",
+      ctaLabel: "Prepare Trip Ticket",
+    });
   });
   it("requires a rejection reason", () => {
     const r = createRequest(ctx, input, u("r"), "VR-2").request;
@@ -145,6 +150,29 @@ describe("approval workflow", () => {
       at: ctx.now,
     });
     expect(out.request.history.at(-1)?.message).toContain("Staff as alternate");
+  });
+  it("allows the admin-assigned main signatory to act without changing their system role", () => {
+    const r = createRequest(ctx, input, u("r"), "VR-MAIN-SIGNATORY").request;
+    const out = approveStage(ctx, r, u("t"), sig, {}, false, true);
+
+    expect(out.request.status).toBe("pending_recommendation");
+    expect(out.request.signatures[0]).toMatchObject({
+      signerId: "t",
+      signerName: "Staff",
+      signerRole: "transport_staff",
+    });
+    expect(out.request.signatures[0]?.proxySignerName).toBeUndefined();
+    expect(out.request.history.at(-1)?.message).not.toContain("alternate");
+  });
+  it("allows the assigned main signatory to return a request with their own identity", () => {
+    const r = createRequest(ctx, input, u("r"), "VR-MAIN-RETURN").request;
+    const out = rejectStage(ctx, r, u("t"), "Missing travel details", false, true);
+
+    expect(out.request).toMatchObject({
+      status: "returned",
+      lastReturn: { byName: "Staff", byRole: "transport_staff", stage: "review" },
+    });
+    expect(out.request.history.at(-1)?.message).not.toContain("alternate");
   });
   it("restarts at Head of Transport after resubmission and keeps old signatures separate", () => {
     let r = createRequest(ctx, input, u("r"), "VR-3").request;

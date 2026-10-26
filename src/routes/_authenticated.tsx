@@ -10,7 +10,6 @@ import { useEffect } from "react";
 import { AppShell } from "@/components/app/AppShell";
 import NotFound from "@/components/NotFound";
 import { SITE } from "@/lib/site";
-
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: ({ context, location }) => {
     if (!context.viewer) {

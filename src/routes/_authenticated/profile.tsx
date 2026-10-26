@@ -53,7 +53,7 @@ function Profile() {
     <>
       <PageHeader
         title="Profile"
-        description="Your name here is used on requests, signatures and the printed trip ticket."
+        description="Your name here is used on requests."
       />
       <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
         <Section title="Account">

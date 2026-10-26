@@ -91,8 +91,8 @@ function PrintTicket() {
       return (
         <div className="mx-auto max-w-[210mm] p-8">
           <p role="status">
-            The official ticket image is not available yet. Please contact the office that approved
-            your request.
+            The official trip ticket has not been sent yet. The final approver may have missed
+            sending it. Please contact the approving office for assistance.
           </p>
           <Link
             to="/requests/$id"
@@ -122,8 +122,7 @@ function PrintTicket() {
           </div>
         </div>
         <p className="no-print mx-auto mb-3 max-w-[210mm] px-4 text-xs text-muted-foreground">
-          Download the official ticket snapshot attached to your approval notice for your digital
-          records.
+          Download the Official Trip Ticket and Present It to the Driver.
         </p>
         <img
           src={officialTicket.data}
@@ -200,6 +199,7 @@ function PrintTicket() {
         return;
       }
       setTicketSent(true);
+      await queryClient.invalidateQueries({ queryKey: ["notifications"] });
       if (result.data.testEmail?.sent) {
         setTestEmailSent(true);
         toast.success("Trip ticket test email sent only to mj.turingan@lyceumalabang.edu.ph.");

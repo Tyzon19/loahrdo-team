@@ -145,7 +145,12 @@ function RequestDetailPage() {
   const r = detail.request;
   const stage = stageForStatus(r.status);
   const isProxySigner = Boolean(stage && detail.assistantUserIds[stage.key] === viewer.id);
-  const myTurn = Boolean(stage && (stage.role === viewer.role || isProxySigner));
+  const assignedMainUserId = stage ? detail.approverUserIds[stage.key] : undefined;
+  const isAssignedMainSignatory = Boolean(stage && assignedMainUserId === viewer.id);
+  const isRoleBasedSignatory = Boolean(stage && !assignedMainUserId && stage.role === viewer.role);
+  const myTurn = Boolean(
+    stage && (isAssignedMainSignatory || isRoleBasedSignatory || isProxySigner),
+  );
   const isOwner = r.requisitionerId === viewer.id;
   const canSendTripTicket = canViewAllRequests(viewer.role);
   const sigs = currentSignatures(r);
@@ -270,6 +275,9 @@ function RequestDetailPage() {
           <Info className="h-4 w-4 shrink-0 text-primary" aria-hidden />
           <span className="flex-1">
             Waiting for the {stage.title} ({stage.label}).
+            {detail.approverNames[stage.key]
+              ? ` Main signatory: ${detail.approverNames[stage.key]}.`
+              : ""}
             {detail.assistantNames[stage.key]
               ? ` Assigned alternate: ${detail.assistantNames[stage.key]}; that account must sign in to complete this stage.`
               : " No alternate signatory is currently assigned. Ask the administrator to assign one in Profile settings."}
@@ -396,12 +404,6 @@ function RequestDetailPage() {
                 );
               })}
             </div>
-            {r.attempt > 1 && (
-              <p className="mt-3 text-xs text-muted-foreground">
-                Only signatures for the current version (attempt {r.attempt}) are shown. Earlier
-                signatures remain in the history.
-              </p>
-            )}
           </Section>
         </div>
         <Section title="Activity history">

@@ -2,6 +2,7 @@ import { getRequestIP } from "@tanstack/react-start/server";
 import { analyticsPathSchema, tripArchiveFilterSchema } from "@/lib/validation";
 import { AppError, parseInput } from "@/lib/errors";
 import type { RowDataPacket } from "mysql2/promise";
+import { aggregateDestinationTrips } from "@/lib/destination-analytics";
 import { all, likePattern, run } from "./db";
 import { requireViewer } from "./auth";
 
@@ -114,14 +115,12 @@ export async function getTripArchive(input: unknown) {
     params,
   );
   const destinationRows = await all<RowDataPacket[]>(
-    `SELECT d.destination, COUNT(DISTINCT r.id) AS trips
+    `SELECT r.id AS request_id, d.destination
      FROM requests r
      JOIN request_destinations d ON d.request_id = r.id
      LEFT JOIN dispatch_records dr ON dr.request_id = r.id
      WHERE ${whereSql}
-     GROUP BY d.destination
-     ORDER BY trips DESC, d.destination
-     LIMIT 20`,
+     ORDER BY r.submitted_at DESC`,
     params,
   );
 
@@ -140,10 +139,12 @@ export async function getTripArchive(input: unknown) {
       month: String(row["month"]),
       trips: Number(row["trips"]),
     })),
-    destinations: destinationRows.map((row) => ({
-      name: String(row["destination"]),
-      trips: Number(row["trips"]),
-    })),
+    destinations: aggregateDestinationTrips(
+      destinationRows.map((row) => ({
+        requestId: String(row["request_id"]),
+        destination: String(row["destination"]),
+      })),
+    ),
     rows: archiveRows.map((row) => ({
       id: row.id,
       number: row.number,

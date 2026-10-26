@@ -12,15 +12,18 @@ import { fmtDate, fmtRange, fmtTime, todayISO } from "@/lib/format";
 import { LoadingScreen } from "@/components/app/LoadingPanel";
 import { Progress } from "@/components/ui/progress";
 import { Section } from "./PageHeader";
+import { DestinationInput } from "./DestinationInput";
 function Req() { return <span className="text-destructive" aria-hidden> *</span>; }
 export function RequestForm({
-  initial, header, submitLabel, onSubmit,
+  initial, header, submitLabel, onSubmit, allowExistingPastStartDate = false,
 }: {
   initial: RequestInput;
   header: { number: string; date: string; requisitioner: string };
   submitLabel: string;
   onSubmit: (v: RequestInput) => Promise<void> | void;
+  allowExistingPastStartDate?: boolean;
 }) {
+  const isEditing = submitLabel === "Save Changes";
   const [v, setV] = useState<RequestInput>(initial);
   const [errors, setErrors] = useState<Partial<Record<keyof RequestInput, string>>>({});
   const [review, setReview] = useState(false);
@@ -30,13 +33,15 @@ export function RequestForm({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const dirty = JSON.stringify(v) !== JSON.stringify(initial);
   const blocker = useBlocker({ shouldBlockFn: () => dirty && !done, withResolver: true, enableBeforeUnload: () => dirty && !done });
-  useEffect(() => { if (Object.keys(errors).length) setErrors(validateRequestInput(v, todayISO())); }, [v]);
+  const validationDate =
+    allowExistingPastStartDate && v.dateStart === initial.dateStart ? undefined : todayISO();
+  useEffect(() => { if (Object.keys(errors).length) setErrors(validateRequestInput(v, validationDate)); }, [v, validationDate]);
   const set = <K extends keyof RequestInput>(k: K, val: RequestInput[K]) => setV((x) => ({ ...x, [k]: val }));
   const err = (k: keyof RequestInput) => errors[k] && <p id={`${k}-err`} className="mt-1 text-sm text-destructive">{errors[k]}</p>;
   const mobileSteps: { title: string; description: string; fields: (keyof RequestInput)[] }[] = [
     {
       title: "Department & destination",
-      description: "Tell us which office is requesting the vehicle and where you need to go.",
+      description: "Tell us which office is requesting.",
       fields: ["department", "destinations"],
     },
     {
@@ -62,7 +67,7 @@ export function RequestForm({
   const mobileGroupClass = (step: number) =>
     `${mobileStep === step ? "block" : "hidden"} sm:contents`;
   function continueMobileStep() {
-    const validation = validateRequestInput(v, todayISO());
+    const validation = validateRequestInput(v, validationDate);
     setErrors(validation);
     const firstInvalid = mobileSteps[mobileStep]?.fields.find((field) => validation[field]);
     if (firstInvalid) {
@@ -76,7 +81,7 @@ export function RequestForm({
       noValidate
       onSubmit={(e) => {
         e.preventDefault();
-        const ee = validateRequestInput(v, todayISO());
+        const ee = validateRequestInput(v, validationDate);
         setErrors(ee);
         if (Object.keys(ee).length) { document.getElementById(Object.keys(ee)[0]!)?.focus(); return; }
         setSubmitError(null);
@@ -84,7 +89,7 @@ export function RequestForm({
       }}
       className="space-y-4"
     >
-      {busy && <LoadingScreen label="Submitting vehicle request" mode="overlay" />}
+      {busy && <LoadingScreen label={isEditing ? "Saving request changes" : "Submitting vehicle request"} mode="overlay" />}
       <Section title="Request details">
         <dl className="mb-4 grid grid-cols-1 gap-3 rounded-sm bg-muted p-3 text-sm sm:grid-cols-2">
           <div><dt className="text-xs text-muted-foreground">Request Number</dt><dd className="font-medium">{header.number}</dd></div>
@@ -126,7 +131,14 @@ export function RequestForm({
             <div className="mt-1 space-y-2">
               {v.destinations.map((d, i) => (
                 <div key={i} className="flex gap-2">
-                  <Input id={i === 0 ? "destinations" : undefined} aria-label={`Destination ${i + 1}`} value={d} onChange={(e) => set("destinations", v.destinations.map((x, j) => (j === i ? e.target.value : x)))} aria-invalid={!!errors.destinations} />
+                  <DestinationInput
+                    id={i === 0 ? "destinations" : `destination-${i + 1}`}
+                    invalid={!!errors.destinations}
+                    value={d}
+                    onChange={(value) =>
+                      set("destinations", v.destinations.map((destination, j) => (j === i ? value : destination)))
+                    }
+                  />
                   {v.destinations.length > 1 && <Button type="button" variant="ghost" size="icon" aria-label={`Remove destination ${i + 1}`} onClick={() => set("destinations", v.destinations.filter((_, j) => j !== i))}><X className="h-4 w-4" /></Button>}
                 </div>
               ))}
@@ -148,7 +160,7 @@ export function RequestForm({
           </div>
           <div>
             <Label htmlFor="dateStart">Date Needed — Start<Req /></Label>
-            <Input id="dateStart" type="date" min={todayISO()} className="mt-1" value={v.dateStart} onChange={(e) => { const val = e.target.value; setV((x) => ({ ...x, dateStart: val, dateEnd: !x.dateEnd || x.dateEnd < val ? val : x.dateEnd })); }} aria-invalid={!!errors.dateStart} />
+            <Input id="dateStart" type="date" min={allowExistingPastStartDate && v.dateStart === initial.dateStart && initial.dateStart < todayISO() ? initial.dateStart : todayISO()} className="mt-1" value={v.dateStart} onChange={(e) => { const val = e.target.value; setV((x) => ({ ...x, dateStart: val, dateEnd: !x.dateEnd || x.dateEnd < val ? val : x.dateEnd })); }} aria-invalid={!!errors.dateStart} />
             {err("dateStart")}
           </div>
           <div>
@@ -165,10 +177,10 @@ export function RequestForm({
           </div>
           </div>
         </div>
-        <p className="mt-3 text-xs text-muted-foreground"><span className="text-destructive">*</span> Required. Vehicle type and plate number are assigned by Transport Services.</p>
+        <p className="mt-3 text-xs text-muted-foreground"><span className="text-destructive">*</span> Required to fill up all fields</p>
       </Section>
       <div className="hidden justify-end gap-2 sm:flex">
-        <Button type="submit">Review before submitting</Button>
+        <Button type="submit">{isEditing ? "Review changes" : "Review before submitting"}</Button>
       </div>
       <div className="flex items-center justify-between gap-3 sm:hidden">
         <Button
@@ -187,14 +199,18 @@ export function RequestForm({
             <ArrowRight aria-hidden="true" />
           </Button>
         ) : (
-          <Button type="submit">Review request</Button>
+          <Button type="submit">{isEditing ? "Review changes" : "Review request"}</Button>
         )}
       </div>
       <AlertDialog open={review} onOpenChange={setReview}>
         <AlertDialogContent className="max-h-[92vh] overflow-y-auto">
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirm your request</AlertDialogTitle>
-            <AlertDialogDescription>Please check the details. After submitting, the request goes to the Head of Transport Services for review.</AlertDialogDescription>
+            <AlertDialogTitle>{isEditing ? "Review your changes" : "Confirm your request"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {isEditing
+                ? "Check the details before saving. Your request stays with the Head of Transport Services for review."
+                : "Please check the details. After submitting, the request goes to the Head of Transport Services for review."}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           {submitError && (
             <p role="alert" className="rounded-sm border border-destructive/40 bg-danger-soft p-2 text-sm text-destructive">
@@ -223,7 +239,7 @@ export function RequestForm({
                 setSubmitError(null);
                 void Promise.resolve(onSubmit(v))
                   .catch((error: unknown) => {
-                    setSubmitError(error instanceof Error ? error.message : "The request could not be submitted. Please try again.");
+                    setSubmitError(error instanceof Error ? error.message : `The request could not be ${isEditing ? "saved" : "submitted"}. Please try again.`);
                     setDone(false);
                     setReview(true);
                   })

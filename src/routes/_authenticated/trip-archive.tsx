@@ -415,7 +415,7 @@ function TripArchive() {
                           </div>
                           <div className="col-span-2 min-w-0">
                             <dt className="text-[11px] text-muted-foreground">
-                              Requisitioner / office
+                              Requisitioner / Office
                             </dt>
                             <dd className="break-words text-xs">
                               {row.requisitionerName}
@@ -452,9 +452,9 @@ function TripArchive() {
                         <TableRow className="bg-muted/50 hover:bg-muted/50">
                           <TableHead>Ticket</TableHead>
                           <TableHead>Travel date</TableHead>
-                          <TableHead>Requisitioner / office</TableHead>
+                          <TableHead>Requisitioner / Office</TableHead>
                           <TableHead>Destination(s)</TableHead>
-                          <TableHead>Vehicle / driver</TableHead>
+                          <TableHead>Vehicle / Driver</TableHead>
                           <TableHead>Passengers</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead className="text-right">Ticket</TableHead>

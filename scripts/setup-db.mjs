@@ -87,6 +87,14 @@ try {
        ENUM('requisitioner','transport_head','director','president','transport_staff','assistant','guard','driver','admin') NOT NULL`,
     );
   }
+  await conn.query(
+    `ALTER TABLE request_history MODIFY type
+     ENUM('submitted','updated','signed','returned','resubmitted','approved','dispatch','completed') NOT NULL`,
+  );
+  await conn.query(
+    `ALTER TABLE notifications MODIFY kind
+     ENUM('action_review','action_recommend','action_approve','returned','approved_requester','approved_transport','trip_ticket_reminder') NOT NULL`,
+  );
   const [proxySignerColumn] = await conn.query(
     `SELECT COUNT(*) AS count
      FROM information_schema.COLUMNS

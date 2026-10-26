@@ -72,7 +72,7 @@ function NewRequest() {
     <>
       <PageHeader
         title="New Vehicle Request"
-        description="Fill in the details below. The request number is generated when you submit."
+        description="Fill in the details below."
       />
       <RequestForm
         key={viewer.id}

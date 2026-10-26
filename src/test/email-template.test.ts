@@ -147,6 +147,10 @@ describe("professional email template", () => {
       { ...message, kind: "action_approve" },
       "https://vrtt.example.edu",
     );
+    const reminder = renderEmailTemplate(
+      { ...message, kind: "trip_ticket_reminder", ctaLabel: "Prepare Trip Ticket" },
+      "https://vrtt.example.edu",
+    );
     expect(returned.html).toContain("https://vrtt.example.edu/revise/");
     expect(returned.html).toContain("background-color:#fef2f2");
     expect(returned.html).toContain("border-left:4px solid #dc2626");
@@ -156,6 +160,8 @@ describe("professional email template", () => {
     expect(returned.html).not.toContain("Reason: Please correct the travel dates.</p>");
     expect(returned.text).toContain("Reason: Please correct the travel dates.");
     expect(action.html).toContain("https://vrtt.example.edu/requests/");
+    expect(reminder.html).toContain("https://vrtt.example.edu/print/");
+    expect(reminder.html).toContain("Prepare Trip Ticket");
   });
   it("escapes the return reason inside the warning block", () => {
     const returned = renderEmailTemplate(

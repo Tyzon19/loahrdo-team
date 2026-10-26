@@ -156,17 +156,60 @@ export async function loadUsers(db: Db): Promise<User[]> {
 }
 
 export async function loadApproverNames(db: Db): Promise<Partial<Record<StageKey, string>>> {
-  const rows = await all<UserDbRow[]>(
-    "SELECT id, name, email, role, department FROM users WHERE role IN ('transport_head','director','president')",
-    [],
-    db,
-  );
-  const out: Partial<Record<StageKey, string>> = {};
-  for (const stage of STAGES) {
-    const match = rows.find((r) => r.role === stage.role);
-    if (match) out[stage.key] = match.name;
+  return (await loadMainSignatories(db)).names;
+}
+
+export async function loadApproverUserIds(db: Db): Promise<Partial<Record<StageKey, string>>> {
+  return (await loadMainSignatories(db)).configuredUserIds;
+}
+
+export async function loadEffectiveApproverUserIds(
+  db: Db,
+): Promise<Partial<Record<StageKey, string>>> {
+  return (await loadMainSignatories(db)).userIds;
+}
+
+async function loadMainSignatories(db: Db) {
+  const [assignments, roleUsers] = await Promise.all([
+    all<RowDataPacket[]>(
+      `SELECT a.stage_key, a.user_id, u.name
+       FROM main_signatory_assignments a
+       JOIN users u ON u.id = a.user_id`,
+      [],
+      db,
+    ),
+    all<UserDbRow[]>(
+      "SELECT id, name, email, role, department FROM users WHERE role IN ('transport_head','director','president') ORDER BY id",
+      [],
+      db,
+    ),
+  ]);
+  const configuredUserIds: Partial<Record<StageKey, string>> = {};
+  const configuredNames: Partial<Record<StageKey, string>> = {};
+  for (const row of assignments) {
+    const stageKey = String(row["stage_key"]);
+    if (stageKey !== "review" && stageKey !== "recommend" && stageKey !== "approve") continue;
+    configuredUserIds[stageKey] = String(row["user_id"]);
+    configuredNames[stageKey] = String(row["name"]);
   }
-  return out;
+
+  const names: Partial<Record<StageKey, string>> = {};
+  const userIds: Partial<Record<StageKey, string>> = {};
+  for (const stage of STAGES) {
+    const configuredUserId = configuredUserIds[stage.key];
+    const configuredName = configuredNames[stage.key];
+    if (configuredUserId && configuredName) {
+      userIds[stage.key] = configuredUserId;
+      names[stage.key] = configuredName;
+      continue;
+    }
+    const fallback = roleUsers.find((user) => user.role === stage.role);
+    if (fallback) {
+      userIds[stage.key] = fallback.id;
+      names[stage.key] = fallback.name;
+    }
+  }
+  return { names, userIds, configuredUserIds };
 }
 
 export interface AssistantDbRow extends RowDataPacket {

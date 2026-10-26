@@ -7,7 +7,6 @@ import { EmptyState, Section } from "@/components/app/PageHeader";
 import { LoadingPanel } from "@/components/app/LoadingPanel";
 import { getTripArchiveFn } from "@/server-functions";
 import { unwrap } from "@/lib/api";
-
 function localDate(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");

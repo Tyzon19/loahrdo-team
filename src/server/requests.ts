@@ -52,6 +52,7 @@ import { AppError, isDuplicateKey, parseInput } from "@/lib/errors";
 import { sendTripTicketTestEmail, sendWorkflowTestEmail } from "./gmail";
 import {
   loadApproverNames,
+  loadApproverUserIds,
   loadAssistantNames,
   loadAssistantUserIds,
   loadDoc,
@@ -179,6 +180,52 @@ async function notifyAssistant(
   };
   const message = messages[stage];
   return [...emails, ...makeEmails(ctx, request, message.kind, [assistant], message.body, stage)];
+}
+
+async function routeMainSignatory(
+  conn: PoolConnection,
+  emails: EmailMessage[],
+  request: VehicleRequest,
+  ctx: Ctx,
+  stage: "review" | "recommend" | "approve",
+) {
+  const assignedUserId = (await loadApproverUserIds(conn))[stage];
+  if (!assignedUserId) return emails;
+  const account = ctx.users.find((user) => user.id === assignedUserId);
+  if (!account) {
+    throw new AppError("The assigned main signatory account is unavailable.");
+  }
+  const stageEmails = emails.filter((email) => email.stage === stage);
+  const source = stageEmails.find((email) => email.toUserId === assignedUserId) ?? stageEmails[0];
+  const routedMessage = source
+    ? {
+        ...source,
+        id: randomUUID(),
+        toUserId: account.id,
+        toName: account.name,
+        toEmail: account.email,
+        read: false,
+      }
+    : makeEmails(
+        ctx,
+        request,
+        stage === "review"
+          ? "action_review"
+          : stage === "recommend"
+            ? "action_recommend"
+            : "action_approve",
+        [account],
+        `You are assigned as the main signatory for the ${
+          stage === "review"
+            ? "Head of Transport Services"
+            : stage === "recommend"
+              ? "Director for Administration"
+              : "President"
+        }.`,
+        stage,
+      )[0];
+  if (!routedMessage) return emails;
+  return [...emails.filter((email) => email.stage !== stage), routedMessage];
 }
 
 async function insertDestinations(conn: PoolConnection, requestId: string, destinations: string[]) {
@@ -321,12 +368,15 @@ async function requestDetail(
     viewer.role !== "requisitioner" || includeSignatureImages,
   );
   if (!request || !canSee(viewer, request.requisitionerId)) return null;
-  const [doc, approverNames, assistantNames, assistantUserIds] = await Promise.all([
-    loadDoc(pool),
-    loadApproverNames(pool),
-    loadAssistantNames(pool),
-    loadAssistantUserIds(pool),
-  ]);
+  const [doc, approverNames, approverUserIds, assistantNames, assistantUserIds] = await Promise.all(
+    [
+      loadDoc(pool),
+      loadApproverNames(pool),
+      loadApproverUserIds(pool),
+      loadAssistantNames(pool),
+      loadAssistantUserIds(pool),
+    ],
+  );
   const ticketNotifications = await all<RowDataPacket[]>(
     `SELECT n.id
      FROM notifications n
@@ -336,7 +386,10 @@ async function requestDetail(
     [request.id, request.requisitionerId],
   );
 
-  const canSeeFleet = isApproverRole(viewer.role) || canManageVehicles(viewer.role);
+  const canSeeFleet =
+    isApproverRole(viewer.role) ||
+    canManageVehicles(viewer.role) ||
+    approverUserIds.review === viewer.id;
   const vehicles = canSeeFleet ? await loadVehicles(pool) : [];
   const conflicts = canSeeFleet
     ? await all<RowDataPacket[]>(
@@ -352,6 +405,7 @@ async function requestDetail(
     tripTicketAttached: ticketNotifications.length > 0,
     doc,
     approverNames,
+    approverUserIds: canViewAllRequests(viewer.role) ? approverUserIds : {},
     vehicles,
     assistantNames,
     assistantUserIds: canViewAllRequests(viewer.role) ? assistantUserIds : {},
@@ -439,7 +493,8 @@ export async function submitRequest(input: unknown): Promise<{
     );
     await insertDestinations(conn, request.id, request.destinations);
     await insertHistory(conn, request.id, request.history);
-    const notifications = await notifyAssistant(conn, out.emails, request, ctx, "review");
+    const primaryNotifications = await routeMainSignatory(conn, out.emails, request, ctx, "review");
+    const notifications = await notifyAssistant(conn, primaryNotifications, request, ctx, "review");
     await insertNotifications(conn, notifications);
 
     return {
@@ -482,9 +537,14 @@ export async function approveRequest(
     if (data.driverName !== undefined && stage.key !== "review") {
       throw new AppError("A driver can only be assigned during the transport review stage.");
     }
-    const assistantUserId = (await loadAssistantUserIds(conn))[stage.key];
+    const [assistantUserId, assignedMainUserId] = await Promise.all([
+      loadAssistantUserIds(conn).then((ids) => ids[stage.key]),
+      loadApproverUserIds(conn).then((ids) => ids[stage.key]),
+    ]);
     const isProxySigner = assistantUserId === viewer.id;
-    if (stage.role !== viewer.role && !isProxySigner) {
+    const isAssignedMainSignatory = assignedMainUserId === viewer.id;
+    const canSignAsMain = assignedMainUserId ? isAssignedMainSignatory : stage.role === viewer.role;
+    if (!canSignAsMain && !isProxySigner) {
       throw new AppError(`This step must be completed by the ${stage.title}.`);
     }
     if (data.proxySigner !== isProxySigner) {
@@ -539,6 +599,7 @@ export async function approveRequest(
           remarks: data.remarks,
         },
         isProxySigner,
+        isAssignedMainSignatory && viewer.role !== stage.role,
       );
     } catch (error) {
       if (error instanceof WorkflowError) throw new AppError(error.message);
@@ -580,9 +641,12 @@ export async function approveRequest(
     }
     await insertHistory(conn, updated.id, updated.history.slice(request.history.length));
     const nextStage = stageForStatus(updated.status);
-    const emails = nextStage
-      ? await notifyAssistant(conn, out.emails, updated, ctx, nextStage.key)
+    const primaryEmails = nextStage
+      ? await routeMainSignatory(conn, out.emails, updated, ctx, nextStage.key)
       : out.emails;
+    const emails = nextStage
+      ? await notifyAssistant(conn, primaryEmails, updated, ctx, nextStage.key)
+      : primaryEmails;
     await insertNotifications(conn, emails);
 
     return {
@@ -610,8 +674,19 @@ export async function rejectRequest(
     }
 
     const stage = stageForStatus(request.status);
-    const assistantUserId = stage ? (await loadAssistantUserIds(conn))[stage.key] : undefined;
+    const [assistantUserId, assignedMainUserId] = stage
+      ? await Promise.all([
+          loadAssistantUserIds(conn).then((ids) => ids[stage.key]),
+          loadApproverUserIds(conn).then((ids) => ids[stage.key]),
+        ])
+      : [undefined, undefined];
     const isProxySigner = assistantUserId === viewer.id;
+    const isAssignedMainSignatory = assignedMainUserId === viewer.id;
+    const canSignAsMain = stage
+      ? assignedMainUserId
+        ? isAssignedMainSignatory
+        : stage.role === viewer.role
+      : false;
     const ctx = {
       users: await loadUsers(conn),
       now: new Date().toISOString(),
@@ -619,7 +694,14 @@ export async function rejectRequest(
     };
     let out;
     try {
-      out = rejectStage(ctx, request, viewer, data.reason, isProxySigner);
+      out = rejectStage(
+        ctx,
+        request,
+        viewer,
+        data.reason,
+        isProxySigner,
+        canSignAsMain && viewer.role !== stage?.role,
+      );
     } catch (error) {
       if (error instanceof WorkflowError) throw new AppError(error.message);
       throw error;
@@ -652,7 +734,8 @@ export async function rejectRequest(
       conn,
     );
     await insertHistory(conn, updated.id, updated.history.slice(request.history.length));
-    const notifications = await notifyAssistant(conn, out.emails, updated, ctx, "review");
+    const primaryNotifications = await routeMainSignatory(conn, out.emails, updated, ctx, "review");
+    const notifications = await notifyAssistant(conn, primaryNotifications, updated, ctx, "review");
     await insertNotifications(conn, notifications);
 
     return {
@@ -722,12 +805,13 @@ export async function resubmitRequest(
     await run("DELETE FROM request_destinations WHERE request_id = ?", [updated.id], conn);
     await insertDestinations(conn, updated.id, updated.destinations);
     await insertHistory(conn, updated.id, updated.history.slice(request.history.length));
-    await insertNotifications(conn, out.emails);
+    const primaryEmails = await routeMainSignatory(conn, out.emails, updated, ctx, "review");
+    await insertNotifications(conn, primaryEmails);
 
     return {
       id: updated.id,
       request: updated,
-      email: out.emails.find((message: EmailMessage) => message.stage === "review"),
+      email: primaryEmails.find((message: EmailMessage) => message.stage === "review"),
     };
   });
   const workflowEmail = await sendWorkflowTestEmail(result.email, result.request);
@@ -869,6 +953,13 @@ export async function sendTripTicket(input: unknown): Promise<{
        VALUES (?, 'image/png', ?)
        ON DUPLICATE KEY UPDATE image = VALUES(image)`,
       [notificationId, bytes],
+      conn,
+    );
+    await run(
+      `UPDATE notifications
+       SET read_at = COALESCE(read_at, NOW())
+       WHERE request_id = ? AND kind = 'trip_ticket_reminder'`,
+      [request.id],
       conn,
     );
     return { alreadySent, request, ticketImage: bytes };

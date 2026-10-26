@@ -6,6 +6,8 @@ import {
   institutionalEmailAllowed,
   passwordIssues,
   createAssistantAccountSchema,
+  createMainSignatoryAccountSchema,
+  mainSignatoriesSchema,
   registrationOtpSchema,
   requestInputSchema,
   resetUserPasswordSchema,
@@ -102,10 +104,10 @@ describe("signatory assistant validation", () => {
     }
   });
 
-  it("normalizes unselected stages when one assistant is assigned", () => {
+  it("accepts explicitly unassigned stages when one assistant is assigned", () => {
     const result = signatoryAssistantsSchema.safeParse({
-      review: { name: "", userId: "" },
-      recommend: { name: "", userId: "" },
+      review: { name: "", userId: null },
+      recommend: { name: "", userId: null },
       approve: {
         name: "Mailyn Duelas Obena",
         userId: "1d1d19d1-062c-4dd1-846d-27797f7d3c75",
@@ -147,6 +149,39 @@ describe("assistant account validation", () => {
         role: "admin",
       }).success,
     ).toBe(true);
+  });
+});
+
+describe("main signatory management validation", () => {
+  it("normalizes unassigned stages and validates selected account ids", () => {
+    const result = mainSignatoriesSchema.safeParse({
+      review: null,
+      recommend: "1d1d19d1-062c-4dd1-846d-27797f7d3c75",
+      approve: null,
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toEqual({
+        review: null,
+        recommend: "1d1d19d1-062c-4dd1-846d-27797f7d3c75",
+        approve: null,
+      });
+    }
+  });
+
+  it("only allows main approval stages for new main signatory accounts", () => {
+    const account = {
+      name: "Alex Signatory",
+      email: "alex@lyceumalabang.edu.ph",
+      department: "Administration",
+    };
+    expect(
+      createMainSignatoryAccountSchema.safeParse({ ...account, stage: "approve" }).success,
+    ).toBe(true);
+    expect(createMainSignatoryAccountSchema.safeParse({ ...account, stage: "admin" }).success).toBe(
+      false,
+    );
   });
 });
 
