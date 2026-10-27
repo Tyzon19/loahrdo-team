@@ -103,6 +103,75 @@ try {
     `ALTER TABLE notifications MODIFY kind
      ENUM('action_review','action_recommend','action_approve','returned','approved_requester','approved_transport','trip_ticket_reminder') NOT NULL`,
   );
+  for (const [table, column, definition] of [
+    ["users", "phone_number", "VARCHAR(32) NULL"],
+    ["notifications", "email_status", "ENUM('pending','sent','failed') NULL"],
+    ["notifications", "email_error", "VARCHAR(500) NULL"],
+  ]) {
+    const [existingColumn] = await conn.query(
+      `SELECT COUNT(*) AS count
+       FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+      [dbName, table, column],
+    );
+    if (Number(existingColumn[0]?.count ?? 0) === 0) {
+      await conn.query(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${definition}`);
+    }
+  }
+  const [transportMainAssignment] = await conn.query(
+    `SELECT a.user_id AS userId
+     FROM main_signatory_assignments a
+     JOIN users u ON u.id = a.user_id
+     WHERE a.stage_key = 'recommend' AND u.role = 'transport_head'
+       AND NOT EXISTS (
+         SELECT 1 FROM main_signatory_assignments existing_assignment
+         WHERE existing_assignment.stage_key = 'review'
+       )
+     LIMIT 1`,
+  );
+  if (transportMainAssignment.length) {
+    await conn.query(
+      `UPDATE main_signatory_assignments
+       SET stage_key = 'review'
+       WHERE stage_key = 'recommend' AND user_id = ?`,
+      [transportMainAssignment[0].userId],
+    );
+  }
+  if (transportMainAssignment.length) {
+    const [transportAlternateAssignment] = await conn.query(
+      `SELECT recommend.assistant_name AS assistantName,
+              recommend.assistant_user_id AS assistantUserId,
+              review.stage_key AS reviewStage
+       FROM signatory_assistants recommend
+       LEFT JOIN signatory_assistants review ON review.stage_key = 'review'
+       WHERE recommend.stage_key = 'recommend'
+         AND recommend.assistant_user_id IS NOT NULL
+         AND (review.stage_key IS NULL OR review.assistant_user_id IS NULL)
+       LIMIT 1`,
+    );
+    if (transportAlternateAssignment.length) {
+      const assignment = transportAlternateAssignment[0];
+      if (assignment.reviewStage) {
+        await conn.query(
+          `UPDATE signatory_assistants
+           SET assistant_name = ?, assistant_user_id = ?
+           WHERE stage_key = 'review'`,
+          [assignment.assistantName, assignment.assistantUserId],
+        );
+        await conn.query(
+          `UPDATE signatory_assistants
+           SET assistant_name = '', assistant_user_id = NULL
+           WHERE stage_key = 'recommend'`,
+        );
+      } else {
+        await conn.query(
+          `UPDATE signatory_assistants
+           SET stage_key = 'review'
+           WHERE stage_key = 'recommend'`,
+        );
+      }
+    }
+  }
   const [proxySignerColumn] = await conn.query(
     `SELECT COUNT(*) AS count
      FROM information_schema.COLUMNS
@@ -113,6 +182,26 @@ try {
   if (Number(proxySignerColumn[0]?.count ?? 0) === 0) {
     await conn.query(
       "ALTER TABLE request_signatures ADD COLUMN proxy_signer_name VARCHAR(120) NULL AFTER signer_role",
+    );
+  }
+  await conn.query("ALTER TABLE request_signatures MODIFY signer_id CHAR(36) NULL");
+  const [signatureSignerConstraint] = await conn.query(
+    `SELECT DELETE_RULE AS deleteRule
+     FROM information_schema.REFERENTIAL_CONSTRAINTS
+     WHERE CONSTRAINT_SCHEMA = ? AND TABLE_NAME = 'request_signatures'
+       AND CONSTRAINT_NAME = 'request_signatures_signer_fk'`,
+    [dbName],
+  );
+  if (signatureSignerConstraint[0]?.deleteRule !== "SET NULL") {
+    if (signatureSignerConstraint.length) {
+      await conn.query(
+        "ALTER TABLE request_signatures DROP FOREIGN KEY request_signatures_signer_fk",
+      );
+    }
+    await conn.query(
+      `ALTER TABLE request_signatures
+       ADD CONSTRAINT request_signatures_signer_fk
+       FOREIGN KEY (signer_id) REFERENCES users (id) ON DELETE SET NULL`,
     );
   }
   const [assistantUserColumn] = await conn.query(

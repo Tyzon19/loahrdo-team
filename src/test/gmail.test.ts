@@ -75,7 +75,12 @@ describe("Gmail workflow delivery", () => {
 
     const result = await sendWorkflowEmails([message], request);
 
-    expect(result).toEqual({ sent: true, delivered: 1, failed: 0 });
+    expect(result).toEqual({
+      sent: true,
+      delivered: 1,
+      failed: 0,
+      recipientResults: [{ notificationId: message.id, sent: true }],
+    });
     expect(sentMessages).toHaveLength(1);
     const sentMime = sentMessages[0] ?? "";
     expect(sentMime).toContain("To: signatory@example.edu");

@@ -4,6 +4,7 @@ import {
   createMainSignatoryAccountSchema,
   mainSignatoriesSchema,
   resetUserPasswordSchema,
+  signatoryPhoneSchema,
   signatoryAssistantsSchema,
 } from "@/lib/validation";
 import { AppError, isDuplicateKey, parseInput } from "@/lib/errors";
@@ -24,6 +25,7 @@ import { emailDomainAllowed } from "@/lib/validation";
 import { hashPassword } from "./password";
 import { sendTemporaryPasswordEmail } from "./gmail";
 import { ROLE_TITLES, STAGES } from "@/lib/workflow";
+import type { SignatoryContact } from "@/lib/types";
 
 const ASSISTANT_ROLES: Role[] = ["assistant", "transport_staff", "guard", "driver"];
 const MAIN_SIGNATORY_ELIGIBLE_ROLES: Role[] = [
@@ -32,7 +34,7 @@ const MAIN_SIGNATORY_ELIGIBLE_ROLES: Role[] = [
   "president",
   ...ASSISTANT_ROLES,
 ];
-const STAGE_ROLES: Record<StageKey, Role> = {
+const STAGE_ROLES: Partial<Record<StageKey, Role>> = {
   review: "transport_head",
   recommend: "director",
   approve: "president",
@@ -71,6 +73,56 @@ export async function getSignatoryAssistants() {
     mainSignatoryUsers: users.filter((user) => MAIN_SIGNATORY_ELIGIBLE_ROLES.includes(user.role)),
     resettableUsers: users.filter((user) => user.role !== "admin"),
   };
+}
+
+export async function getPhoneDirectory(): Promise<SignatoryContact[]> {
+  await requireViewer();
+  const rows = await all<RowDataPacket[]>(
+    `SELECT DISTINCT u.id, u.name, u.role, u.phone_number
+     FROM users u
+     LEFT JOIN main_signatory_assignments m ON m.user_id = u.id
+     LEFT JOIN signatory_assistants a
+       ON a.assistant_user_id = u.id AND a.stage_key IN ('review', 'recommend', 'approve')
+     WHERE u.role = 'admin' OR m.user_id IS NOT NULL OR a.assistant_user_id IS NOT NULL
+     ORDER BY u.role, u.name`,
+  );
+  return rows.map((row) => ({
+    userId: String(row["id"]),
+    name: String(row["name"]),
+    role: String(row["role"]) as Role,
+    phoneNumber: row["phone_number"] ? String(row["phone_number"]) : undefined,
+  }));
+}
+
+export async function saveSignatoryPhoneNumber(input: unknown): Promise<{ ok: true }> {
+  const viewer = await requireViewer();
+  requireAdmin(viewer.role);
+  const data = parseInput(signatoryPhoneSchema, input);
+  const rows = await all<RowDataPacket[]>(
+    `SELECT u.id
+     FROM users u
+     WHERE u.id = ?
+       AND (u.role = 'admin'
+         OR EXISTS (SELECT 1 FROM main_signatory_assignments m WHERE m.user_id = u.id)
+         OR EXISTS (
+           SELECT 1 FROM signatory_assistants a
+           WHERE a.assistant_user_id = u.id
+             AND a.stage_key IN ('review', 'recommend', 'approve')
+         ))
+     LIMIT 1`,
+    [data.userId],
+  );
+  if (!rows.length) {
+    throw new AppError("That account is not listed in the LOA signatory directory.");
+  }
+  const result = await run(
+    `UPDATE users
+     SET phone_number = ?
+     WHERE id = ?`,
+    [data.phoneNumber?.trim() || null, data.userId],
+  );
+  if (result.affectedRows > 1) throw new AppError("Could not update the signatory contact number.");
+  return { ok: true };
 }
 
 export async function saveMainSignatories(input: unknown) {
@@ -173,12 +225,7 @@ export async function saveSignatoryAssistants(input: unknown) {
         if (!account || !ASSISTANT_ROLES.includes(account.role)) {
           throw new AppError("Choose an eligible registered account for the alternate signatory.");
         }
-        const stageRole: Record<StageKey, Role> = {
-          review: "transport_head",
-          recommend: "director",
-          approve: "president",
-        };
-        if (account.role === stageRole[stage]) {
+        if (account.role === STAGE_ROLES[stage]) {
           throw new AppError("Choose an account other than the primary signatory.");
         }
         if (assistant.name !== account.name.trim()) {
@@ -254,6 +301,7 @@ export async function createMainSignatoryAccount(input: unknown) {
   }
 
   const role = STAGE_ROLES[data.stage];
+  if (!role) throw new AppError("Choose a valid signatory stage.");
   const id = randomUUID();
   const temporaryPassword = `${randomBytes(24).toString("base64url")}Aa1!`;
   const passwordHash = await hashPassword(temporaryPassword);

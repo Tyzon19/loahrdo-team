@@ -48,7 +48,7 @@ export interface SignatureDbRow extends RowDataPacket {
   id: string;
   stage: StageKey;
   attempt: number;
-  signer_id: string;
+  signer_id: string | null;
   signer_name: string;
   proxy_signer_name: string | null;
   signer_role: Role;
@@ -104,6 +104,8 @@ export interface NotificationDbRow extends RowDataPacket {
   body: string;
   cta_label: string;
   read_at: string | null;
+  email_status: "pending" | "sent" | "failed" | null;
+  email_error: string | null;
   created_at: string;
 }
 
@@ -340,7 +342,7 @@ export async function loadRequest(
     signatures: signatures.map((s): SignatureRecord => ({
       stage: s.stage,
       attempt: s.attempt,
-      signerId: s.signer_id,
+      signerId: s.signer_id ?? undefined,
       signerName: s.signer_name,
       proxySignerName: s.proxy_signer_name ?? undefined,
       signerRole: s.signer_role,
@@ -401,5 +403,7 @@ export function mapNotification(row: NotificationDbRow): EmailMessage {
     body: row.body,
     ctaLabel: row.cta_label,
     read: row.read_at !== null,
+    emailDeliveryStatus: row.email_status ?? undefined,
+    emailDeliveryMessage: row.email_error ?? undefined,
   };
 }

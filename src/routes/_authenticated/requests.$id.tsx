@@ -61,7 +61,7 @@ export const Route = createFileRoute("/_authenticated/requests/$id")({
 
 const ACTION_LABEL: Record<StageKey, string> = {
   review: "Review, Sign & Forward",
-  recommend: "Recommend Approval, Sign & Forward",
+  recommend: "Complete Transport Review, Sign & Forward",
   approve: "Approve & Sign",
 };
 
@@ -144,7 +144,9 @@ function RequestDetailPage() {
 
   const r = detail.request;
   const stage = stageForStatus(r.status);
-  const isProxySigner = Boolean(stage && detail.assistantUserIds[stage.key] === viewer.id);
+  const isProxySigner = Boolean(
+    stage && stage.key !== "review" && detail.assistantUserIds[stage.key] === viewer.id,
+  );
   const assignedMainUserId = stage ? detail.approverUserIds[stage.key] : undefined;
   const isAssignedMainSignatory = Boolean(stage && assignedMainUserId === viewer.id);
   const isRoleBasedSignatory = Boolean(stage && !assignedMainUserId && stage.role === viewer.role);
@@ -227,7 +229,7 @@ function RequestDetailPage() {
           title={`Your vehicle request ${r.number} has been submitted successfully.`}
         >
           It is now waiting for review by the Head of Transport Services. Updates appear in your
-          notifications or Email.
+          notifications or email.
         </Notice>
       )}
       {search.notice === "resubmitted" && isOwner && r.status === "pending_review" && (
@@ -555,16 +557,21 @@ function ActionPanel({
         )}
         {stageKey === "recommend" && previous && (
           <p className="text-sm">
-            Reviewed by <strong>{previous.signerName}</strong> (Head of Transport Services) on{" "}
-            {fmtDateTime(previous.at)}
-            {r.reviewRemarks ? <> — “{r.reviewRemarks}”</> : null}. Your signature recommends the
-            request for approval; final approval rests with the President.
+            Reviewed by the Head of Transport Services, <strong>{previous.signerName}</strong>, on{" "}
+            {fmtDateTime(previous.at)}. Complete your recommendation before forwarding the request
+            to the President.
+          </p>
+        )}
+        {stageKey === "review" && (
+          <p className="text-sm">
+            Review the request details, record vehicle and driver information, then sign and forward
+            it to the Director for Administration.
           </p>
         )}
         {stageKey === "review" && (
           <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="min-w-0 break-words text-sm sm:col-span-2">
-              Reviewed By: <strong>{viewer.name}</strong>
+              Head of Transport Services review by: <strong>{viewer.name}</strong>
             </div>
             <div className="min-w-0 sm:col-span-2">
               <Label htmlFor="vehicle">Assign vehicle</Label>
@@ -673,7 +680,8 @@ function ActionPanel({
         </div>
         <p className="flex min-w-0 items-start gap-1.5 break-words text-xs text-muted-foreground">
           <Mail className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-          The next person receives an in-app notification. Email delivery is not connected yet.
+          The next approver receives an in-app notification and an email delivery attempt. Any email
+          failure is reported after you sign.
         </p>
       </div>
 

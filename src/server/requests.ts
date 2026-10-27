@@ -43,6 +43,7 @@ import {
   rejectStage,
   resubmit as resubmitWorkflow,
   stageForStatus,
+  STAGES,
   updatePendingRequest as updatePendingRequestWorkflow,
   WorkflowError,
   type Ctx,
@@ -52,7 +53,7 @@ import { all, getPool, likePattern, run, withTransaction } from "./db";
 import { AppError, isDuplicateKey, parseInput } from "@/lib/errors";
 import { serverEnv } from "./env";
 import { createTicketVerificationToken, ticketDataDigest } from "@/lib/ticket-verification";
-import { sendTripTicketEmail, sendWorkflowEmails } from "./gmail";
+import { sendTripTicketEmail, sendWorkflowEmails, type EmailRecipientResult } from "./gmail";
 import {
   loadApproverNames,
   loadApproverUserIds,
@@ -131,7 +132,7 @@ async function insertSignature(
 
 async function insertNotifications(conn: PoolConnection, emails: EmailMessage[]) {
   if (!emails.length) return;
-  const placeholders = emails.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
+  const placeholders = emails.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
   const values = emails.flatMap((email) => [
     email.id,
     email.requestId,
@@ -145,14 +146,42 @@ async function insertNotifications(conn: PoolConnection, emails: EmailMessage[])
     email.body,
     email.ctaLabel,
     toDbTimestamp(email.at),
+    "pending",
+    null,
   ]);
   await run(
     `INSERT INTO notifications
-      (id, request_id, to_user_id, to_name, to_email, subject, kind, stage, heading, body, cta_label, created_at)
+      (id, request_id, to_user_id, to_name, to_email, subject, kind, stage, heading, body, cta_label, created_at, email_status, email_error)
      VALUES ${placeholders}`,
     values,
     conn,
   );
+}
+
+async function recordEmailDelivery(results: EmailRecipientResult[] | undefined) {
+  if (!results?.length) return;
+  try {
+    for (const result of results) {
+      await run(
+        `UPDATE notifications
+         SET email_status = ?, email_error = ?
+         WHERE id = ?`,
+        [result.sent ? "sent" : "failed", result.message ?? null, result.notificationId],
+      );
+    }
+  } catch (error) {
+    console.error(
+      `[email] Delivery status could not be saved: ${
+        error instanceof Error ? error.message : "unknown"
+      }`,
+    );
+  }
+}
+
+async function deliverWorkflowEmails(messages: EmailMessage[], request: VehicleRequest) {
+  const result = await sendWorkflowEmails(messages, request);
+  await recordEmailDelivery(result.recipientResults);
+  return result;
 }
 
 async function notifyAssistant(
@@ -223,11 +252,7 @@ async function routeMainSignatory(
             : "action_approve",
         [account],
         `You are assigned as the main signatory for the ${
-          stage === "review"
-            ? "Head of Transport Services"
-            : stage === "recommend"
-              ? "Director for Administration"
-              : "President"
+          STAGES.find((item) => item.key === stage)?.title ?? "approval stage"
         }.`,
         stage,
       )[0];
@@ -529,7 +554,7 @@ export async function submitRequest(input: unknown): Promise<{
     };
   });
   const workflowEmail = result.emails.length
-    ? await sendWorkflowEmails(result.emails, result.request)
+    ? await deliverWorkflowEmails(result.emails, result.request)
     : undefined;
   return { id: result.id, number: result.number, ...(workflowEmail ? { workflowEmail } : {}) };
 }
@@ -561,7 +586,9 @@ export async function approveRequest(
     const stage = stageForStatus(request.status);
     if (!stage) throw new AppError("This request is not waiting for an approval decision.");
     if (data.driverName !== undefined && stage.key !== "review") {
-      throw new AppError("A driver can only be assigned during the transport review stage.");
+      throw new AppError(
+        "A driver can only be assigned during the Head of Transport Services review.",
+      );
     }
     const [assistantUserId, assignedMainUserId] = await Promise.all([
       loadAssistantUserIds(conn).then((ids) => ids[stage.key]),
@@ -683,7 +710,7 @@ export async function approveRequest(
   });
   const approvalMessages = result.emails.filter((message) => message.kind !== "approved_requester");
   const workflowEmail = approvalMessages.length
-    ? await sendWorkflowEmails(approvalMessages, result.request)
+    ? await deliverWorkflowEmails(approvalMessages, result.request)
     : undefined;
   return { status: result.status, ...(workflowEmail ? { workflowEmail } : {}) };
 }
@@ -768,7 +795,7 @@ export async function rejectRequest(
     };
   });
   const workflowEmail = result.emails.length
-    ? await sendWorkflowEmails(result.emails, result.request)
+    ? await deliverWorkflowEmails(result.emails, result.request)
     : undefined;
   return { status: result.status, ...(workflowEmail ? { workflowEmail } : {}) };
 }
@@ -841,7 +868,7 @@ export async function resubmitRequest(
     };
   });
   const workflowEmail = result.emails.length
-    ? await sendWorkflowEmails(result.emails, result.request)
+    ? await deliverWorkflowEmails(result.emails, result.request)
     : undefined;
   return { id: result.id, ...(workflowEmail ? { workflowEmail } : {}) };
 }
@@ -959,7 +986,7 @@ export async function sendTripTicket(input: unknown): Promise<{
       alreadySent = attachments.length > 0;
       await run(
         `UPDATE notifications
-         SET body = ?, read_at = IF(?, read_at, NULL)
+         SET body = ?, read_at = IF(?, read_at, NULL), email_status = 'pending', email_error = NULL
          WHERE id = ?`,
         [
           `The official trip ticket for ${request.number} is attached. It was prepared by ${viewer.name}.`,
@@ -998,6 +1025,7 @@ export async function sendTripTicket(input: unknown): Promise<{
     result.request,
     result.ticketImage,
   );
+  await recordEmailDelivery(emailDelivery.recipientResults);
   return { alreadySent: result.alreadySent, emailDelivery };
 }
 

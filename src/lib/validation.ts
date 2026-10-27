@@ -17,7 +17,11 @@ const department = z
   .min(2, "Enter your department or office.")
   .max(190, "Department must be 190 characters or fewer.");
 
-const controlChars = /[\u0000-\u001f\u007f]/;
+const hasControlChars = (value: string) =>
+  Array.from(value).some((char) => {
+    const code = char.charCodeAt(0);
+    return code <= 0x1f || code === 0x7f;
+  });
 
 /** Minimum 12 characters with upper case, lower case, a number and a symbol. */
 export function passwordIssues(value: string): string[] {
@@ -82,7 +86,7 @@ const destination = z
   .trim()
   .min(2, "Enter a destination.")
   .max(200, "Destinations must be 200 characters or fewer.")
-  .refine((v) => !controlChars.test(v), "Destinations contain invalid characters.");
+  .refine((v) => !hasControlChars(v), "Destinations contain invalid characters.");
 
 export const requestInputSchema = z
   .object({
@@ -106,7 +110,7 @@ export const requestInputSchema = z
       .trim()
       .min(5, "Describe the purpose of travel (at least 5 characters).")
       .max(1000, "Purpose must be 1,000 characters or fewer.")
-      .refine((v) => !controlChars.test(v), "Purpose contains invalid characters."),
+      .refine((v) => !hasControlChars(v), "Purpose contains invalid characters."),
   })
   .refine((v) => v.dateEnd >= v.dateStart, {
     path: ["dateEnd"],
@@ -217,6 +221,16 @@ export const createAssistantAccountSchema = z.object({
 
 export const resetUserPasswordSchema = z.object({
   userId: z.string().uuid(),
+});
+
+export const signatoryPhoneSchema = z.object({
+  userId: z.string().uuid(),
+  phoneNumber: z
+    .string()
+    .trim()
+    .max(32, "Phone numbers must be 32 characters or fewer.")
+    .regex(/^[0-9+().\-\s]*$/, "Enter a valid telephone or mobile number.")
+    .nullable(),
 });
 
 export const requestFilterSchema = z.object({

@@ -213,8 +213,21 @@ function NotificationPreview({ email }: { email: EmailMessage }) {
           <strong className="font-medium">Subject:</strong>{" "}
           <span className="font-medium [overflow-wrap:anywhere]">{email.subject}</span>
         </p>
-        <p className="mt-1 text-warning">
-          In-app notification. Email delivery is not connected yet.
+        <p
+          className={cn(
+            "mt-1",
+            email.emailDeliveryStatus === "failed" && "text-destructive",
+            email.emailDeliveryStatus === "sent" && "text-success",
+            email.emailDeliveryStatus === "pending" && "text-warning",
+          )}
+        >
+          {email.emailDeliveryStatus === "sent"
+            ? `Email sent to ${email.toEmail}.`
+            : email.emailDeliveryStatus === "failed"
+              ? `Email not sent.${email.emailDeliveryMessage ? ` ${email.emailDeliveryMessage}` : ""}`
+              : email.emailDeliveryStatus === "pending"
+                ? "Email delivery is pending or the delivery result has not been recorded yet."
+                : "This is an in-app notification. Email status is unavailable for older notifications."}
         </p>
       </div>
       <div className="mx-auto min-w-0 max-w-xl p-4 sm:p-5">

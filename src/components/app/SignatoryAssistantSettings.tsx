@@ -11,9 +11,11 @@ import { ButtonLoading, LoadingPanel } from "@/components/app/LoadingPanel";
 import {
   createAssistantAccountFn,
   createMainSignatoryAccountFn,
+  getPhoneDirectoryFn,
   getSignatoryAssistantsFn,
   resetUserPasswordFn,
   saveMainSignatoriesFn,
+  saveSignatoryPhoneNumberFn,
   saveSignatoryAssistantsFn,
 } from "@/server-functions";
 import { unwrap } from "@/lib/api";
@@ -21,7 +23,7 @@ import type { StageKey } from "@/lib/types";
 
 const FIELDS: { key: StageKey; label: string }[] = [
   { key: "review", label: "Head of Transport Services" },
-  { key: "recommend", label: "Director" },
+  { key: "recommend", label: "Director for Administration" },
   { key: "approve", label: "President" },
 ];
 
@@ -58,6 +60,12 @@ const EMPTY_MAIN_SIGNATORIES: MainSignatoryForm = {
 
 export function SignatoryAssistantSettings() {
   const queryClient = useQueryClient();
+  const phoneDirectory = useQuery({
+    queryKey: ["phone-directory"],
+    queryFn: () => unwrap(getPhoneDirectoryFn()),
+  });
+  const [phoneNumbers, setPhoneNumbers] = useState<Record<string, string>>({});
+  const [savingPhoneUserId, setSavingPhoneUserId] = useState<string | null>(null);
   const query = useQuery({
     queryKey: ["signatory-assistants"],
     queryFn: () => unwrap(getSignatoryAssistantsFn()),
@@ -102,6 +110,15 @@ export function SignatoryAssistantSettings() {
   } | null>(null);
 
   useEffect(() => {
+    if (!phoneDirectory.data) return;
+    setPhoneNumbers(
+      Object.fromEntries(
+        phoneDirectory.data.map((contact) => [contact.userId, contact.phoneNumber ?? ""]),
+      ),
+    );
+  }, [phoneDirectory.data]);
+
+  useEffect(() => {
     if (!query.data) return;
     setForm({
       review: {
@@ -123,6 +140,29 @@ export function SignatoryAssistantSettings() {
       approve: query.data.configuredMainSignatoryUserIds.approve ?? "",
     });
   }, [query.data]);
+
+  async function savePhoneNumber(userId: string) {
+    if (savingPhoneUserId) return;
+    setSavingPhoneUserId(userId);
+    try {
+      const result = await saveSignatoryPhoneNumberFn({
+        data: {
+          userId,
+          phoneNumber: phoneNumbers[userId]?.trim() || null,
+        },
+      });
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success("LOA phone directory updated.");
+      await queryClient.invalidateQueries({ queryKey: ["phone-directory"] });
+    } catch {
+      toast.error("We couldn't save that contact number. Please try again.");
+    } finally {
+      setSavingPhoneUserId(null);
+    }
+  }
 
   async function saveMainSignatories(event: React.FormEvent) {
     event.preventDefault();
@@ -324,64 +364,76 @@ export function SignatoryAssistantSettings() {
   }
   return (
     <div className="space-y-4">
-      <Section title="Assign Main Signatories">
-        <p className="mb-4 max-w-3xl text-sm text-muted-foreground">
-          Choose the account responsible for each approval stage. Existing accounts keep their
-          system role and permissions; changing this assignment replaces who may sign for that
-          stage. The approval order remains unchanged.
+      <Section title="Manage LOA Phone Directory">
+        <p className="mb-4 text-sm text-muted-foreground">
+          Add verified contact numbers for administrators and assigned signatories. Numbers are
+          visible to signed-in users in the LOA Phone Directory.
         </p>
-        {query.isPending ? (
-          <LoadingPanel label="Loading main signatories" rows={3} />
-        ) : query.isError ? (
+        {phoneDirectory.isPending ? (
+          <LoadingPanel label="Loading signatory phone numbers" rows={3} />
+        ) : phoneDirectory.isError ? (
           <div className="p-4 text-sm" role="alert">
-            <p className="font-medium">We couldn&apos;t load main signatories.</p>
-            <Button className="mt-3" variant="outline" onClick={() => void query.refetch()}>
+            <p className="font-medium">We couldn&apos;t load phone directory contacts.</p>
+            <Button
+              className="mt-3"
+              variant="outline"
+              onClick={() => void phoneDirectory.refetch()}
+            >
               Try again
             </Button>
           </div>
+        ) : phoneDirectory.data.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No signatory accounts have been assigned.</p>
         ) : (
-          <form className="max-w-xl space-y-4" onSubmit={saveMainSignatories}>
-            {FIELDS.map(({ key, label }) => {
-              const selected = query.data.mainSignatoryUsers.find(
-                (user: User) => user.id === mainForm[key],
-              );
-              return (
-                <div key={key}>
-                  <Label htmlFor={`main-signatory-${key}`}>{label} main signatory</Label>
-                  <select
-                    id={`main-signatory-${key}`}
-                    className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    value={mainForm[key]}
-                    onChange={(event) =>
-                      setMainForm((current) => ({ ...current, [key]: event.target.value }))
-                    }
-                  >
-                    <option value="">Select a main signatory account</option>
-                    {query.data.mainSignatoryUsers.map((user: User) => (
-                      <option key={user.id} value={user.id}>
-                        {user.name} — {user.email} ({ROLE_TITLES[user.role]})
-                      </option>
-                    ))}
-                  </select>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Current main signatory:{" "}
-                    {selected?.name ?? query.data.mainSignatoryNames[key] ?? "No account found"}
-                  </p>
+          <div className="space-y-3">
+            {phoneDirectory.data.map((contact) => (
+              <form
+                key={contact.userId}
+                className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,18rem)_auto] sm:items-end"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void savePhoneNumber(contact.userId);
+                }}
+              >
+                <div>
+                  <p className="font-medium">{contact.name}</p>
+                  <p className="text-xs text-muted-foreground">{ROLE_TITLES[contact.role]}</p>
                 </div>
-              );
-            })}
-            <Button type="submit" disabled={mainBusy}>
-              {mainBusy ? <ButtonLoading label="Saving…" /> : "Save main signatories"}
-            </Button>
-          </form>
+                <div>
+                  <Label htmlFor={`phone-${contact.userId}`}>Telephone / mobile</Label>
+                  <Input
+                    id={`phone-${contact.userId}`}
+                    className="mt-1"
+                    type="tel"
+                    maxLength={32}
+                    value={phoneNumbers[contact.userId] ?? ""}
+                    onChange={(event) =>
+                      setPhoneNumbers((current) => ({
+                        ...current,
+                        [contact.userId]: event.target.value,
+                      }))
+                    }
+                    placeholder="Not provided"
+                  />
+                </div>
+                <Button type="submit" variant="outline" disabled={savingPhoneUserId !== null}>
+                  {savingPhoneUserId === contact.userId ? (
+                    <ButtonLoading label="Saving…" />
+                  ) : (
+                    "Save number"
+                  )}
+                </Button>
+              </form>
+            ))}
+          </div>
         )}
       </Section>
       <Section title="Create Main Signatory Account">
         <p className="mb-4 max-w-3xl text-sm text-muted-foreground">
-          Create an institutional account for a new Head of Transport Services, Director, or
-          President. Creating it assigns that account as the main signatory for the selected stage
-          and replaces the current assignment. The system emails a one-time temporary password to
-          the new signatory, who must change it at first sign-in.
+          Create an institutional account for a new Head of Transport Services, Director for
+          Administration, or President. Creating an account assigns it as the main signatory for the
+          selected stage and replaces the current assignment. The system emails a one-time temporary
+          password to the new signatory, who must change it at first sign-in.
         </p>
         <form className="grid max-w-3xl gap-4 sm:grid-cols-2" onSubmit={createMainAccount}>
           <div>
@@ -491,6 +543,58 @@ export function SignatoryAssistantSettings() {
           </div>
         )}
       </Section>
+      <Section title="Assign Main Signatories">
+        <p className="mb-4 max-w-3xl text-sm text-muted-foreground">
+          Assign all three approval stages in order: Head of Transport Services → Director for
+          Administration → President.
+        </p>
+        {query.isPending ? (
+          <LoadingPanel label="Loading main signatories" rows={3} />
+        ) : query.isError ? (
+          <div className="p-4 text-sm" role="alert">
+            <p className="font-medium">We couldn&apos;t load main signatories.</p>
+            <Button className="mt-3" variant="outline" onClick={() => void query.refetch()}>
+              Try again
+            </Button>
+          </div>
+        ) : (
+          <form className="max-w-xl space-y-4" onSubmit={saveMainSignatories}>
+            {FIELDS.map(({ key, label }) => {
+              const selected = query.data.mainSignatoryUsers.find(
+                (user: User) => user.id === mainForm[key],
+              );
+              return (
+                <div key={key}>
+                  <Label htmlFor={`main-signatory-${key}`}>{label} main signatory</Label>
+                  <select
+                    id={`main-signatory-${key}`}
+                    className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={mainForm[key]}
+                    onChange={(event) =>
+                      setMainForm((current) => ({ ...current, [key]: event.target.value }))
+                    }
+                  >
+                    <option value="">Select a main signatory account</option>
+                    {query.data.mainSignatoryUsers.map((user: User) => (
+                      <option key={user.id} value={user.id}>
+                        {user.name} — {user.email} ({ROLE_TITLES[user.role]})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Current main signatory:{" "}
+                    {selected?.name ?? query.data.mainSignatoryNames[key] ?? "No account found"}
+                  </p>
+                </div>
+              );
+            })}
+            <Button type="submit" disabled={mainBusy}>
+              {mainBusy ? <ButtonLoading label="Saving…" /> : "Save main signatories"}
+            </Button>
+          </form>
+        )}
+      </Section>
+
       <Section title="Create Alternate Signatory Account">
         <p className="mb-4 text-sm text-muted-foreground">
           Create an individual institutional account for an alternate signatory. The system emails a
@@ -669,9 +773,8 @@ export function SignatoryAssistantSettings() {
       </Section>
       <Section title="Assign Alternate Signatories">
         <p className="mb-4 text-sm text-muted-foreground">
-          Choose an alternate signatory account for each stage. When needed, the assigned person
-          signs in with their own account; their name, signature, and signing time are recorded
-          separately from the primary signatory.
+          Choose an alternate account for each approval stage. When needed, the assigned person
+          signs in with their own account; their name, signature, and signing time are recorded.
         </p>
         {query.isPending ? (
           <LoadingPanel label="Loading alternate signatories" rows={3} />

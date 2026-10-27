@@ -113,6 +113,16 @@ export const getSignatoryAssistantsFn = createServerFn({ method: "GET" }).handle
   runSafely(async () => (await import("./server/signatories")).getSignatoryAssistants()),
 );
 
+export const getPhoneDirectoryFn = createServerFn({ method: "GET" }).handler(async () =>
+  runSafely(async () => (await import("./server/signatories")).getPhoneDirectory()),
+);
+
+export const saveSignatoryPhoneNumberFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/signatories")).saveSignatoryPhoneNumber(data)),
+  );
+
 export const saveSignatoryAssistantsFn = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) =>

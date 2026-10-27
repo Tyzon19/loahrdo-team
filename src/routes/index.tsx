@@ -44,8 +44,8 @@ const STEPS = [
   },
   {
     icon: ClipboardCheck,
-    title: "Three fixed approvals",
-    body: "Transport Services reviews, the Director recommends, and the President grants final approval — in that order.",
+    title: "Three approval steps",
+    body: "The Head of Transport Services reviews first, the Director for Administration recommends approval, and the President grants final approval — in that order.",
   },
   {
     icon: Printer,
@@ -130,8 +130,8 @@ function Landing() {
             Contact ITM
           </h2>
           <p className="mt-2 text-muted-foreground">
-            For questions about your request or trip ticket, reach the Information Technology Management
-            Office.
+            For questions about your request or trip ticket, reach the Information Technology
+            Management Office.
           </p>
           <ul className="mt-6 grid gap-3 sm:grid-cols-2">
             <li className="flex gap-3 rounded-sm border bg-background p-4">

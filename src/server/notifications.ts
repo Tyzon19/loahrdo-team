@@ -10,7 +10,8 @@ export async function listNotifications(): Promise<EmailMessage[]> {
   const viewer = await requireViewer();
   const rows = await all<NotificationDbRow[]>(
     `SELECT n.id, n.request_id, r.number AS request_number, n.to_user_id, n.to_name, n.to_email,
-            n.subject, n.kind, n.stage, n.heading, n.body, n.cta_label, n.read_at, n.created_at
+            n.subject, n.kind, n.stage, n.heading, n.body, n.cta_label, n.read_at,
+            n.email_status, n.email_error, n.created_at
      FROM notifications n
      JOIN requests r ON r.id = n.request_id
      WHERE n.to_user_id = ?

@@ -17,6 +17,7 @@ import { Route as RegisterRouteImport } from './routes/register'
 import { Route as AuthenticatedChangePasswordRouteImport } from './routes/_authenticated/change-password'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedNotificationsRouteImport } from './routes/_authenticated/notifications'
+import { Route as AuthenticatedPhoneDirectoryRouteImport } from './routes/_authenticated/phone-directory'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 import { Route as AuthenticatedTripArchiveRouteImport } from './routes/_authenticated/trip-archive'
 import { Route as AuthenticatedVehiclesRouteImport } from './routes/_authenticated/vehicles'
@@ -69,6 +70,12 @@ const AuthenticatedNotificationsRoute =
   AuthenticatedNotificationsRouteImport.update({
     id: '/notifications',
     path: '/notifications',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedPhoneDirectoryRoute =
+  AuthenticatedPhoneDirectoryRouteImport.update({
+    id: '/phone-directory',
+    path: '/phone-directory',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
@@ -143,6 +150,7 @@ export interface FileRoutesByFullPath {
   '/change-password': typeof AuthenticatedChangePasswordRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/notifications': typeof AuthenticatedNotificationsRoute
+  '/phone-directory': typeof AuthenticatedPhoneDirectoryRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/trip-archive': typeof AuthenticatedTripArchiveRoute
   '/vehicles': typeof AuthenticatedVehiclesRoute
@@ -164,6 +172,7 @@ export interface FileRoutesByTo {
   '/change-password': typeof AuthenticatedChangePasswordRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/notifications': typeof AuthenticatedNotificationsRoute
+  '/phone-directory': typeof AuthenticatedPhoneDirectoryRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/trip-archive': typeof AuthenticatedTripArchiveRoute
   '/vehicles': typeof AuthenticatedVehiclesRoute
@@ -187,6 +196,7 @@ export interface FileRoutesById {
   '/_authenticated/change-password': typeof AuthenticatedChangePasswordRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/notifications': typeof AuthenticatedNotificationsRoute
+  '/_authenticated/phone-directory': typeof AuthenticatedPhoneDirectoryRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/trip-archive': typeof AuthenticatedTripArchiveRoute
   '/_authenticated/vehicles': typeof AuthenticatedVehiclesRoute
@@ -210,6 +220,7 @@ export interface FileRouteTypes {
     | '/change-password'
     | '/dashboard'
     | '/notifications'
+    | '/phone-directory'
     | '/profile'
     | '/trip-archive'
     | '/vehicles'
@@ -231,6 +242,7 @@ export interface FileRouteTypes {
     | '/change-password'
     | '/dashboard'
     | '/notifications'
+    | '/phone-directory'
     | '/profile'
     | '/trip-archive'
     | '/vehicles'
@@ -253,6 +265,7 @@ export interface FileRouteTypes {
     | '/_authenticated/change-password'
     | '/_authenticated/dashboard'
     | '/_authenticated/notifications'
+    | '/_authenticated/phone-directory'
     | '/_authenticated/profile'
     | '/_authenticated/trip-archive'
     | '/_authenticated/vehicles'
@@ -335,6 +348,13 @@ declare module '@tanstack/react-router' {
       path: '/notifications'
       fullPath: '/notifications'
       preLoaderRoute: typeof AuthenticatedNotificationsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/phone-directory': {
+      id: '/_authenticated/phone-directory'
+      path: '/phone-directory'
+      fullPath: '/phone-directory'
+      preLoaderRoute: typeof AuthenticatedPhoneDirectoryRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/profile': {
@@ -428,6 +448,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedChangePasswordRoute: typeof AuthenticatedChangePasswordRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedNotificationsRoute: typeof AuthenticatedNotificationsRoute
+  AuthenticatedPhoneDirectoryRoute: typeof AuthenticatedPhoneDirectoryRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
   AuthenticatedTripArchiveRoute: typeof AuthenticatedTripArchiveRoute
   AuthenticatedVehiclesRoute: typeof AuthenticatedVehiclesRoute
@@ -442,6 +463,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedChangePasswordRoute: AuthenticatedChangePasswordRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedNotificationsRoute: AuthenticatedNotificationsRoute,
+  AuthenticatedPhoneDirectoryRoute: AuthenticatedPhoneDirectoryRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
   AuthenticatedTripArchiveRoute: AuthenticatedTripArchiveRoute,
   AuthenticatedVehiclesRoute: AuthenticatedVehiclesRoute,

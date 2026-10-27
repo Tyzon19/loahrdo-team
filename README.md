@@ -1,11 +1,11 @@
 # LOA Vehicle Reservation & Trip Ticket
 
 Vehicle reservation and trip-ticket system for the Lyceum of Alabang Physical Facilities
-Management Office. Requisitioners file requests; Transport Services, the Director for
-Administration and the President review them in a fixed order.
+Management Office. Requisitioners file requests; the Head of Transport Services reviews first,
+followed by the Director for Administration and the President.
 
-During the Head of Transport Services review, the assigned driver's name can be recorded with the
-vehicle details. The name is shown below the vehicle type and plate number on the trip ticket.
+During the Head of Transport Services review, vehicle details and the assigned driver's name are
+recorded. They are shown on the trip ticket.
 
 Every finally approved ticket remains searchable in its saved request record. Administrators can
 use **Trip Archive & Analytics** to search by ticket, destination, requester, driver or vehicle;
@@ -15,7 +15,8 @@ remain in the archive but are not counted as completed journeys.
 
 All data is stored in MySQL (Laragon locally). There is no demo request data: setup seeds
 one administrator account and the document header. The administrator creates and assigns the
-three main signatory accounts after setup.
+Head of Transport Services, Director for Administration and President accounts after setup. Admins
+maintain the LOA phone directory; signed-in users can view assigned contacts there.
 
 ## Requirements
 
@@ -38,9 +39,10 @@ command. It generates a random password for the application user, writes everyth
 `SELECT, INSERT, UPDATE, DELETE` on the `loa_vrtt` database.
 
 `db:seed` prints an initial password once for the administrator account. The administrator
-must choose a new password at first sign-in, then create and assign one account for each main
-signatory stage from Profile. Each new signatory account gets a generated temporary password
-emailed to its configured institutional address and must change it at first sign-in. The seeded
+must choose a new password at first sign-in, then create and assign the Head of Transport Services,
+Director for Administration and President accounts from Profile. Each new signatory account gets a
+generated temporary password emailed to its configured institutional address and must change it at
+first sign-in. The seeded
 administrator account:
 
 | Role          | Email              |
@@ -91,11 +93,12 @@ and password resets go to the email address configured for that account.
 The request or account change is committed before Gmail delivery, so a mail failure is reported
 to the administrator and does not undo the saved action. Final-approval messages to requisitioners
 are sent when staff send the official ticket; that message includes the ticket image and the
-requisitioner's configured account address is used as the recipient. Ticket delivery can be retried
-from the print page. Requests changed before email delivery was enabled are not emailed
-retroactively. Production must use server-side OAuth secrets and a public HTTPS `SITE_URL`; never
-expose OAuth credentials or refresh tokens with a `VITE_` prefix. Google's OAuth policies, sender
-restrictions, and recipient mail systems can still reject delivery.
+requisitioner's configured account address is used as the recipient. Each in-app notification shows
+whether its email was sent, failed, or is still pending; older notifications have no delivery status.
+Ticket delivery can be retried from the print page. Requests changed before email delivery was
+enabled are not emailed retroactively. Production must use server-side OAuth secrets and a public
+HTTPS `SITE_URL`; never expose OAuth credentials or refresh tokens with a `VITE_` prefix. Google's
+OAuth policies, sender restrictions, and recipient mail systems can still reject delivery.
 
 ## Security notes
 

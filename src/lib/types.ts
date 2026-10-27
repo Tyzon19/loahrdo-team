@@ -17,6 +17,13 @@ export interface User {
   email: string;
 }
 
+export interface SignatoryContact {
+  userId: string;
+  name: string;
+  role: Role;
+  phoneNumber?: string | undefined;
+}
+
 /** Server-verified account for the current session. Never built from client input. */
 export interface Viewer extends User {
   mustChangePassword: boolean;
@@ -51,7 +58,7 @@ export type StageKey = "review" | "recommend" | "approve";
 export interface SignatureRecord {
   stage: StageKey;
   attempt: number;
-  signerId: string;
+  signerId?: string | undefined;
   signerName: string;
   proxySignerName?: string | undefined;
   signerRole: Role;
@@ -203,6 +210,8 @@ export interface EmailMessage {
   body: string;
   ctaLabel: string;
   read: boolean;
+  emailDeliveryStatus?: "pending" | "sent" | "failed" | undefined;
+  emailDeliveryMessage?: string | undefined;
 }
 
 export interface DocConfig {

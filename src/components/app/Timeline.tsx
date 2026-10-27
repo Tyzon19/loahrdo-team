@@ -46,7 +46,7 @@ export function StageStepper({ r }: { r: VehicleRequest }) {
           stage.key === "review"
             ? "Transport review"
             : stage.key === "recommend"
-              ? "Director recommendation"
+              ? "Recommendation"
               : "Final approval",
         approver: signature?.signerName ?? stage.title,
         status,

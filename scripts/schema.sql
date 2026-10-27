@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS users (
   id CHAR(36) NOT NULL,
   name VARCHAR(120) NOT NULL,
   email VARCHAR(190) NOT NULL,
+  phone_number VARCHAR(32) NULL,
   password_hash VARCHAR(255) NOT NULL,
   role ENUM('requisitioner','transport_head','director','president','transport_staff','assistant','guard','driver','admin') NOT NULL,
   department VARCHAR(190) NOT NULL DEFAULT '',
@@ -113,7 +114,7 @@ CREATE TABLE IF NOT EXISTS request_signatures (
   request_id CHAR(36) NOT NULL,
   stage ENUM('review','recommend','approve') NOT NULL,
   attempt INT NOT NULL,
-  signer_id CHAR(36) NOT NULL,
+  signer_id CHAR(36) NULL,
   signer_name VARCHAR(120) NOT NULL,
   signer_role ENUM('requisitioner','transport_head','director','president','transport_staff','assistant','guard','driver','admin') NOT NULL,
   proxy_signer_name VARCHAR(120) NULL,
@@ -124,7 +125,7 @@ CREATE TABLE IF NOT EXISTS request_signatures (
   PRIMARY KEY (id),
   KEY request_signatures_request_idx (request_id, attempt),
   CONSTRAINT request_signatures_request_fk FOREIGN KEY (request_id) REFERENCES requests (id) ON DELETE CASCADE,
-  CONSTRAINT request_signatures_signer_fk FOREIGN KEY (signer_id) REFERENCES users (id) ON DELETE RESTRICT
+  CONSTRAINT request_signatures_signer_fk FOREIGN KEY (signer_id) REFERENCES users (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS request_history (
@@ -184,6 +185,8 @@ CREATE TABLE IF NOT EXISTS notifications (
   body TEXT NOT NULL,
   cta_label VARCHAR(80) NOT NULL,
   read_at DATETIME NULL,
+  email_status ENUM('pending','sent','failed') NULL,
+  email_error VARCHAR(500) NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY notifications_inbox_idx (to_user_id, created_at),

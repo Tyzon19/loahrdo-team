@@ -122,7 +122,7 @@ export function RequestForm({
         <div className="grid gap-4 sm:grid-cols-2">
           <div className={mobileGroupClass(0)}>
           <div className="sm:col-span-2">
-            <Label htmlFor="department">Department or Office<Req /></Label>
+            <Label htmlFor="department">Department of requestor<Req /></Label>
             <Input id="department" className="mt-1" value={v.department} onChange={(e) => set("department", e.target.value)} aria-invalid={!!errors.department} aria-describedby="department-err" />
             {err("department")}
           </div>

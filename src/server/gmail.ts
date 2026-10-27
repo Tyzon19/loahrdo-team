@@ -18,8 +18,25 @@ interface GoogleTokenResponse {
 const LOGO_CONTENT_ID = "loa-header-logo";
 
 export type EmailDeliveryResult =
-  | { sent: true; delivered: number; failed: 0 }
-  | { sent: false; delivered: number; failed: number; message: string };
+  | {
+      sent: true;
+      delivered: number;
+      failed: 0;
+      recipientResults?: EmailRecipientResult[] | undefined;
+    }
+  | {
+      sent: false;
+      delivered: number;
+      failed: number;
+      message: string;
+      recipientResults?: EmailRecipientResult[] | undefined;
+    };
+
+export interface EmailRecipientResult {
+  notificationId: string;
+  sent: boolean;
+  message?: string | undefined;
+}
 
 function base64(value: string | Buffer): string {
   return Buffer.from(value)
@@ -279,21 +296,34 @@ async function deliverNotifications(
       delivered: 0,
       failed: messages.length,
       message: `The request was saved, but ${message}`,
+      recipientResults: messages.map(({ id }) => ({
+        notificationId: id,
+        sent: false,
+        message,
+      })),
     };
   }
 
   let delivered = 0;
   let firstDeliveryError: string | undefined;
+  const recipientResults: EmailRecipientResult[] = [];
   for (const message of messages) {
     try {
       const mime = await createNotificationMime(message, request, siteUrl, logo, ticketImage);
       await sendMimeMessage(token, mime);
       delivered += 1;
+      recipientResults.push({ notificationId: message.id, sent: true });
     } catch (error) {
-      firstDeliveryError ??=
+      const deliveryMessage =
         error instanceof AppError
           ? error.message
           : "Email delivery failed. Contact the system administrator.";
+      firstDeliveryError ??= deliveryMessage;
+      recipientResults.push({
+        notificationId: message.id,
+        sent: false,
+        message: deliveryMessage,
+      });
       console.error(
         `[email] Notification delivery failed: ${
           error instanceof AppError
@@ -313,8 +343,9 @@ async function deliverNotifications(
         delivered,
         failed,
         message: `The request was saved, but email delivery failed for ${failed} of ${messages.length} configured recipient(s). ${firstDeliveryError ?? "In-app notifications are still available."}`,
+        recipientResults,
       }
-    : { sent: true, delivered, failed: 0 };
+    : { sent: true, delivered, failed: 0, recipientResults };
 }
 
 export function sendWorkflowEmails(

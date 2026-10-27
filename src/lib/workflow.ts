@@ -12,7 +12,7 @@ import type {
   VehicleRequest,
 } from "./types";
 
-/** The approval order is fixed and must never change. */
+/** The approval order is Head of Transport Services, Director, then President. */
 export const STAGES: {
   key: StageKey;
   role: Role;
@@ -56,7 +56,7 @@ export const ROLE_TITLES: Record<Role, string> = {
 };
 
 export const STATUS_LABELS: Record<Status, string> = {
-  pending_review: "Awaiting Review",
+  pending_review: "Awaiting Transport Review",
   pending_recommendation: "Awaiting Recommendation",
   pending_approval: "Awaiting Final Approval",
   returned: "Returned",
@@ -150,7 +150,7 @@ const EMAIL_COPY: Record<EmailKind, { subject: string; heading: string; cta: str
   },
   action_recommend: {
     subject: "Action Required",
-    heading: "A vehicle request is waiting for your recommending approval.",
+    heading: "A vehicle request is waiting for your transport review.",
     cta: "Review and Sign Request",
   },
   action_approve: {
@@ -231,7 +231,7 @@ export function createRequest(ctx: Ctx, input: RequestInput, actor: User, number
     r,
     "action_review",
     usersByRole(ctx, "transport_head"),
-    "Please review the request details, record the vehicle type and plate number if available, then sign and forward.",
+    "Please review the request details, record the vehicle type and plate number if available, then sign and forward it.",
     "review",
   );
   return { request: r, emails };
@@ -327,8 +327,8 @@ export function approveStage(
         actor,
         "signed",
         proxySignerName
-          ? `Recommended approval and signed by ${proxySignerName} as alternate for the Director; forwarded to the President.`
-          : "Recommended approval, signed and forwarded to the President.",
+          ? `Recommendation signed by ${proxySignerName} as alternate for the Director for Administration; forwarded to the President.`
+          : "Recommended, signed and forwarded to the President.",
       ),
     );
     emails = makeEmails(
@@ -336,7 +336,7 @@ export function approveStage(
       next,
       "action_approve",
       usersByRole(ctx, "president"),
-      "This request has been reviewed and recommended for approval. Your final approval is required.",
+      "The request has been reviewed by the Head of Transport Services and recommended by the Director for Administration. Your final approval is required.",
       "approve",
     );
   } else {
@@ -493,7 +493,7 @@ export function updatePendingRequest(
     history: [...r.history],
   };
   next.history.push(
-    ev(ctx, next, actor, "updated", "Updated the request before the initial transport review."),
+    ev(ctx, next, actor, "updated", "Updated the request before transport review."),
   );
   return next;
 }
