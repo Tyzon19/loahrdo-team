@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Seeds the initial admin, three approver accounts and the document header.
+ * Seeds the initial administrator and document header.
  * No demo requests, vehicles or notifications are created.
  *
  * Initial passwords are printed once. Only scrypt hashes are stored, and every
@@ -57,24 +57,6 @@ const accounts = [
     role: "admin",
     department: "Physical Facilities Management Office",
   },
-  {
-    name: "MR. MICHAEL DELA CRUZ",
-    email: "transport@loa.edu.ph",
-    role: "transport_head",
-    department: "Transport Services",
-  },
-  {
-    name: "ATTY. JOHNLERY O. PUGAO",
-    email: "director@loa.edu.ph",
-    role: "director",
-    department: "Office of the Director for Administration",
-  },
-  {
-    name: "MS. FAITH M. AYAP-AQUINO",
-    email: "president@loa.edu.ph",
-    role: "president",
-    department: "Office of the President",
-  },
 ];
 
 const conn = await mysql.createConnection({
@@ -112,7 +94,14 @@ try {
     await conn.query(
       `INSERT INTO users (id, name, email, password_hash, role, department, must_change_password)
        VALUES (?, ?, ?, ?, ?, ?, 1)`,
-      [randomUUID(), account.name, account.email, hashPassword(password), account.role, account.department],
+      [
+        randomUUID(),
+        account.name,
+        account.email,
+        hashPassword(password),
+        account.role,
+        account.department,
+      ],
     );
     created.push({ ...account, password });
   }
@@ -127,7 +116,8 @@ try {
       console.log("  already exists — password left unchanged");
     }
   }
-  console.log("\nNo demo requests or vehicles were created.");
+  console.log("\nSignatory accounts must be created and assigned by an administrator.");
+  console.log("No demo requests or vehicles were created.");
 } finally {
   await conn.end();
 }

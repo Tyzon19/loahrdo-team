@@ -14,8 +14,6 @@ declare global {
     gtag?: (...args: unknown[]) => void;
   }
 }
-
-/** Groups record ids so analytics never stores a request identifier. */
 function normalisePath(path: string) {
   const grouped = path
     .replace(/\/(requests|revise|print)\/[0-9a-f-]{36}/gi, "/$1/:id")
@@ -35,8 +33,6 @@ export function Analytics({ measurementId }: { measurementId: string | null }) {
     else if (window.navigator.doNotTrack === "1") setConsent("denied");
     setReady(true);
   }, []);
-
-  // Google Analytics 4 loads only after the visitor chooses "Accept".
   useEffect(() => {
     if (consent !== "granted" || !measurementId || gaLoaded) return;
     const existing = document.querySelector<HTMLScriptElement>("script[data-loa-ga]");
@@ -67,7 +63,6 @@ export function Analytics({ measurementId }: { measurementId: string | null }) {
     if (view.startsWith("/print")) return;
 
     window.gtag?.("event", "page_view", { page_path: view });
-    // Cookie-free first-party count; no account id, IP or query string stored.
     void recordPageViewFn({ data: view }).catch(() => {});
   }, [consent, ready, path]);
 

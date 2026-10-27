@@ -8,16 +8,10 @@ import { requireViewer } from "./auth";
 
 const recent = new Map<string, number>();
 
-/**
- * First-party analytics: stores only the normalised page path and a timestamp.
- * No IP address, account id, query string or referrer is persisted, and the
- * client only calls this after the visitor accepts analytics cookies.
- */
 export async function recordPageView(input: unknown): Promise<{ recorded: boolean }> {
   const parsed = analyticsPathSchema.safeParse(input);
   if (!parsed.success) return { recorded: false };
 
-  // Collapse duplicate page-view reports (StrictMode, quick navigation).
   const key = `${getRequestIP() ?? "unknown"}:${parsed.data}`;
   const now = Date.now();
   const last = recent.get(key);

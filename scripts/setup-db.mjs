@@ -174,8 +174,8 @@ const envContent = [
   `GA_MEASUREMENT_ID=${existing.GA_MEASUREMENT_ID || ""}`,
   `GOOGLE_CLIENT_ID=${existing.GOOGLE_CLIENT_ID || ""}`,
   `GOOGLE_CLIENT_SECRET=${existing.GOOGLE_CLIENT_SECRET || ""}`,
-  `GOOGLE_REDIRECT_URI=${existing.GOOGLE_REDIRECT_URI || "http://localhost:8080/api/gmail-test/callback"}`,
-  `GOOGLE_TEST_RECIPIENT=${existing.GOOGLE_TEST_RECIPIENT || ""}`,
+  `GOOGLE_REDIRECT_URI=${existing.GOOGLE_REDIRECT_URI || "http://localhost:8080/api/gmail/callback"}`,
+  `GOOGLE_SENDER_EMAIL=${existing.GOOGLE_SENDER_EMAIL || "markjosephturingan4@gmail.com"}`,
   `GOOGLE_REFRESH_TOKEN=${existing.GOOGLE_REFRESH_TOKEN || ""}`,
   "",
 ].join("\n");

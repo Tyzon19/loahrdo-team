@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   renderEmailTemplate,
   renderRegistrationOtpEmail,
+  renderTemporaryPasswordEmail,
   splitReturnedReason,
 } from "@/lib/email-template";
 import type { EmailMessage } from "@/lib/types";
@@ -106,6 +107,43 @@ describe("professional email template", () => {
         }),
       ).toThrow("positive number");
     });
+  });
+
+  it("renders a branded signatory welcome email with a forced password-change notice", () => {
+    const rendered = renderTemporaryPasswordEmail(
+      {
+        recipientName: "<script>Test</script>",
+        email: "signatory@example.edu",
+        temporaryPassword: "temporary<&>password",
+        signatoryTitle: "Head of Transport Services",
+        loginUrl: "https://vrtt.example.edu/login",
+      },
+      "loa-logo",
+    );
+
+    expect(rendered.subject).toBe("[LOA Vehicle Request] Your account is ready");
+    expect(rendered.html).toContain('src="cid:loa-logo"');
+    expect(rendered.html).toContain("&lt;script&gt;Test&lt;/script&gt;");
+    expect(rendered.html).toContain("temporary&lt;&amp;&gt;password");
+    expect(rendered.html).toContain("Change this password immediately");
+    expect(rendered.html).toContain('href="https://vrtt.example.edu/login"');
+    expect(rendered.text).toContain("temporary<&>password");
+    expect(rendered.text).toContain("change this temporary password immediately");
+  });
+
+  it("uses password-reset copy for account recovery emails", () => {
+    const rendered = renderTemporaryPasswordEmail({
+      recipientName: "Alex User",
+      email: "alex@example.edu",
+      temporaryPassword: "temporary-password",
+      signatoryTitle: "Requisitioner",
+      loginUrl: "https://vrtt.example.edu/login",
+      accountAction: "password-reset",
+    });
+
+    expect(rendered.subject).toBe("[LOA Vehicle Request] Temporary password reset");
+    expect(rendered.html).toContain("Your Requisitioner account password was reset");
+    expect(rendered.html).not.toContain("An administrator created your");
   });
 
   it("includes escaped trip details and the inline approved ticket image", () => {

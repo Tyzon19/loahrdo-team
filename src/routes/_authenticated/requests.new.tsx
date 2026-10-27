@@ -55,11 +55,11 @@ function NewRequest() {
     await queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
     toast.success(`Request ${result.data.number} submitted.`);
     if (result.data.workflowEmail?.sent) {
-      toast.success("Test approval email sent to mj.turingan@lyceumalabang.edu.ph.");
-    } else if (result.data.workflowEmail) {
-      toast.error(
-        `Request submitted, but the test email was not sent: ${result.data.workflowEmail.message}`,
+      toast.success(
+        `Approval notification emailed to ${result.data.workflowEmail.delivered} configured recipient(s).`,
       );
+    } else if (result.data.workflowEmail) {
+      toast.error(result.data.workflowEmail.message);
     }
     await navigate({
       to: "/requests/$id",
@@ -70,10 +70,7 @@ function NewRequest() {
 
   return (
     <>
-      <PageHeader
-        title="New Vehicle Request"
-        description="Fill in the details below."
-      />
+      <PageHeader title="New Vehicle Request" description="Fill in the details below." />
       <RequestForm
         key={viewer.id}
         header={{ number: "Assigned on submit", date: todayISO(), requisitioner: viewer.name }}

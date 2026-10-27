@@ -22,6 +22,8 @@ import {
 import { allowedEmailDomains } from "./env";
 import { emailDomainAllowed } from "@/lib/validation";
 import { hashPassword } from "./password";
+import { sendTemporaryPasswordEmail } from "./gmail";
+import { ROLE_TITLES, STAGES } from "@/lib/workflow";
 
 const ASSISTANT_ROLES: Role[] = ["assistant", "transport_staff", "guard", "driver"];
 const MAIN_SIGNATORY_ELIGIBLE_ROLES: Role[] = [
@@ -76,6 +78,9 @@ export async function saveMainSignatories(input: unknown) {
   requireAdmin(viewer.role);
   const assignments = parseInput(mainSignatoriesSchema, input);
   const stages: StageKey[] = ["review", "recommend", "approve"];
+  if (stages.some((stage) => !assignments[stage])) {
+    throw new AppError("Create and assign a main signatory account for every approval stage.");
+  }
   const selectedUserIds = stages
     .map((stage) => assignments[stage])
     .filter((userId): userId is string => Boolean(userId));
@@ -227,7 +232,17 @@ export async function createAssistantAccount(input: unknown) {
     throw error;
   }
 
-  return { email: data.email, temporaryPassword };
+  const emailDelivery = await sendTemporaryPasswordEmail({
+    recipientName: data.name,
+    recipientEmail: data.email,
+    temporaryPassword,
+    signatoryTitle: "Alternate Signatory",
+  });
+  return {
+    email: data.email,
+    emailDelivery,
+    ...(!emailDelivery.sent ? { temporaryPassword } : {}),
+  };
 }
 
 export async function createMainSignatoryAccount(input: unknown) {
@@ -273,7 +288,22 @@ export async function createMainSignatoryAccount(input: unknown) {
     throw error;
   }
 
-  return { id, name: data.name, email: data.email, role, temporaryPassword };
+  const stage = STAGES.find((item) => item.key === data.stage);
+  if (!stage) throw new AppError("Choose a valid signatory stage.");
+  const emailDelivery = await sendTemporaryPasswordEmail({
+    recipientName: data.name,
+    recipientEmail: data.email,
+    temporaryPassword,
+    signatoryTitle: stage.title,
+  });
+  return {
+    id,
+    name: data.name,
+    email: data.email,
+    role,
+    emailDelivery,
+    ...(!emailDelivery.sent ? { temporaryPassword } : {}),
+  };
 }
 
 export async function resetUserPassword(input: unknown) {
@@ -300,5 +330,16 @@ export async function resetUserPassword(input: unknown) {
   );
   await run("DELETE FROM sessions WHERE user_id = ?", [userId]);
 
-  return { email: user.email, temporaryPassword };
+  const emailDelivery = await sendTemporaryPasswordEmail({
+    recipientName: user.name,
+    recipientEmail: user.email,
+    temporaryPassword,
+    signatoryTitle: ROLE_TITLES[user.role],
+    accountAction: "password-reset",
+  });
+  return {
+    email: user.email,
+    emailDelivery,
+    ...(!emailDelivery.sent ? { temporaryPassword } : {}),
+  };
 }

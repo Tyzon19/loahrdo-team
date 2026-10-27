@@ -1,10 +1,3 @@
-/**
- * Server-only environment access.
- *
- * Vite only exposes VITE_* variables to the browser, but we still read these
- * values exclusively inside server functions. The .env file is gitignored and
- * is never imported by client code.
- */
 let loaded = false;
 
 function ensureLoaded() {

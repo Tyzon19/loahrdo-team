@@ -209,7 +209,7 @@ export function DestinationInput({
           blurTimer.current = window.setTimeout(() => setOpen(false), 150);
         }}
         onKeyDown={handleKeyDown}
-        placeholder="Type your destination"
+        placeholder="Search your destination..."
       />
       {open && query.length >= MIN_QUERY_LENGTH && (
         <div className="absolute z-50 mt-1 max-h-72 w-full overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md">
@@ -250,8 +250,7 @@ export function DestinationInput({
           )}
           {photonError && suggestions.length > 0 && (
             <p className="px-3 py-2 text-xs text-muted-foreground" role="status">
-              Can&apos;t find your destination? Enter it manually, or select a previously used
-              destination above.
+              Can&apos;t find your destination? Enter it manually.
             </p>
           )}
           {!loading && savedError && suggestions.length > 0 && (
@@ -272,9 +271,7 @@ export function DestinationInput({
         </div>
       )}
       <p id={`${inputId}-search-status`} className="mt-1 text-xs text-muted-foreground">
-        {query.length < MIN_QUERY_LENGTH
-          ? "Type at least 3 characters to search... "
-          : ""}
+        {query.length < MIN_QUERY_LENGTH ? "Type at least 3 characters to search... " : ""}
       </p>
     </div>
   );

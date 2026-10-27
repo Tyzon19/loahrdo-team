@@ -21,7 +21,6 @@ export async function listNotifications(): Promise<EmailMessage[]> {
   return rows.map(mapNotification);
 }
 
-/** Returns the trip ticket photo as a data URL, only for the notification's own recipient. */
 export async function notificationImage(input: unknown): Promise<string | null> {
   const viewer = await requireViewer();
   const parsed = notificationIdSchema.safeParse(input);
@@ -37,7 +36,6 @@ export async function notificationImage(input: unknown): Promise<string | null> 
   return `data:${String(row["mime"])};base64,${Buffer.from(row["image"] as Buffer).toString("base64")}`;
 }
 
-/** Returns only the approved ticket snapshot for its own requisitioner. */
 export async function officialTripTicketImage(input: unknown): Promise<string | null> {
   const viewer = await requireViewer();
   if (viewer.role !== "requisitioner") {
@@ -68,8 +66,6 @@ export async function markNotificationRead(input: unknown): Promise<{ ok: true }
   const parsed = notificationIdSchema.safeParse(input);
   if (!parsed.success) throw new AppError("We couldn't find that notification.");
 
-  // The to_user_id predicate is the authorization check: one account can never
-  // mark or read another account's inbox.
   const result = await run(
     "UPDATE notifications SET read_at = NOW() WHERE id = ? AND to_user_id = ?",
     [parsed.data, viewer.id],

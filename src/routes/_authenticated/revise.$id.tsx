@@ -93,11 +93,11 @@ function Revise() {
     ]);
     toast.success("Request resubmitted. Approval restarts with the Head of Transport Services.");
     if (result.data.workflowEmail?.sent) {
-      toast.success("Test approval email sent to mj.turingan@lyceumalabang.edu.ph.");
-    } else if (result.data.workflowEmail) {
-      toast.error(
-        `Request resubmitted, but the test email was not sent: ${result.data.workflowEmail.message}`,
+      toast.success(
+        `Approval notification emailed to ${result.data.workflowEmail.delivered} configured recipient(s).`,
       );
+    } else if (result.data.workflowEmail) {
+      toast.error(result.data.workflowEmail.message);
     }
     await navigate({
       to: "/requests/$id",

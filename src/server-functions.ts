@@ -1,12 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { runSafely } from "@/lib/errors";
 
-/**
- * Client entry points. Each handler dynamically imports its server-only module
- * so MySQL credentials and queries never enter the browser bundle. Every
- * service re-checks the session and role before touching data.
- */
-
 export const bootstrapFn = createServerFn({ method: "GET" }).handler(async () => {
   try {
     const [{ viewer }, { serverEnvOptional }] = await Promise.all([

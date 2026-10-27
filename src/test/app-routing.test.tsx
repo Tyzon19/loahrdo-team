@@ -4,8 +4,6 @@ import { describe, expect, it } from "vitest";
 
 import { routeTree } from "@/routeTree.gen";
 
-// Match routes without running guards or rendering: guards call server functions,
-// which need a live server, and jsdom never loads the stylesheets React waits on.
 function match(path: string) {
   const router = createRouter({
     routeTree,

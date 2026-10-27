@@ -67,7 +67,6 @@ if (import.meta.hot) {
 
 export type Db = Pool | PoolConnection;
 
-/** Always parameterised: values never become part of the SQL text. */
 export async function all<T extends RowDataPacket[]>(
   sql: string,
   params: unknown[] = [],
@@ -112,7 +111,6 @@ export async function withTransaction<T>(fn: (conn: PoolConnection) => Promise<T
   }
 }
 
-/** Escapes LIKE wildcards; the value itself is still sent as a bound parameter. */
 export function likePattern(term: string) {
   return `%${term.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
 }

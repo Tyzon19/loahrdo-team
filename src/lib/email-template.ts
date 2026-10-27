@@ -22,6 +22,15 @@ export interface RegistrationOtpEmailInput {
   expiresInMinutes: number;
 }
 
+export interface TemporaryPasswordEmailInput {
+  recipientName: string;
+  email: string;
+  temporaryPassword: string;
+  signatoryTitle: string;
+  loginUrl: string;
+  accountAction?: "created" | "password-reset";
+}
+
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => {
     switch (character) {
@@ -281,5 +290,94 @@ export function renderRegistrationOtpEmail(
   </body>
 </html>`;
 
+  return { subject, html, text };
+}
+
+export function renderTemporaryPasswordEmail(
+  input: TemporaryPasswordEmailInput,
+  logoContentId = "loa-header-logo",
+): RenderedEmail {
+  if (!input.temporaryPassword || input.temporaryPassword.length > 200) {
+    throw new Error("The temporary password is invalid.");
+  }
+  let loginUrl: URL;
+  try {
+    loginUrl = new URL(input.loginUrl);
+  } catch {
+    throw new Error("The temporary-password email requires a valid login URL.");
+  }
+  if (!["http:", "https:"].includes(loginUrl.protocol) || loginUrl.username || loginUrl.password) {
+    throw new Error("The temporary-password email login URL must use HTTP or HTTPS.");
+  }
+
+  const name = escapeHtml(input.recipientName);
+  const email = escapeHtml(input.email);
+  const password = escapeHtml(input.temporaryPassword);
+  const title = escapeHtml(input.signatoryTitle);
+  const logo = escapeHtml(logoContentId);
+  const actionUrl = escapeHtml(loginUrl.toString());
+  const isPasswordReset = input.accountAction === "password-reset";
+  const subject = isPasswordReset
+    ? "[LOA Vehicle Request] Temporary password reset"
+    : "[LOA Vehicle Request] Your account is ready";
+  const heading = isPasswordReset
+    ? `Your ${input.signatoryTitle} account password was reset`
+    : `Your ${input.signatoryTitle} account is ready`;
+  const intro = isPasswordReset
+    ? `An administrator reset the password for your ${input.signatoryTitle} account in the LOA Vehicle Reservation & Trip Ticket system.`
+    : `An administrator created your ${input.signatoryTitle} account for the LOA Vehicle Reservation & Trip Ticket system.`;
+  const text = [
+    `Dear ${input.recipientName},`,
+    "",
+    intro,
+    `Sign-in email: ${input.email}`,
+    `Temporary password: ${input.temporaryPassword}`,
+    "",
+    "Sign in using the link below and change this temporary password immediately. This password is for your account only; do not share or forward this email.",
+    loginUrl.toString(),
+    "",
+    "If you were not expecting this account, contact the system administrator.",
+    "",
+    "Lyceum of Alabang",
+    "Vehicle Reservation & Trip Ticket",
+    "This is an automated message. Please do not reply.",
+  ].join("\n");
+  const html = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <title>${escapeHtml(subject)}</title>
+  </head>
+  <body style="margin:0;padding:0;background-color:#f3f5f8;font-family:Arial,Helvetica,sans-serif;color:#172033;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#f3f5f8;">
+      <tr><td align="center" style="padding:32px 12px;">
+        <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:600px;background-color:#ffffff;border:1px solid #e2e7ef;border-radius:8px;overflow:hidden;">
+          <tr><td style="padding:30px 32px 8px;">
+            <img src="cid:${logo}" width="190" alt="Lyceum of Alabang" style="display:block;width:190px;max-width:100%;height:auto;border:0;">
+          </td></tr>
+          <tr><td style="padding:24px 32px 32px;">
+            <p style="margin:0 0 18px;color:#353b45;font-size:14px;line-height:1.6;">Dear ${name},</p>
+            <h1 style="margin:0 0 14px;color:#202833;font-size:20px;line-height:1.4;font-weight:700;">${escapeHtml(heading)}</h1>
+            <p style="margin:0 0 20px;color:#353b45;font-size:14px;line-height:1.65;">${escapeHtml(intro)}</p>
+            <p style="margin:0 0 8px;color:#353b45;font-size:14px;line-height:1.6;"><strong>Sign-in email:</strong> ${email}</p>
+            <div style="margin:0 0 20px;padding:18px 16px;background-color:#f2f5fa;border:1px solid #dfe6f0;border-radius:6px;">
+              <p style="margin:0 0 8px;color:#687386;font-size:11px;line-height:1.4;letter-spacing:.08em;">TEMPORARY PASSWORD</p>
+              <p style="margin:0;color:#172b4d;font-family:monospace;font-size:16px;line-height:1.5;overflow-wrap:anywhere;">${password}</p>
+            </div>
+            <p style="margin:0 0 22px;color:#353b45;font-size:13px;line-height:1.6;"><strong>Change this password immediately after signing in.</strong> Do not share or forward this email.</p>
+            <p style="margin:0 0 20px;"><a href="${actionUrl}" style="display:inline-block;padding:12px 18px;background-color:#1f3b68;border-radius:5px;color:#ffffff;font-size:14px;font-weight:700;text-decoration:none;">Sign in to the system</a></p>
+            <p style="margin:0;padding:12px 14px;background-color:#f7f8fa;border-left:3px solid #1f3b68;color:#454f5e;font-size:12px;line-height:1.6;">If you were not expecting this account, contact the system administrator.</p>
+          </td></tr>
+          <tr><td style="padding:0 32px 26px;">
+            <p style="margin:0;color:#353b45;font-size:14px;line-height:1.6;">Kind regards,<br><strong>Lyceum of Alabang<br>Vehicle Reservation &amp; Trip Ticket Team</strong></p>
+            <p style="margin:18px 0 0;color:#687386;font-size:11px;line-height:1.6;">This is an automated message. Please do not reply to this email.</p>
+          </td></tr>
+        </table>
+      </td></tr>
+    </table>
+  </body>
+</html>`;
   return { subject, html, text };
 }

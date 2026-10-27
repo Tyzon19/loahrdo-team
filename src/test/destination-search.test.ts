@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   combineDestinationSuggestions,
+  destinationSearchScore,
   normalizeDestination,
   photonSuggestions,
 } from "@/lib/destination-search";
@@ -82,6 +83,17 @@ describe("destination suggestions", () => {
     ]);
     expect(normalizeDestination("  Festival   Mall ")).toBe("festival mall");
     expect(normalizeDestination("Bulacan, Philippines")).toBe("bulacan");
+  });
+
+  it("matches saved destination names by initials and partial keywords", () => {
+    expect(destinationSearchScore("Godofredo Ragas Street, Muntinlupa", "GRS")).toBeGreaterThan(0);
+    expect(
+      destinationSearchScore("Godofredo Ragas Street, Muntinlupa", "Godofredo"),
+    ).toBeGreaterThan(0);
+    expect(destinationSearchScore("Godofredo Ragas Street, Muntinlupa", "Ragas")).toBeGreaterThan(
+      0,
+    );
+    expect(destinationSearchScore("Godofredo Ragas Street", "SMX")).toBe(0);
   });
 });
 

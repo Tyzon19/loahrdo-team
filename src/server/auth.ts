@@ -31,9 +31,15 @@ import { AppError, isDuplicateKey, parseInput } from "@/lib/errors";
 import { DUMMY_HASH, hashPassword, verifyPassword } from "./password";
 import { sendRegistrationOtpEmail } from "./gmail";
 
-const SESSION_COOKIE = "loa_session";
-const SESSION_HOURS = 8;
-const SESSION_SECONDS = SESSION_HOURS * 3600;
+function sessionCookieName() {
+  return "loa_session";
+}
+function sessionHours() {
+  return 8;
+}
+function sessionSeconds() {
+  return sessionHours() * 3600;
+}
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCK_MINUTES = 15;
 const REGISTRATION_OTP_MINUTES = 10;
@@ -94,7 +100,8 @@ function cookieOptions(maxAge: number) {
 }
 
 async function startSession(userId: string) {
-  const previous = getCookie(SESSION_COOKIE);
+  const cookieName = sessionCookieName();
+  const previous = getCookie(cookieName);
   if (previous) {
     await run("DELETE FROM sessions WHERE token_hash = ?", [sha256(previous)]);
   }
@@ -104,18 +111,19 @@ async function startSession(userId: string) {
   await run(
     `INSERT INTO sessions (id, user_id, token_hash, user_agent, expires_at)
      VALUES (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? HOUR))`,
-    [randomUUID(), userId, sha256(token), userAgent, SESSION_HOURS],
+    [randomUUID(), userId, sha256(token), userAgent, sessionHours()],
   );
   await run("DELETE FROM sessions WHERE expires_at < DATE_SUB(NOW(), INTERVAL 7 DAY)");
-  setCookie(SESSION_COOKIE, token, cookieOptions(SESSION_SECONDS));
+  setCookie(cookieName, token, cookieOptions(sessionSeconds()));
 }
 
 function clearSessionCookie() {
-  deleteCookie(SESSION_COOKIE, { path: "/" });
+  deleteCookie(sessionCookieName(), { path: "/" });
 }
 
 export async function viewer(): Promise<Viewer | null> {
-  const token = getCookie(SESSION_COOKIE);
+  const cookieName = sessionCookieName();
+  const token = getCookie(cookieName);
   if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token)) {
     if (token) clearSessionCookie();
     return null;
@@ -139,10 +147,11 @@ export async function viewer(): Promise<Viewer | null> {
     `UPDATE sessions
      SET last_seen_at = NOW(),
          expires_at = IF(expires_at < DATE_ADD(NOW(), INTERVAL 2 HOUR), DATE_ADD(NOW(), INTERVAL ? HOUR), expires_at)
-     WHERE token_hash = ?`,
-    [SESSION_HOURS, hash],
+     WHERE token_hash = ?
+       AND last_seen_at < DATE_SUB(NOW(), INTERVAL 1 MINUTE)`,
+    [sessionHours(), hash],
   );
-  setCookie(SESSION_COOKIE, token, cookieOptions(SESSION_SECONDS));
+  setCookie(cookieName, token, cookieOptions(sessionSeconds()));
   return mapViewer(row);
 }
 
@@ -219,7 +228,8 @@ export async function requestRegistrationOtp(input: unknown): Promise<{ sent: tr
   if (
     !serverEnvOptional("GOOGLE_CLIENT_ID") ||
     !serverEnvOptional("GOOGLE_CLIENT_SECRET") ||
-    !serverEnvOptional("GOOGLE_REFRESH_TOKEN")
+    !serverEnvOptional("GOOGLE_REFRESH_TOKEN") ||
+    !serverEnvOptional("GOOGLE_SENDER_EMAIL")
   ) {
     throw new AppError(
       "Email verification is not connected yet. Please contact the system administrator.",
@@ -387,7 +397,7 @@ export async function verifyRegistrationOtp(
 }
 
 export async function logout(): Promise<{ ok: true }> {
-  const token = getCookie(SESSION_COOKIE);
+  const token = getCookie(sessionCookieName());
   if (token) await run("DELETE FROM sessions WHERE token_hash = ?", [sha256(token)]);
   clearSessionCookie();
   return { ok: true };
@@ -412,7 +422,7 @@ export async function changePassword(input: unknown): Promise<{ ok: true }> {
     });
   }
 
-  const token = getCookie(SESSION_COOKIE);
+  const token = getCookie(sessionCookieName());
   await run(
     "UPDATE users SET password_hash = ?, must_change_password = 0, failed_attempts = 0, locked_until = NULL WHERE id = ?",
     [await hashPassword(data.newPassword), current.id],

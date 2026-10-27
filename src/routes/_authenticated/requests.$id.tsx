@@ -227,7 +227,7 @@ function RequestDetailPage() {
           title={`Your vehicle request ${r.number} has been submitted successfully.`}
         >
           It is now waiting for review by the Head of Transport Services. Updates appear in your
-          notifications.
+          notifications or Email.
         </Notice>
       )}
       {search.notice === "resubmitted" && isOwner && r.status === "pending_review" && (
@@ -279,7 +279,7 @@ function RequestDetailPage() {
               ? ` Main signatory: ${detail.approverNames[stage.key]}.`
               : ""}
             {detail.assistantNames[stage.key]
-              ? ` Assigned alternate: ${detail.assistantNames[stage.key]}; that account must sign in to complete this stage.`
+              ? ` Assigned alternate: ${detail.assistantNames[stage.key]};`
               : " No alternate signatory is currently assigned. Ask the administrator to assign one in Profile settings."}
           </span>
         </div>
@@ -482,11 +482,11 @@ function ActionPanel({
         : "Signed and forwarded to the next approver.",
     );
     if (result.data.workflowEmail?.sent) {
-      toast.success("Test approval email sent to mj.turingan@lyceumalabang.edu.ph.");
-    } else if (result.data.workflowEmail) {
-      toast.error(
-        `Approval was saved, but the test email was not sent: ${result.data.workflowEmail.message}`,
+      toast.success(
+        `Approval notification emailed to ${result.data.workflowEmail.delivered} configured recipient(s).`,
       );
+    } else if (result.data.workflowEmail) {
+      toast.error(result.data.workflowEmail.message);
     }
     await refresh();
   }
@@ -500,11 +500,11 @@ function ActionPanel({
     setRejectOpen(false);
     toast.success("Request returned to the requisitioner.");
     if (result.data.workflowEmail?.sent) {
-      toast.success("Test return email sent to mj.turingan@lyceumalabang.edu.ph.");
-    } else if (result.data.workflowEmail) {
-      toast.error(
-        `Request was returned, but the test email was not sent: ${result.data.workflowEmail.message}`,
+      toast.success(
+        `Return notification emailed to ${result.data.workflowEmail.delivered} configured recipient(s).`,
       );
+    } else if (result.data.workflowEmail) {
+      toast.error(result.data.workflowEmail.message);
     }
     await refresh();
   }

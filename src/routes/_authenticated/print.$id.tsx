@@ -38,7 +38,7 @@ function PrintTicket() {
   const [sending, setSending] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [ticketSent, setTicketSent] = useState(false);
-  const [testEmailSent, setTestEmailSent] = useState(false);
+  const [ticketEmailSent, setTicketEmailSent] = useState(false);
   const [verificationUrl, setVerificationUrl] = useState("");
   const [verificationQr, setVerificationQr] = useState("");
   const [verificationQrFailed, setVerificationQrFailed] = useState(false);
@@ -240,19 +240,11 @@ function PrintTicket() {
       }
       setTicketSent(true);
       await queryClient.invalidateQueries({ queryKey: ["notifications"] });
-      if (result.data.testEmail?.sent) {
-        setTestEmailSent(true);
-        toast.success("Trip ticket test email sent only to mj.turingan@lyceumalabang.edu.ph.");
-      } else if (result.data.testEmail) {
-        toast.error(
-          `The ticket is saved in the requisitioner's in-app notification, but the test email was not sent: ${result.data.testEmail.message}`,
-        );
+      if (result.data.emailDelivery.sent) {
+        setTicketEmailSent(true);
+        toast.success("Trip ticket emailed to the requisitioner's configured address.");
       } else {
-        toast.success(
-          result.data.alreadySent
-            ? "The trip ticket is attached to the requisitioner's in-app notification."
-            : "Trip ticket attached to the requisitioner's in-app notification.",
-        );
+        toast.error(result.data.emailDelivery.message);
       }
     } catch {
       toast.error("We couldn't create the trip ticket photo. Try again.");
@@ -292,28 +284,23 @@ function PrintTicket() {
             )}
             <Button
               onClick={() => void sendToRequisitioner()}
-              disabled={!approved || !verificationQr || sending || testEmailSent}
+              disabled={!approved || !verificationQr || sending || ticketEmailSent}
             >
               <Send className="h-4 w-4" aria-hidden />
               {sending
                 ? "Sending…"
-                : testEmailSent
+                : ticketEmailSent
                   ? "Trip Ticket Sent"
-                  : import.meta.env.DEV
-                    ? ticketAlreadySent
-                      ? "Resend Trip Ticket"
-                      : "Send Trip Ticket"
-                    : ticketAlreadySent
-                      ? "Trip Ticket Sent"
-                      : "Send Trip Ticket"}
+                  : ticketAlreadySent
+                    ? "Resend Trip Ticket"
+                    : "Send Trip Ticket"}
             </Button>
           </div>
         </div>
         {approved && (
           <p className="no-print mx-auto mb-3 max-w-[210mm] px-4 text-xs text-muted-foreground">
-            Download a digital copy or attach it to the requisitioner&apos;s in-app notification.
-            {import.meta.env.DEV &&
-              " Local test email delivery is restricted to mj.turingan@lyceumalabang.edu.ph."}
+            The approved ticket will be emailed to the requisitioner&apos;s configured address and
+            attached to their in-app notification.
             {!verificationQr &&
               (verificationQrFailed
                 ? " The verification QR could not be created. Reload before sending the ticket."

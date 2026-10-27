@@ -76,7 +76,9 @@ export function SignatoryAssistantSettings() {
   const [createdMainAccount, setCreatedMainAccount] = useState<{
     name: string;
     email: string;
-    temporaryPassword: string;
+    emailSent: boolean;
+    emailMessage?: string;
+    temporaryPassword?: string;
   } | null>(null);
   const [accountForm, setAccountForm] = useState<NewAssistantAccount>({
     name: "",
@@ -86,13 +88,17 @@ export function SignatoryAssistantSettings() {
   const [accountBusy, setAccountBusy] = useState(false);
   const [createdAccount, setCreatedAccount] = useState<{
     email: string;
-    temporaryPassword: string;
+    emailSent: boolean;
+    emailMessage?: string;
+    temporaryPassword?: string;
   } | null>(null);
   const [resetUserId, setResetUserId] = useState("");
   const [resetBusy, setResetBusy] = useState(false);
   const [resetCredentials, setResetCredentials] = useState<{
     email: string;
-    temporaryPassword: string;
+    emailSent: boolean;
+    emailMessage?: string;
+    temporaryPassword?: string;
   } | null>(null);
 
   useEffect(() => {
@@ -156,6 +162,12 @@ export function SignatoryAssistantSettings() {
       const id = isRecord(data) ? data["id"] : undefined;
       const email = isRecord(data) ? data["email"] : undefined;
       const name = isRecord(data) ? data["name"] : undefined;
+      const emailDelivery = isRecord(data) ? data["emailDelivery"] : undefined;
+      const emailSent = isRecord(emailDelivery) && emailDelivery["sent"] === true;
+      const emailMessage =
+        isRecord(emailDelivery) && typeof emailDelivery["message"] === "string"
+          ? emailDelivery["message"]
+          : undefined;
       const temporaryPassword = isRecord(data) ? data["temporaryPassword"] : undefined;
       if (
         !isRecord(result) ||
@@ -163,15 +175,26 @@ export function SignatoryAssistantSettings() {
         typeof id !== "string" ||
         typeof name !== "string" ||
         typeof email !== "string" ||
-        typeof temporaryPassword !== "string"
+        !isRecord(emailDelivery) ||
+        (!emailSent && typeof temporaryPassword !== "string")
       ) {
         toast.error(resultError(result, "We couldn't create the main signatory account."));
         return;
       }
-      setCreatedMainAccount({ name, email, temporaryPassword });
+      setCreatedMainAccount({
+        name,
+        email,
+        emailSent,
+        ...(emailMessage ? { emailMessage } : {}),
+        ...(typeof temporaryPassword === "string" ? { temporaryPassword } : {}),
+      });
       setMainForm((current) => ({ ...current, [mainAccountForm.stage]: id }));
       setMainAccountForm((current) => ({ ...current, name: "", email: "", department: "" }));
-      toast.success("Main signatory account created and assigned.");
+      if (emailSent) {
+        toast.success("Main signatory account created and assigned. Login details emailed.");
+      } else {
+        toast.error(emailMessage ?? "Account created, but the signatory email was not sent.");
+      }
       await queryClient.invalidateQueries({ queryKey: ["signatory-assistants"] });
       await queryClient.invalidateQueries({ queryKey: ["request"] });
       await queryClient.invalidateQueries({ queryKey: ["requests"] });
@@ -216,26 +239,39 @@ export function SignatoryAssistantSettings() {
       const result: unknown = await createAssistantAccountFn({ data: accountForm });
       const data = isRecord(result) ? result["data"] : undefined;
       const email = isRecord(data) ? data["email"] : undefined;
+      const emailDelivery = isRecord(data) ? data["emailDelivery"] : undefined;
+      const emailSent = isRecord(emailDelivery) && emailDelivery["sent"] === true;
+      const emailMessage =
+        isRecord(emailDelivery) && typeof emailDelivery["message"] === "string"
+          ? emailDelivery["message"]
+          : undefined;
       const temporaryPassword = isRecord(data) ? data["temporaryPassword"] : undefined;
       if (
         !isRecord(result) ||
         result["ok"] !== true ||
         typeof email !== "string" ||
-        typeof temporaryPassword !== "string"
+        !isRecord(emailDelivery) ||
+        (!emailSent && typeof temporaryPassword !== "string")
       ) {
         toast.error(resultError(result, "We couldn't create the alternate signatory account."));
         return;
       }
       setCreatedAccount({
         email,
-        temporaryPassword,
+        emailSent,
+        ...(emailMessage ? { emailMessage } : {}),
+        ...(typeof temporaryPassword === "string" ? { temporaryPassword } : {}),
       });
       setAccountForm({
         name: "",
         email: "",
         department: "",
       });
-      toast.success("Alternate signatory account created. Copy the temporary password now.");
+      if (emailSent) {
+        toast.success("Alternate signatory account created. Login details emailed.");
+      } else {
+        toast.error(emailMessage ?? "Account created, but the signatory email was not sent.");
+      }
       await queryClient.invalidateQueries({ queryKey: ["signatory-assistants"] });
     } catch {
       toast.error("We couldn't create the alternate signatory account. Please try again.");
@@ -252,21 +288,34 @@ export function SignatoryAssistantSettings() {
       const result: unknown = await resetUserPasswordFn({ data: { userId: resetUserId } });
       const data = isRecord(result) ? result["data"] : undefined;
       const email = isRecord(data) ? data["email"] : undefined;
+      const emailDelivery = isRecord(data) ? data["emailDelivery"] : undefined;
+      const emailSent = isRecord(emailDelivery) && emailDelivery["sent"] === true;
+      const emailMessage =
+        isRecord(emailDelivery) && typeof emailDelivery["message"] === "string"
+          ? emailDelivery["message"]
+          : undefined;
       const temporaryPassword = isRecord(data) ? data["temporaryPassword"] : undefined;
       if (
         !isRecord(result) ||
         result["ok"] !== true ||
         typeof email !== "string" ||
-        typeof temporaryPassword !== "string"
+        !isRecord(emailDelivery) ||
+        (!emailSent && typeof temporaryPassword !== "string")
       ) {
         toast.error(resultError(result, "We couldn't reset the user's password."));
         return;
       }
       setResetCredentials({
         email,
-        temporaryPassword,
+        emailSent,
+        ...(emailMessage ? { emailMessage } : {}),
+        ...(typeof temporaryPassword === "string" ? { temporaryPassword } : {}),
       });
-      toast.success("Password reset. Copy the temporary password and share it securely.");
+      if (emailSent) {
+        toast.success("Password reset. The temporary login details were emailed to the user.");
+      } else {
+        toast.error(emailMessage ?? "Password reset, but the user email was not sent.");
+      }
     } catch {
       toast.error("We couldn't reset the user's password. Please try again.");
     } finally {
@@ -307,7 +356,7 @@ export function SignatoryAssistantSettings() {
                       setMainForm((current) => ({ ...current, [key]: event.target.value }))
                     }
                   >
-                    <option value="">Use the account with this system role</option>
+                    <option value="">Select a main signatory account</option>
                     {query.data.mainSignatoryUsers.map((user: User) => (
                       <option key={user.id} value={user.id}>
                         {user.name} — {user.email} ({ROLE_TITLES[user.role]})
@@ -331,8 +380,8 @@ export function SignatoryAssistantSettings() {
         <p className="mb-4 max-w-3xl text-sm text-muted-foreground">
           Create an institutional account for a new Head of Transport Services, Director, or
           President. Creating it assigns that account as the main signatory for the selected stage
-          and replaces the current assignment. The temporary password is shown once; the account
-          holder must change it at first sign-in.
+          and replaces the current assignment. The system emails a one-time temporary password to
+          the new signatory, who must change it at first sign-in.
         </p>
         <form className="grid max-w-3xl gap-4 sm:grid-cols-2" onSubmit={createMainAccount}>
           <div>
@@ -402,32 +451,50 @@ export function SignatoryAssistantSettings() {
           </Button>
         </form>
         {createdMainAccount && (
-          <div className="mt-4 rounded-sm border border-success/40 bg-success-soft p-4">
+          <div
+            className={`mt-4 rounded-sm border p-4 ${
+              createdMainAccount.emailSent
+                ? "border-success/40 bg-success-soft"
+                : "border-destructive/40 bg-destructive/5"
+            }`}
+          >
             <p className="font-semibold">
               Account created for {createdMainAccount.name}: {createdMainAccount.email}
             </p>
-            <Label htmlFor="main-temporary-password" className="mt-3 block">
-              Temporary password — copy and share securely now
-            </Label>
-            <Input
-              id="main-temporary-password"
-              className="mt-1 select-all font-mono"
-              value={createdMainAccount.temporaryPassword}
-              readOnly
-              onFocus={(event) => event.currentTarget.select()}
-            />
-            <p className="mt-2 text-xs">
-              This password is shown only in this result. The account holder must change it at first
-              sign-in.
-            </p>
+            {createdMainAccount.emailSent ? (
+              <p className="mt-2 text-sm">Temporary login details were emailed to the signatory.</p>
+            ) : (
+              <>
+                <p className="mt-2 text-sm">
+                  The account is assigned, but its email was not sent:{" "}
+                  {createdMainAccount.emailMessage ?? "Gmail delivery failed."}
+                </p>
+                {createdMainAccount.temporaryPassword && (
+                  <>
+                    <Label htmlFor="main-temporary-password" className="mt-3 block">
+                      Temporary password — share securely with the account holder
+                    </Label>
+                    <Input
+                      id="main-temporary-password"
+                      className="mt-1 select-all font-mono"
+                      value={createdMainAccount.temporaryPassword}
+                      readOnly
+                      onFocus={(event) => event.currentTarget.select()}
+                    />
+                    <p className="mt-2 text-xs">
+                      The account holder must change it at first sign-in.
+                    </p>
+                  </>
+                )}
+              </>
+            )}
           </div>
         )}
       </Section>
       <Section title="Create Alternate Signatory Account">
         <p className="mb-4 text-sm text-muted-foreground">
-          Create an individual institutional account for an alternate signatory. The temporary
-          password is shown once; share it securely. New accounts must change their password at
-          first sign-in.
+          Create an individual institutional account for an alternate signatory. The system emails a
+          one-time temporary password to the account holder, who must change it at first sign-in.
         </p>
         <form className="grid max-w-3xl gap-4 sm:grid-cols-2" onSubmit={createAccount}>
           <div>
@@ -479,29 +546,51 @@ export function SignatoryAssistantSettings() {
           </Button>
         </form>
         {createdAccount && (
-          <div className="mt-4 rounded-sm border border-success/40 bg-success-soft p-4">
+          <div
+            className={`mt-4 rounded-sm border p-4 ${
+              createdAccount.emailSent
+                ? "border-success/40 bg-success-soft"
+                : "border-destructive/40 bg-destructive/5"
+            }`}
+          >
             <p className="font-semibold">Account created: {createdAccount.email}</p>
-            <Label htmlFor="assistant-temporary-password" className="mt-3 block">
-              Temporary password — copy and share securely now
-            </Label>
-            <Input
-              id="assistant-temporary-password"
-              className="mt-1 select-all font-mono"
-              value={createdAccount.temporaryPassword}
-              readOnly
-              onFocus={(event) => event.currentTarget.select()}
-            />
-            <p className="mt-2 text-xs">
-              This password is shown only in this result. The account holder must change it on first
-              sign-in.
-            </p>
+            {createdAccount.emailSent ? (
+              <p className="mt-2 text-sm">
+                Temporary login details were emailed to the account holder.
+              </p>
+            ) : (
+              <>
+                <p className="mt-2 text-sm">
+                  The account was created, but its email was not sent:{" "}
+                  {createdAccount.emailMessage ?? "Gmail delivery failed."}
+                </p>
+                {createdAccount.temporaryPassword && (
+                  <>
+                    <Label htmlFor="assistant-temporary-password" className="mt-3 block">
+                      Temporary password — share securely with the account holder
+                    </Label>
+                    <Input
+                      id="assistant-temporary-password"
+                      className="mt-1 select-all font-mono"
+                      value={createdAccount.temporaryPassword}
+                      readOnly
+                      onFocus={(event) => event.currentTarget.select()}
+                    />
+                    <p className="mt-2 text-xs">
+                      The account holder must change it at first sign-in.
+                    </p>
+                  </>
+                )}
+              </>
+            )}
           </div>
         )}
       </Section>
       <Section title="Reset User Password">
         <p className="mb-4 text-sm text-muted-foreground">
           Issue a new one-time temporary password for a non-administrator account. This signs the
-          user out of active sessions and requires a password change at their next sign-in.
+          user out of active sessions and emails the new temporary password. The user must change it
+          at their next sign-in.
         </p>
         {query.isPending ? (
           <LoadingPanel label="Loading user accounts" rows={2} />
@@ -540,21 +629,41 @@ export function SignatoryAssistantSettings() {
           </form>
         )}
         {resetCredentials && (
-          <div className="mt-4 rounded-sm border border-success/40 bg-success-soft p-4">
+          <div
+            className={`mt-4 rounded-sm border p-4 ${
+              resetCredentials.emailSent
+                ? "border-success/40 bg-success-soft"
+                : "border-destructive/40 bg-destructive/5"
+            }`}
+          >
             <p className="font-semibold">Password reset for: {resetCredentials.email}</p>
-            <Label htmlFor="reset-temporary-password" className="mt-3 block">
-              Temporary password — copy and share securely now
-            </Label>
-            <Input
-              id="reset-temporary-password"
-              className="mt-1 select-all font-mono"
-              value={resetCredentials.temporaryPassword}
-              readOnly
-              onFocus={(event) => event.currentTarget.select()}
-            />
-            <p className="mt-2 text-xs">
-              It is shown only here. The user must change it at their next sign-in.
-            </p>
+            {resetCredentials.emailSent ? (
+              <p className="mt-2 text-sm">
+                The new temporary login details were emailed to the user.
+              </p>
+            ) : (
+              <>
+                <p className="mt-2 text-sm">
+                  Password reset, but the email was not sent:{" "}
+                  {resetCredentials.emailMessage ?? "Gmail delivery failed."}
+                </p>
+                {resetCredentials.temporaryPassword && (
+                  <>
+                    <Label htmlFor="reset-temporary-password" className="mt-3 block">
+                      Temporary password — share securely with the account holder
+                    </Label>
+                    <Input
+                      id="reset-temporary-password"
+                      className="mt-1 select-all font-mono"
+                      value={resetCredentials.temporaryPassword}
+                      readOnly
+                      onFocus={(event) => event.currentTarget.select()}
+                    />
+                    <p className="mt-2 text-xs">The user must change it at their next sign-in.</p>
+                  </>
+                )}
+              </>
+            )}
           </div>
         )}
       </Section>

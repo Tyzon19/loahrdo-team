@@ -16,6 +16,7 @@ import type {
   VehicleRequest,
   Viewer,
 } from "@/lib/types";
+import { destinationSearchScore, normalizeDestination } from "@/lib/destination-search";
 import {
   canManageVehicles,
   canViewAllRequests,
@@ -51,7 +52,7 @@ import { all, getPool, likePattern, run, withTransaction } from "./db";
 import { AppError, isDuplicateKey, parseInput } from "@/lib/errors";
 import { serverEnv } from "./env";
 import { createTicketVerificationToken, ticketDataDigest } from "@/lib/ticket-verification";
-import { sendTripTicketTestEmail, sendWorkflowTestEmail } from "./gmail";
+import { sendTripTicketEmail, sendWorkflowEmails } from "./gmail";
 import {
   loadApproverNames,
   loadApproverUserIds,
@@ -192,7 +193,11 @@ async function routeMainSignatory(
   stage: "review" | "recommend" | "approve",
 ) {
   const assignedUserId = (await loadApproverUserIds(conn))[stage];
-  if (!assignedUserId) return emails;
+  if (!assignedUserId) {
+    throw new AppError(
+      "An administrator must assign the main signatory account before this approval stage can continue.",
+    );
+  }
   const account = ctx.users.find((user) => user.id === assignedUserId);
   if (!account) {
     throw new AppError("The assigned main signatory account is unavailable.");
@@ -323,33 +328,31 @@ export async function getDestinationSuggestions(input: unknown): Promise<string[
     throw new AppError("Only requisitioners can search their previous destinations.");
   }
   const query = parseInput(destinationSearchSchema, input);
-  const searchPattern = `%${query
-    .split(/\s+/)
-    .map((term) => likePattern(term).slice(1, -1))
-    .join("%")}%`;
   const rows = await all<RowDataPacket[]>(
-    `SELECT d.destination
+    `SELECT d.destination, MAX(r.submitted_at) AS last_submitted
      FROM request_destinations d
      JOIN requests r ON r.id = d.request_id
-     WHERE r.requisitioner_id = ? AND d.destination LIKE ?
-     ORDER BY r.submitted_at DESC
-     LIMIT 50`,
-    [viewer.id, searchPattern],
+     WHERE r.requisitioner_id = ?
+     GROUP BY d.destination
+     ORDER BY last_submitted DESC
+     LIMIT 500`,
+    [viewer.id],
   );
   const normalized = new Set<string>();
-  const matches: string[] = [];
-  const lowerQuery = query.replace(/\s+/g, " ").toLocaleLowerCase();
+  const matches: Array<{ destination: string; score: number; index: number }> = [];
   for (const row of rows) {
     const storedDestination = String(row["destination"]).trim().replace(/\s+/g, " ");
-    if (!storedDestination.toLocaleLowerCase().includes(lowerQuery)) continue;
     const destination = storedDestination.split(",")[0]?.trim().replace(/\s+/g, " ") ?? "";
-    const key = destination.toLocaleLowerCase();
-    if (!destination || normalized.has(key)) continue;
+    const key = normalizeDestination(destination);
+    const score = destinationSearchScore(destination, query);
+    if (!destination || !score || normalized.has(key)) continue;
     normalized.add(key);
-    matches.push(destination);
-    if (matches.length === 5) break;
+    matches.push({ destination, score, index: matches.length });
   }
-  return matches;
+  return matches
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .slice(0, 5)
+    .map((match) => match.destination);
 }
 
 async function requestDetail(
@@ -454,7 +457,7 @@ export function getPrintableRequestDetail(id: unknown): Promise<RequestDetail | 
 export async function submitRequest(input: unknown): Promise<{
   id: string;
   number: string;
-  workflowEmail?: Awaited<ReturnType<typeof sendWorkflowTestEmail>>;
+  workflowEmail?: Awaited<ReturnType<typeof sendWorkflowEmails>>;
 }> {
   const viewer = await requireViewer();
   if (viewer.role !== "requisitioner") {
@@ -522,10 +525,12 @@ export async function submitRequest(input: unknown): Promise<{
       id: request.id,
       number: request.number,
       request,
-      email: notifications.find((message) => message.stage === "review"),
+      emails: notifications,
     };
   });
-  const workflowEmail = await sendWorkflowTestEmail(result.email, result.request);
+  const workflowEmail = result.emails.length
+    ? await sendWorkflowEmails(result.emails, result.request)
+    : undefined;
   return { id: result.id, number: result.number, ...(workflowEmail ? { workflowEmail } : {}) };
 }
 
@@ -543,7 +548,7 @@ async function lockAndLoad(conn: PoolConnection, id: string) {
 
 export async function approveRequest(
   input: unknown,
-): Promise<{ status: Status; workflowEmail?: Awaited<ReturnType<typeof sendWorkflowTestEmail>> }> {
+): Promise<{ status: Status; workflowEmail?: Awaited<ReturnType<typeof sendWorkflowEmails>> }> {
   const viewer = await requireViewer();
   const data = parseInput(approveSchema, input);
   signatureBytes(data.signature.image);
@@ -564,7 +569,7 @@ export async function approveRequest(
     ]);
     const isProxySigner = assistantUserId === viewer.id;
     const isAssignedMainSignatory = assignedMainUserId === viewer.id;
-    const canSignAsMain = assignedMainUserId ? isAssignedMainSignatory : stage.role === viewer.role;
+    const canSignAsMain = isAssignedMainSignatory;
     if (!canSignAsMain && !isProxySigner) {
       throw new AppError(`This step must be completed by the ${stage.title}.`);
     }
@@ -673,18 +678,19 @@ export async function approveRequest(
     return {
       status: updated.status,
       request: updated,
-      email: nextStage ? emails.find((message) => message.stage === nextStage.key) : undefined,
+      emails,
     };
   });
-  const workflowEmail = result.email
-    ? await sendWorkflowTestEmail(result.email, result.request)
+  const approvalMessages = result.emails.filter((message) => message.kind !== "approved_requester");
+  const workflowEmail = approvalMessages.length
+    ? await sendWorkflowEmails(approvalMessages, result.request)
     : undefined;
   return { status: result.status, ...(workflowEmail ? { workflowEmail } : {}) };
 }
 
 export async function rejectRequest(
   input: unknown,
-): Promise<{ status: Status; workflowEmail?: Awaited<ReturnType<typeof sendWorkflowTestEmail>> }> {
+): Promise<{ status: Status; workflowEmail?: Awaited<ReturnType<typeof sendWorkflowEmails>> }> {
   const viewer = await requireViewer();
   const data = parseInput(rejectSchema, input);
 
@@ -703,11 +709,7 @@ export async function rejectRequest(
       : [undefined, undefined];
     const isProxySigner = assistantUserId === viewer.id;
     const isAssignedMainSignatory = assignedMainUserId === viewer.id;
-    const canSignAsMain = stage
-      ? assignedMainUserId
-        ? isAssignedMainSignatory
-        : stage.role === viewer.role
-      : false;
+    const canSignAsMain = stage ? isAssignedMainSignatory : false;
     const ctx = {
       users: await loadUsers(conn),
       now: new Date().toISOString(),
@@ -762,16 +764,18 @@ export async function rejectRequest(
     return {
       status: updated.status,
       request: updated,
-      email: notifications.find((message: EmailMessage) => message.kind === "returned"),
+      emails: notifications,
     };
   });
-  const workflowEmail = await sendWorkflowTestEmail(result.email, result.request);
+  const workflowEmail = result.emails.length
+    ? await sendWorkflowEmails(result.emails, result.request)
+    : undefined;
   return { status: result.status, ...(workflowEmail ? { workflowEmail } : {}) };
 }
 
 export async function resubmitRequest(
   input: unknown,
-): Promise<{ id: string; workflowEmail?: Awaited<ReturnType<typeof sendWorkflowTestEmail>> }> {
+): Promise<{ id: string; workflowEmail?: Awaited<ReturnType<typeof sendWorkflowEmails>> }> {
   const viewer = await requireViewer();
   const data = parseInput(resubmitSchema, input);
   assertFutureDate(data.input);
@@ -827,15 +831,18 @@ export async function resubmitRequest(
     await insertDestinations(conn, updated.id, updated.destinations);
     await insertHistory(conn, updated.id, updated.history.slice(request.history.length));
     const primaryEmails = await routeMainSignatory(conn, out.emails, updated, ctx, "review");
-    await insertNotifications(conn, primaryEmails);
+    const emails = await notifyAssistant(conn, primaryEmails, updated, ctx, "review");
+    await insertNotifications(conn, emails);
 
     return {
       id: updated.id,
       request: updated,
-      email: primaryEmails.find((message: EmailMessage) => message.stage === "review"),
+      emails,
     };
   });
-  const workflowEmail = await sendWorkflowTestEmail(result.email, result.request);
+  const workflowEmail = result.emails.length
+    ? await sendWorkflowEmails(result.emails, result.request)
+    : undefined;
   return { id: result.id, ...(workflowEmail ? { workflowEmail } : {}) };
 }
 
@@ -898,7 +905,7 @@ export async function updatePendingRequest(input: unknown): Promise<{ id: string
 
 export async function sendTripTicket(input: unknown): Promise<{
   alreadySent: boolean;
-  testEmail?: Awaited<ReturnType<typeof sendTripTicketTestEmail>>;
+  emailDelivery: Awaited<ReturnType<typeof sendTripTicketEmail>>;
 }> {
   const viewer = await requireViewer();
   if (!canViewAllRequests(viewer.role)) {
@@ -920,6 +927,15 @@ export async function sendTripTicket(input: unknown): Promise<{
     const users = await loadUsers(conn);
     const requester = users.find((u) => u.id === request.requisitionerId);
     if (!requester) throw new AppError("We couldn't find the requisitioner for this request.");
+    const ctx = { users, now: new Date().toISOString(), newId: () => randomUUID() };
+    const ticketEmail = makeEmails(
+      ctx,
+      request,
+      "approved_requester",
+      [requester],
+      `The official trip ticket for ${request.number} is attached. It was prepared by ${viewer.name}.`,
+    )[0];
+    if (!ticketEmail) throw new AppError("We couldn't prepare the trip ticket email.");
 
     const existing = await all<RowDataPacket[]>(
       `SELECT id FROM notifications
@@ -934,6 +950,7 @@ export async function sendTripTicket(input: unknown): Promise<{
 
     if (existing.length) {
       const notificationIds = existing.map((row) => String(row["id"]));
+      ticketEmail.id = notificationId;
       const attachments = await all<RowDataPacket[]>(
         "SELECT notification_id, image FROM notification_attachments WHERE notification_id IN (?)",
         [notificationIds],
@@ -956,17 +973,8 @@ export async function sendTripTicket(input: unknown): Promise<{
         await run("DELETE FROM notifications WHERE id IN (?)", [duplicateIds], conn);
       }
     } else {
-      const ctx = { users, now: new Date().toISOString(), newId: () => randomUUID() };
-      const emails = makeEmails(
-        ctx,
-        request,
-        "approved_requester",
-        [requester],
-        `The official trip ticket for ${request.number} is attached. It was prepared by ${viewer.name}.`,
-      );
-      await insertNotifications(conn, emails);
-      notificationId = emails[0]?.id ?? "";
-      if (!notificationId) throw new AppError("We couldn't prepare the trip ticket notification.");
+      await insertNotifications(conn, [ticketEmail]);
+      notificationId = ticketEmail.id;
     }
 
     await run(
@@ -983,10 +991,14 @@ export async function sendTripTicket(input: unknown): Promise<{
       [request.id],
       conn,
     );
-    return { alreadySent, request, ticketImage: bytes };
+    return { alreadySent, request, ticketImage: bytes, ticketEmail };
   });
-  const testEmail = await sendTripTicketTestEmail(result.request, result.ticketImage, viewer.name);
-  return { alreadySent: result.alreadySent, ...(testEmail ? { testEmail } : {}) };
+  const emailDelivery = await sendTripTicketEmail(
+    result.ticketEmail,
+    result.request,
+    result.ticketImage,
+  );
+  return { alreadySent: result.alreadySent, emailDelivery };
 }
 
 /* ------------------------------ Vehicles ----------------------------- */

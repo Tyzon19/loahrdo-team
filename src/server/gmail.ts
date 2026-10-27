@@ -1,7 +1,11 @@
 import { randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { renderEmailTemplate, renderRegistrationOtpEmail } from "@/lib/email-template";
+import {
+  renderEmailTemplate,
+  renderRegistrationOtpEmail,
+  renderTemporaryPasswordEmail,
+} from "@/lib/email-template";
 import { AppError } from "@/lib/errors";
 import type { EmailMessage, VehicleRequest } from "@/lib/types";
 import { STAGES } from "@/lib/workflow";
@@ -12,13 +16,10 @@ interface GoogleTokenResponse {
 }
 
 const LOGO_CONTENT_ID = "loa-header-logo";
-const WORKFLOW_TEST_RECIPIENT = "mj.turingan@lyceumalabang.edu.ph";
-const WORKFLOW_TEST_NAME = "MJ Turingan";
 
-export interface WorkflowTestEmailResult {
-  sent: boolean;
-  message?: string;
-}
+export type EmailDeliveryResult =
+  | { sent: true; delivered: number; failed: 0 }
+  | { sent: false; delivered: number; failed: number; message: string };
 
 function base64(value: string | Buffer): string {
   return Buffer.from(value)
@@ -35,14 +36,49 @@ function encodedHeader(value: string): string {
   return `=?UTF-8?B?${Buffer.from(value, "utf8").toString("base64")}?=`;
 }
 
+function validEmail(value: string): boolean {
+  return /^[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+$/.test(value) && !/[\r\n]/.test(value);
+}
+
+function siteUrlForEmail(): URL {
+  let url: URL;
+  try {
+    url = new URL(publicSiteUrl());
+  } catch {
+    throw new AppError(
+      "Email links are not configured correctly. Contact the system administrator.",
+    );
+  }
+  if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) {
+    throw new AppError(
+      "Email links are not configured correctly. Contact the system administrator.",
+    );
+  }
+  if (
+    process.env["NODE_ENV"] === "production" &&
+    (url.protocol !== "https:" || ["localhost", "127.0.0.1"].includes(url.hostname))
+  ) {
+    throw new AppError("Production email requires a public HTTPS SITE_URL.");
+  }
+  return url;
+}
+
 async function accessToken(): Promise<string> {
   const clientId = serverEnvOptional("GOOGLE_CLIENT_ID");
   const clientSecret = serverEnvOptional("GOOGLE_CLIENT_SECRET");
   const refreshToken = serverEnvOptional("GOOGLE_REFRESH_TOKEN");
-  if (!clientId || !clientSecret || !refreshToken) {
-    throw new AppError(
-      "Email verification is not connected yet. Please contact the system administrator.",
-    );
+  const senderEmail = serverEnvOptional("GOOGLE_SENDER_EMAIL")?.toLowerCase();
+  if (!clientId || !clientSecret || !refreshToken || !senderEmail) {
+    const missingSettings = [
+      !clientId ? "GOOGLE_CLIENT_ID" : undefined,
+      !clientSecret ? "GOOGLE_CLIENT_SECRET" : undefined,
+      !refreshToken ? "GOOGLE_REFRESH_TOKEN" : undefined,
+      !senderEmail ? "GOOGLE_SENDER_EMAIL" : undefined,
+    ].filter((setting): setting is string => Boolean(setting));
+    throw new AppError(`Missing Gmail sender configuration: ${missingSettings.join(", ")}.`);
+  }
+  if (!validEmail(senderEmail)) {
+    throw new AppError("GOOGLE_SENDER_EMAIL must be a valid email address.");
   }
 
   let response: Response;
@@ -62,18 +98,19 @@ async function accessToken(): Promise<string> {
     console.error(
       `[gmail] OAuth refresh request failed: ${error instanceof Error ? error.name : "unknown"}`,
     );
-    throw new AppError("We couldn't send the verification email. Please try again later.");
+    throw new AppError("Gmail could not be reached. Please try again later.");
   }
 
   if (!response.ok) {
     console.error(`[gmail] OAuth refresh failed (${response.status}).`);
-    throw new AppError("We couldn't send the verification email. Please try again later.");
+    throw new AppError("The Gmail sender authorization is invalid or expired. Reconnect Gmail.");
   }
   const token = (await response.json()) as GoogleTokenResponse;
   if (!token.access_token) {
     console.error("[gmail] OAuth refresh response did not include an access token.");
-    throw new AppError("We couldn't send the verification email. Please try again later.");
+    throw new AppError("Gmail did not authorize the sender. Reconnect Gmail.");
   }
+
   return token.access_token;
 }
 
@@ -88,275 +125,21 @@ function dateLabel(value: string) {
   }).format(new Date(Date.UTC(year, month - 1, day, 12)));
 }
 
-/** Sends workflow-triggered email samples only to the configured local test account. */
-export async function sendWorkflowTestEmail(
-  source: EmailMessage | undefined,
-  request: VehicleRequest,
-): Promise<WorkflowTestEmailResult | undefined> {
-  if (process.env["NODE_ENV"] === "production") return undefined;
-
-  let siteUrl: URL;
-  try {
-    siteUrl = new URL(publicSiteUrl());
-  } catch (error) {
-    console.error(
-      `[gmail-test] Invalid local SITE_URL: ${error instanceof Error ? error.message : "unknown error"}`,
-    );
-    return { sent: false, message: "SITE_URL must be a valid URL for local email testing." };
-  }
-  if (!["localhost", "127.0.0.1"].includes(siteUrl.hostname)) return undefined;
-  if (!source) {
-    return { sent: false, message: "No signatory account is configured for this approval stage." };
-  }
-
-  const recipient = serverEnvOptional("GOOGLE_TEST_RECIPIENT")?.toLowerCase();
-  if (!recipient) {
-    return { sent: false, message: "Configure GOOGLE_TEST_RECIPIENT for local email testing." };
-  }
-  if (recipient !== WORKFLOW_TEST_RECIPIENT) {
-    return {
-      sent: false,
-      message: "The local workflow email test is locked to the authorized personal test address.",
-    };
-  }
-
-  try {
-    const stage = source.stage ? STAGES.find((item) => item.key === source.stage) : undefined;
-    const message: EmailMessage = {
-      ...source,
-      toUserId: "local-workflow-email-test",
-      toName: WORKFLOW_TEST_NAME,
-      toEmail: WORKFLOW_TEST_RECIPIENT,
-      subject: `[TEST] ${source.subject}`,
-      ctaLabel: "Review and Sign Request",
-      read: false,
-    };
-    const email = renderEmailTemplate(
-      message,
-      siteUrl.origin,
-      `/requests/${encodeURIComponent(request.id)}`,
-      LOGO_CONTENT_ID,
-      undefined,
-      {
-        department: request.department,
-        purpose: request.purpose,
-        destinations: request.destinations,
-        passengers: request.passengers,
-        dateStart: dateLabel(request.dateStart),
-        dateEnd: dateLabel(request.dateEnd),
-        currentStage: stage ? `${stage.label} — ${stage.title}` : undefined,
-      },
-    );
-    const logo = await readFile(join(process.cwd(), "public", "loa-loading.png"));
-    const relatedBoundary = `loa_related_${randomBytes(18).toString("hex")}`;
-    const alternativeBoundary = `loa_alt_${randomBytes(18).toString("hex")}`;
-    const mime = [
-      `To: ${WORKFLOW_TEST_RECIPIENT}`,
-      `Subject: ${encodedHeader(email.subject)}`,
-      "MIME-Version: 1.0",
-      `Content-Type: multipart/related; boundary="${relatedBoundary}"`,
-      "",
-      `--${relatedBoundary}`,
-      `Content-Type: multipart/alternative; boundary="${alternativeBoundary}"`,
-      "",
-      `--${alternativeBoundary}`,
-      'Content-Type: text/plain; charset="UTF-8"',
-      "Content-Transfer-Encoding: base64",
-      "",
-      base64(email.text),
-      `--${alternativeBoundary}`,
-      'Content-Type: text/html; charset="UTF-8"',
-      "Content-Transfer-Encoding: base64",
-      "",
-      base64(email.html),
-      `--${alternativeBoundary}--`,
-      `--${relatedBoundary}`,
-      'Content-Type: image/png; name="loa-loading.png"',
-      "Content-Transfer-Encoding: base64",
-      `Content-ID: <${LOGO_CONTENT_ID}>`,
-      'Content-Disposition: inline; filename="loa-loading.png"',
-      "",
-      base64(logo),
-      `--${relatedBoundary}--`,
-      "",
-    ].join("\r\n");
-    const token = await accessToken();
-    const response = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ raw: base64Url(mime) }),
-      signal: AbortSignal.timeout(15_000),
-    });
-    if (!response.ok) {
-      console.error(`[gmail-test] Workflow email send failed (${response.status}).`);
-      return { sent: false, message: "Gmail did not accept the workflow test email." };
-    }
-    return { sent: true };
-  } catch (error) {
-    const message =
-      error instanceof AppError
-        ? error.message
-        : "We couldn't prepare or send the workflow test email.";
-    console.error(
-      `[gmail-test] Workflow email failed: ${error instanceof Error ? error.message : "unknown error"}`,
-    );
-    return { sent: false, message };
-  }
-}
-
-export async function sendTripTicketTestEmail(
-  request: VehicleRequest,
-  ticketImage: Buffer,
-  preparedBy: string,
-): Promise<WorkflowTestEmailResult | undefined> {
-  if (process.env["NODE_ENV"] === "production") return undefined;
-
-  let siteUrl: URL;
-  try {
-    siteUrl = new URL(publicSiteUrl());
-  } catch (error) {
-    console.error(
-      `[gmail-test] Invalid local SITE_URL: ${error instanceof Error ? error.message : "unknown error"}`,
-    );
-    return { sent: false, message: "SITE_URL must be a valid URL for local email testing." };
-  }
-  if (!["localhost", "127.0.0.1"].includes(siteUrl.hostname)) return undefined;
-
-  const recipient = serverEnvOptional("GOOGLE_TEST_RECIPIENT")?.toLowerCase();
-  if (!recipient) {
-    return { sent: false, message: "Configure GOOGLE_TEST_RECIPIENT for local email testing." };
-  }
-  if (recipient !== WORKFLOW_TEST_RECIPIENT) {
-    return {
-      sent: false,
-      message: "The local ticket email test is locked to the authorized personal test address.",
-    };
-  }
-
-  try {
-    const message: EmailMessage = {
-      id: "local-ticket-email-test",
-      at: new Date().toISOString(),
-      toUserId: "local-ticket-email-test",
-      toName: WORKFLOW_TEST_NAME,
-      toEmail: WORKFLOW_TEST_RECIPIENT,
-      subject: `[TEST] Trip Ticket Ready — ${request.number}`,
-      requestId: request.id,
-      requestNumber: request.number,
-      kind: "approved_requester",
-      heading: "Test copy of the approved trip ticket",
-      body: `This is a test email for request ${request.number}. The ticket was prepared by ${preparedBy}.`,
-      ctaLabel: "Open Trip Ticket",
-      read: false,
-    };
-    const ticketContentId = "trip-ticket-test-image";
-    const email = renderEmailTemplate(
-      message,
-      siteUrl.origin,
-      `/print/${encodeURIComponent(request.id)}`,
-      LOGO_CONTENT_ID,
-      ticketContentId,
-      {
-        department: request.department,
-        purpose: request.purpose,
-        destinations: request.destinations,
-        passengers: request.passengers,
-        dateStart: dateLabel(request.dateStart),
-        dateEnd: dateLabel(request.dateEnd),
-      },
-    );
-    const logo = await readFile(join(process.cwd(), "public", "loa-loading.png"));
-    const relatedBoundary = `loa_related_${randomBytes(18).toString("hex")}`;
-    const alternativeBoundary = `loa_alt_${randomBytes(18).toString("hex")}`;
-    const mime = [
-      `To: ${WORKFLOW_TEST_RECIPIENT}`,
-      `Subject: ${encodedHeader(email.subject)}`,
-      "MIME-Version: 1.0",
-      `Content-Type: multipart/related; boundary="${relatedBoundary}"`,
-      "",
-      `--${relatedBoundary}`,
-      `Content-Type: multipart/alternative; boundary="${alternativeBoundary}"`,
-      "",
-      `--${alternativeBoundary}`,
-      'Content-Type: text/plain; charset="UTF-8"',
-      "Content-Transfer-Encoding: base64",
-      "",
-      base64(email.text),
-      `--${alternativeBoundary}`,
-      'Content-Type: text/html; charset="UTF-8"',
-      "Content-Transfer-Encoding: base64",
-      "",
-      base64(email.html),
-      `--${alternativeBoundary}--`,
-      `--${relatedBoundary}`,
-      'Content-Type: image/png; name="loa-loading.png"',
-      "Content-Transfer-Encoding: base64",
-      `Content-ID: <${LOGO_CONTENT_ID}>`,
-      'Content-Disposition: inline; filename="loa-loading.png"',
-      "",
-      base64(logo),
-      `--${relatedBoundary}`,
-      `Content-Type: image/png; name="${request.number}-trip-ticket.png"`,
-      "Content-Transfer-Encoding: base64",
-      `Content-ID: <${ticketContentId}>`,
-      `Content-Disposition: inline; filename="${request.number}-trip-ticket.png"`,
-      "",
-      base64(ticketImage),
-      `--${relatedBoundary}--`,
-      "",
-    ].join("\r\n");
-    const token = await accessToken();
-    const response = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ raw: base64Url(mime) }),
-      signal: AbortSignal.timeout(15_000),
-    });
-    if (!response.ok) {
-      console.error(`[gmail-test] Ticket email send failed (${response.status}).`);
-      return { sent: false, message: "Gmail did not accept the trip-ticket test email." };
-    }
-    return { sent: true };
-  } catch (error) {
-    console.error(
-      `[gmail-test] Ticket email failed: ${error instanceof Error ? error.message : "unknown error"}`,
-    );
-    return { sent: false, message: "We couldn't prepare or send the trip-ticket test email." };
-  }
-}
-
-export async function sendRegistrationOtpEmail(
+function createMimeMessage(
   recipient: string,
-  recipientName: string,
-  code: string,
-  expiresInMinutes: number,
-): Promise<void> {
-  const token = await accessToken();
-  const email = renderRegistrationOtpEmail(
-    { recipientName, code, expiresInMinutes },
-    LOGO_CONTENT_ID,
-  );
-  let logo: Buffer;
-  try {
-    logo = await readFile(join(process.cwd(), "public", "loa-loading.png"));
-  } catch (error) {
-    console.error(
-      `[gmail] Could not read the email logo: ${error instanceof Error ? error.name : "unknown"}`,
-    );
-    throw new AppError("We couldn't prepare the verification email. Please try again later.");
-  }
-
+  subject: string,
+  text: string,
+  html: string,
+  logo: Buffer,
+  ticketImage?: Buffer,
+  ticketFilename?: string,
+): string {
   const relatedBoundary = `loa_related_${randomBytes(18).toString("hex")}`;
   const alternativeBoundary = `loa_alt_${randomBytes(18).toString("hex")}`;
-  const mime = [
+  const ticketContentId = ticketImage ? "approved-trip-ticket" : undefined;
+  const parts = [
     `To: ${recipient}`,
-    `Subject: ${encodedHeader(email.subject)}`,
+    `Subject: ${encodedHeader(subject)}`,
     "MIME-Version: 1.0",
     `Content-Type: multipart/related; boundary="${relatedBoundary}"`,
     "",
@@ -367,12 +150,12 @@ export async function sendRegistrationOtpEmail(
     'Content-Type: text/plain; charset="UTF-8"',
     "Content-Transfer-Encoding: base64",
     "",
-    base64(email.text),
+    base64(text),
     `--${alternativeBoundary}`,
     'Content-Type: text/html; charset="UTF-8"',
     "Content-Transfer-Encoding: base64",
     "",
-    base64(email.html),
+    base64(html),
     `--${alternativeBoundary}--`,
     `--${relatedBoundary}`,
     'Content-Type: image/png; name="loa-loading.png"',
@@ -381,10 +164,25 @@ export async function sendRegistrationOtpEmail(
     'Content-Disposition: inline; filename="loa-loading.png"',
     "",
     base64(logo),
-    `--${relatedBoundary}--`,
-    "",
-  ].join("\r\n");
+  ];
 
+  if (ticketImage && ticketFilename && ticketContentId) {
+    parts.push(
+      `--${relatedBoundary}`,
+      `Content-Type: image/png; name="${ticketFilename}"`,
+      "Content-Transfer-Encoding: base64",
+      `Content-ID: <${ticketContentId}>`,
+      `Content-Disposition: inline; filename="${ticketFilename}"`,
+      "",
+      base64(ticketImage),
+    );
+  }
+
+  parts.push(`--${relatedBoundary}--`, "");
+  return parts.join("\r\n");
+}
+
+async function sendMimeMessage(token: string, mime: string): Promise<void> {
   let response: Response;
   try {
     response = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
@@ -400,10 +198,217 @@ export async function sendRegistrationOtpEmail(
     console.error(
       `[gmail] Send request failed: ${error instanceof Error ? error.name : "unknown"}`,
     );
-    throw new AppError("We couldn't send the verification email. Please try again later.");
+    throw new AppError("Gmail could not be reached. Please try again later.");
   }
   if (!response.ok) {
     console.error(`[gmail] Message send failed (${response.status}).`);
-    throw new AppError("We couldn't send the verification email. Please try again later.");
+    if (response.status === 401 || response.status === 403) {
+      throw new AppError(
+        "Gmail authorization cannot send messages. Reconnect the approved account at /api/gmail/connect and grant Gmail send permission.",
+      );
+    }
+    throw new AppError("Gmail rejected the message. Check the sender authorization and recipient.");
   }
+}
+
+async function createNotificationMime(
+  message: EmailMessage,
+  request: VehicleRequest,
+  siteUrl: URL,
+  logo: Buffer,
+  ticketImage?: Buffer,
+): Promise<string> {
+  if (!validEmail(message.toEmail)) {
+    throw new AppError("A configured email recipient is invalid.");
+  }
+  const stage = message.stage ? STAGES.find((item) => item.key === message.stage) : undefined;
+  const ticketContentId = ticketImage ? "approved-trip-ticket" : undefined;
+  const rendered = renderEmailTemplate(
+    message,
+    siteUrl.origin,
+    ticketImage
+      ? `/print/${encodeURIComponent(request.id)}`
+      : `/requests/${encodeURIComponent(request.id)}`,
+    LOGO_CONTENT_ID,
+    ticketContentId,
+    {
+      department: request.department,
+      purpose: request.purpose,
+      destinations: request.destinations,
+      passengers: request.passengers,
+      dateStart: dateLabel(request.dateStart),
+      dateEnd: dateLabel(request.dateEnd),
+      ...(stage ? { currentStage: `${stage.label} — ${stage.title}` } : {}),
+    },
+  );
+  return createMimeMessage(
+    message.toEmail,
+    rendered.subject,
+    rendered.text,
+    rendered.html,
+    logo,
+    ticketImage,
+    ticketImage ? `${request.number}-trip-ticket.png` : undefined,
+  );
+}
+
+async function deliverNotifications(
+  messages: EmailMessage[],
+  request: VehicleRequest,
+  ticketImage?: Buffer,
+): Promise<EmailDeliveryResult> {
+  let token: string;
+  let siteUrl: URL;
+  let logo: Buffer;
+  try {
+    token = await accessToken();
+    siteUrl = siteUrlForEmail();
+    logo = await readFile(join(process.cwd(), "public", "loa-loading.png"));
+  } catch (error) {
+    const message =
+      error instanceof AppError
+        ? error.message
+        : "Email could not be prepared. Contact the system administrator.";
+    console.error(
+      `[email] Preparation failed: ${
+        error instanceof AppError ? error.message : error instanceof Error ? error.name : "unknown"
+      }`,
+    );
+    return {
+      sent: false,
+      delivered: 0,
+      failed: messages.length,
+      message: `The request was saved, but ${message}`,
+    };
+  }
+
+  let delivered = 0;
+  let firstDeliveryError: string | undefined;
+  for (const message of messages) {
+    try {
+      const mime = await createNotificationMime(message, request, siteUrl, logo, ticketImage);
+      await sendMimeMessage(token, mime);
+      delivered += 1;
+    } catch (error) {
+      firstDeliveryError ??=
+        error instanceof AppError
+          ? error.message
+          : "Email delivery failed. Contact the system administrator.";
+      console.error(
+        `[email] Notification delivery failed: ${
+          error instanceof AppError
+            ? error.message
+            : error instanceof Error
+              ? error.name
+              : "unknown"
+        }`,
+      );
+    }
+  }
+
+  const failed = messages.length - delivered;
+  return failed
+    ? {
+        sent: false,
+        delivered,
+        failed,
+        message: `The request was saved, but email delivery failed for ${failed} of ${messages.length} configured recipient(s). ${firstDeliveryError ?? "In-app notifications are still available."}`,
+      }
+    : { sent: true, delivered, failed: 0 };
+}
+
+export function sendWorkflowEmails(
+  messages: EmailMessage[],
+  request: VehicleRequest,
+): Promise<EmailDeliveryResult> {
+  return deliverNotifications(messages, request);
+}
+
+export function sendTripTicketEmail(
+  message: EmailMessage,
+  request: VehicleRequest,
+  ticketImage: Buffer,
+): Promise<EmailDeliveryResult> {
+  return deliverNotifications([message], request, ticketImage);
+}
+
+export async function sendTemporaryPasswordEmail(input: {
+  recipientName: string;
+  recipientEmail: string;
+  temporaryPassword: string;
+  signatoryTitle: string;
+  accountAction?: "created" | "password-reset";
+}): Promise<EmailDeliveryResult> {
+  try {
+    if (!validEmail(input.recipientEmail)) {
+      throw new AppError("The signatory email address is invalid.");
+    }
+    const siteUrl = siteUrlForEmail();
+    const rendered = renderTemporaryPasswordEmail(
+      {
+        recipientName: input.recipientName,
+        email: input.recipientEmail,
+        temporaryPassword: input.temporaryPassword,
+        signatoryTitle: input.signatoryTitle,
+        loginUrl: new URL("/login", siteUrl.origin).toString(),
+        ...(input.accountAction ? { accountAction: input.accountAction } : {}),
+      },
+      LOGO_CONTENT_ID,
+    );
+    const [token, logo] = await Promise.all([
+      accessToken(),
+      readFile(join(process.cwd(), "public", "loa-loading.png")),
+    ]);
+    const mime = createMimeMessage(
+      input.recipientEmail,
+      rendered.subject,
+      rendered.text,
+      rendered.html,
+      logo,
+    );
+    await sendMimeMessage(token, mime);
+    return { sent: true, delivered: 1, failed: 0 };
+  } catch (error) {
+    console.error(
+      `[email] Signatory account email failed: ${
+        error instanceof AppError ? error.message : error instanceof Error ? error.name : "unknown"
+      }`,
+    );
+    return {
+      sent: false,
+      delivered: 0,
+      failed: 1,
+      message:
+        error instanceof AppError
+          ? error.message
+          : "The signatory account was created, but its email could not be prepared.",
+    };
+  }
+}
+
+export async function sendRegistrationOtpEmail(
+  recipient: string,
+  recipientName: string,
+  code: string,
+  expiresInMinutes: number,
+): Promise<void> {
+  if (!validEmail(recipient)) {
+    throw new AppError("The verification email recipient is invalid.");
+  }
+  const token = await accessToken();
+  const email = renderRegistrationOtpEmail(
+    { recipientName, code, expiresInMinutes },
+    LOGO_CONTENT_ID,
+  );
+  let logo: Buffer;
+  try {
+    logo = await readFile(join(process.cwd(), "public", "loa-loading.png"));
+  } catch (error) {
+    console.error(
+      `[gmail] Could not read the email logo: ${error instanceof Error ? error.name : "unknown"}`,
+    );
+    throw new AppError("We couldn't prepare the verification email. Please try again later.");
+  }
+  const mime = createMimeMessage(recipient, email.subject, email.text, email.html, logo);
+  await sendMimeMessage(token, mime);
 }

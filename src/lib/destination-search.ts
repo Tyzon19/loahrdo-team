@@ -15,7 +15,41 @@ function shortDestinationName(value: string) {
 }
 
 export function normalizeDestination(value: string) {
-  return shortDestinationName(value).toLocaleLowerCase();
+  return shortDestinationName(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+const ACRONYM_STOP_WORDS = new Set(["a", "an", "and", "of", "the", "sa", "ng"]);
+
+export function destinationSearchScore(value: string, search: string): number {
+  const name = normalizeDestination(value);
+  const query = normalizeDestination(search);
+  if (!name || !query) return 0;
+  if (name === query) return 100;
+  if (name.startsWith(query)) return 90;
+  if (name.includes(query)) return 80;
+
+  const words = name.split(" ");
+  const queryWords = query.split(" ");
+  if (queryWords.every((queryWord) => words.some((word) => word.startsWith(queryWord)))) {
+    return 70;
+  }
+
+  const acronyms = [
+    words.map((word) => word[0]).join(""),
+    words
+      .filter((word) => !ACRONYM_STOP_WORDS.has(word))
+      .map((word) => word[0])
+      .join(""),
+  ];
+  if (acronyms.includes(query)) return 65;
+  if (acronyms.some((acronym) => acronym.startsWith(query))) return 60;
+  return 0;
 }
 
 export function photonSuggestions(data: unknown): DestinationSuggestion[] {
@@ -29,18 +63,18 @@ export function photonSuggestions(data: unknown): DestinationSuggestion[] {
     const rawProperties = feature.properties;
     if (!rawProperties || typeof rawProperties !== "object") continue;
     const properties = rawProperties as Record<string, unknown>;
-    if (readable(properties.countrycode).toUpperCase() !== "PH") continue;
+    if (readable(properties["countrycode"]).toUpperCase() !== "PH") continue;
 
     const rawName =
-      readable(properties.name) ||
-      readable(properties.city) ||
-      readable(properties.district) ||
-      readable(properties.street);
+      readable(properties["name"]) ||
+      readable(properties["city"]) ||
+      readable(properties["district"]) ||
+      readable(properties["street"]);
     const name = shortDestinationName(rawName);
     if (!name) continue;
 
-    const locality = readable(properties.city) || readable(properties.district);
-    const address = [locality, readable(properties.state)]
+    const locality = readable(properties["city"]) || readable(properties["district"]);
+    const address = [locality, readable(properties["state"])]
       .filter((part) => part && normalizeDestination(part) !== normalizeDestination(name))
       .filter(
         (part, index, all) =>

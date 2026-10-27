@@ -12,7 +12,6 @@ import type {
   Vehicle,
   VehicleRequest,
 } from "@/lib/types";
-import { STAGES } from "@/lib/workflow";
 import { all, type Db } from "./db";
 
 export interface RequestDbRow extends RowDataPacket {
@@ -126,7 +125,6 @@ export interface DocDbRow extends RowDataPacket {
   effective_date: string;
 }
 
-/** DATETIME values are stored in UTC and returned as ISO strings. */
 export function isoTimestamp(value: string | null | undefined): string | undefined {
   if (!value) return undefined;
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
@@ -170,20 +168,13 @@ export async function loadEffectiveApproverUserIds(
 }
 
 async function loadMainSignatories(db: Db) {
-  const [assignments, roleUsers] = await Promise.all([
-    all<RowDataPacket[]>(
-      `SELECT a.stage_key, a.user_id, u.name
-       FROM main_signatory_assignments a
-       JOIN users u ON u.id = a.user_id`,
-      [],
-      db,
-    ),
-    all<UserDbRow[]>(
-      "SELECT id, name, email, role, department FROM users WHERE role IN ('transport_head','director','president') ORDER BY id",
-      [],
-      db,
-    ),
-  ]);
+  const assignments = await all<RowDataPacket[]>(
+    `SELECT a.stage_key, a.user_id, u.name
+     FROM main_signatory_assignments a
+     JOIN users u ON u.id = a.user_id`,
+    [],
+    db,
+  );
   const configuredUserIds: Partial<Record<StageKey, string>> = {};
   const configuredNames: Partial<Record<StageKey, string>> = {};
   for (const row of assignments) {
@@ -193,23 +184,11 @@ async function loadMainSignatories(db: Db) {
     configuredNames[stageKey] = String(row["name"]);
   }
 
-  const names: Partial<Record<StageKey, string>> = {};
-  const userIds: Partial<Record<StageKey, string>> = {};
-  for (const stage of STAGES) {
-    const configuredUserId = configuredUserIds[stage.key];
-    const configuredName = configuredNames[stage.key];
-    if (configuredUserId && configuredName) {
-      userIds[stage.key] = configuredUserId;
-      names[stage.key] = configuredName;
-      continue;
-    }
-    const fallback = roleUsers.find((user) => user.role === stage.role);
-    if (fallback) {
-      userIds[stage.key] = fallback.id;
-      names[stage.key] = fallback.name;
-    }
-  }
-  return { names, userIds, configuredUserIds };
+  return {
+    names: configuredNames,
+    userIds: configuredUserIds,
+    configuredUserIds,
+  };
 }
 
 export interface AssistantDbRow extends RowDataPacket {

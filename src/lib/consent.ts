@@ -11,12 +11,10 @@ export function readAnalyticsConsent(): ConsentValue | null {
     return null;
   }
 }
-
 export function writeAnalyticsConsent(value: ConsentValue) {
   try {
     window.localStorage.setItem(ANALYTICS_CONSENT_KEY, value);
   } catch {
-    /* Storage may be unavailable; treat as declined for this session. */
   }
 }
 

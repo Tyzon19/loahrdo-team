@@ -59,7 +59,6 @@ export async function verifyPassword(value: string, stored: string): Promise<boo
   }
 }
 
-/** Used to keep sign-in timing similar when the email does not exist. */
 export const DUMMY_HASH = (() => {
   const salt = Buffer.from("c2Vzc2lvbi1kdW1teS1zYWx0", "base64");
   const key = scryptSync("not-a-real-password", salt, SCRYPT.keylen, {
