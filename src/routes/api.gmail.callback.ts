@@ -254,7 +254,6 @@ export const Route = createFileRoute("/api/gmail/callback")({
           headers.forEach((value, key) => response.headers.append(key, value));
           return response;
         }
-
         try {
           await storeRefreshToken(tokens.refresh_token);
         } catch (error) {

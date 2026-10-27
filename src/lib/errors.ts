@@ -25,11 +25,6 @@ export function parseInput<T>(schema: ZodType<T>, input: unknown): T {
   throw new AppError(first, fieldErrors);
 }
 
-/**
- * Every server function returns this shape. Unexpected errors are logged as a
- * short message only (never parameters, SQL or stack traces) and replaced with
- * a generic message for the client.
- */
 export async function runSafely<T>(fn: () => Promise<T>): Promise<ApiResult<T>> {
   try {
     return { ok: true, data: await fn() };
@@ -46,7 +41,6 @@ export async function runSafely<T>(fn: () => Promise<T>): Promise<ApiResult<T>> 
   }
 }
 
-/** Maps mysql2 duplicate-key errors to a safe, user-facing message. */
 export function isDuplicateKey(error: unknown) {
   return (
     typeof error === "object" &&
