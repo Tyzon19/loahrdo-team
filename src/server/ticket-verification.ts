@@ -6,7 +6,7 @@ import {
 } from "@/lib/ticket-verification";
 import { all, getPool } from "./db";
 import { serverEnv } from "./env";
-
+import { request } from "https";
 interface VerificationRequestRow extends RowDataPacket {
   id: string;
   number: string;
@@ -16,7 +16,6 @@ interface VerificationRequestRow extends RowDataPacket {
   status: string;
   approved_at: string | null;
 }
-
 export async function verifyTicketToken(token: string): Promise<{
   requestNumber: string;
   requestDate: string;
@@ -44,7 +43,6 @@ export async function verifyTicketToken(token: string): Promise<{
   ) {
     return null;
   }
-
   const tickets = await all<RowDataPacket[]>(
     `SELECT a.notification_id
      FROM notifications n
@@ -55,7 +53,6 @@ export async function verifyTicketToken(token: string): Promise<{
     pool,
   );
   if (!tickets.length) return null;
-
   const destinations = await all<RowDataPacket[]>(
     `SELECT destination
      FROM request_destinations
@@ -71,7 +68,6 @@ export async function verifyTicketToken(token: string): Promise<{
     destinations: destinations.map((row) => String(row["destination"])),
   };
   if (ticketDataDigest(ticketData) !== claims.ticketDigest) return null;
-
   return {
     requestNumber: request.number,
     ...ticketData,

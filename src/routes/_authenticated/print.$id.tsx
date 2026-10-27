@@ -564,7 +564,6 @@ function PrintTicket() {
                 <div className="max-w-48 text-right text-[8px] leading-tight">
                   <p className="font-bold">VERIFY OFFICIAL TICKET</p>
                   <p>Scan the QR code and compare the official dates and destination.</p>
-                  <p className="break-all">{verificationUrl}</p>
                 </div>
                 <img
                   data-ticket-verification-qr

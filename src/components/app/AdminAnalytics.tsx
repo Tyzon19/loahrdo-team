@@ -21,6 +21,7 @@ export function AdminAnalytics() {
   const analytics = useQuery({
     queryKey: ["trip-analytics-dashboard", from, to],
     queryFn: () => unwrap(getTripArchiveFn({ data: { from, to } })),
+    staleTime: 60_000,
   });
   const monthlyTrips = analytics.data?.monthlyTrips ?? [];
   const maxTrips = Math.max(1, ...monthlyTrips.map((month) => month.trips));

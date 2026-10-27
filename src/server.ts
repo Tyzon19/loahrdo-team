@@ -2,6 +2,7 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { isClientDisconnectError } from "./lib/request-errors";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -18,15 +19,25 @@ async function getServerEntry(): Promise<ServerEntry> {
   return serverEntryPromise;
 }
 
-async function normalizeCatastrophicSsrResponse(response: Response): Promise<Response> {
+async function normalizeCatastrophicSsrResponse(
+  request: Request,
+  response: Response,
+): Promise<Response> {
   if (response.status < 500) return response;
+  if (request.signal.aborted) {
+    consumeLastCapturedError();
+    return response;
+  }
   const contentType = response.headers.get("content-type") ?? "";
   if (!contentType.includes("application/json")) return response;
 
   const body = await response.clone().text();
   if (!isH3SwallowedErrorBody(body)) return response;
 
-  console.error(consumeLastCapturedError() ?? new Error(`h3 swallowed SSR error: ${body}`));
+  const error = consumeLastCapturedError();
+  if (request.signal.aborted || isClientDisconnectError(error)) return response;
+
+  console.error(error ?? new Error(`h3 swallowed SSR error: ${body}`));
   return new Response(renderErrorPage(), {
     status: 500,
     headers: { "content-type": "text/html; charset=utf-8" },
@@ -107,7 +118,7 @@ export default {
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      const normalized = await normalizeCatastrophicSsrResponse(response);
+      const normalized = await normalizeCatastrophicSsrResponse(request, response);
       return withSecurityHeaders(request, normalized);
     } catch (error) {
       // Server-side only; the browser receives a generic page without a stack trace.

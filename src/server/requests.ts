@@ -1058,18 +1058,29 @@ export async function dashboardStats(): Promise<DashboardStats> {
   const where = scoped ? "WHERE requisitioner_id = ?" : "";
   const params = scoped ? [viewer.id] : [];
 
-  const counts = await all<RowDataPacket[]>(
-    `SELECT status, COUNT(*) AS n FROM requests ${where} GROUP BY status`,
-    params,
-  );
+  const [counts, pageViewRows] = await Promise.all([
+    all<RowDataPacket[]>(
+      `SELECT status, COUNT(*) AS n,
+              COALESCE(SUM(
+                submitted_at >= DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01')
+                AND submitted_at < DATE_ADD(DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
+              ), 0) AS month_n
+       FROM requests ${where}
+       GROUP BY status`,
+      params,
+    ),
+    viewer.role === "admin"
+      ? all<RowDataPacket[]>(
+          "SELECT COUNT(*) AS n FROM analytics_pageviews WHERE viewed_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)",
+        )
+      : Promise.resolve([] as RowDataPacket[]),
+  ]);
   const byStatus = new Map<string, number>();
-  for (const row of counts) byStatus.set(String(row["status"]), Number(row["n"]));
-
-  const monthRows = await all<RowDataPacket[]>(
-    `SELECT COUNT(*) AS n FROM requests
-     ${scoped ? `${where} AND` : "WHERE"} YEAR(submitted_at) = YEAR(NOW()) AND MONTH(submitted_at) = MONTH(NOW())`,
-    params,
-  );
+  let thisMonth = 0;
+  for (const row of counts) {
+    byStatus.set(String(row["status"]), Number(row["n"]));
+    thisMonth += Number(row["month_n"]);
+  }
 
   let awaitingYou = 0;
   if (viewer.role === "requisitioner") {
@@ -1084,13 +1095,7 @@ export async function dashboardStats(): Promise<DashboardStats> {
       president: "pending_approval",
     };
     const status = stageRoleStatus[viewer.role];
-    if (status) {
-      const rows = await all<RowDataPacket[]>(
-        "SELECT COUNT(*) AS n FROM requests WHERE status = ?",
-        [status],
-      );
-      awaitingYou = Number(rows[0]?.["n"] ?? 0);
-    }
+    if (status) awaitingYou = byStatus.get(status) ?? 0;
   }
 
   const approved =
@@ -1100,10 +1105,7 @@ export async function dashboardStats(): Promise<DashboardStats> {
 
   let pageViews30d: number | null = null;
   if (viewer.role === "admin") {
-    const rows = await all<RowDataPacket[]>(
-      "SELECT COUNT(*) AS n FROM analytics_pageviews WHERE viewed_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)",
-    );
-    pageViews30d = Number(rows[0]?.["n"] ?? 0);
+    pageViews30d = Number(pageViewRows[0]?.["n"] ?? 0);
   }
 
   const total = [...byStatus.values()].reduce((sum, n) => sum + n, 0);
@@ -1118,7 +1120,7 @@ export async function dashboardStats(): Promise<DashboardStats> {
     approved,
     completed: byStatus.get("completed") ?? 0,
     awaitingYou,
-    thisMonth: Number(monthRows[0]?.["n"] ?? 0),
+    thisMonth,
     pageViews30d,
   };
 }

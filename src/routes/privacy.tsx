@@ -35,17 +35,29 @@ function PrivacyPage() {
           {SITE.institution} · {SITE.office}
         </p>
         <h1 className="mt-2 font-serif text-3xl font-bold sm:text-4xl">Privacy Policy</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Last updated: 23 October 2026</p>
+        <p className="mt-2 text-sm text-muted-foreground">Last updated: 27 October 2026</p>
 
         <div className="mt-8 space-y-8 text-sm leading-relaxed">
           <section>
             <h2 className="font-serif text-xl font-semibold">Who we are</h2>
             <p className="mt-2 text-muted-foreground">
               This system is operated by the {SITE.office} of {SITE.institution} to manage school
-              vehicle reservations, approvals and trip tickets. Questions about this policy or your
-              data can be sent to{" "}
+              vehicle reservations, approvals and trip tickets. It is intended to handle personal
+              information in line with Republic Act No. 10173, the Data Privacy Act of 2012, its
+              Implementing Rules and Regulations, and the Lyceum of Alabang Data Privacy Statement.
+              This notice explains how information is used in this system; it does not replace the
+              institution-wide statement. Questions about this policy or your data can be sent to{" "}
               <a href={`mailto:${SITE.contactEmail}`} className="text-primary underline">
                 {SITE.contactEmail}
+              </a>
+              . Read the{" "}
+              <a
+                href="https://lyceumalabang.edu.ph/data-privacy-statement/"
+                target="_blank"
+                rel="noreferrer"
+                className="text-primary underline"
+              >
+                Lyceum of Alabang Data Privacy Statement
               </a>
               .
             </p>
@@ -69,20 +81,38 @@ function PrivacyPage() {
                 to your account when a request needs your attention.
               </li>
               <li>
+                <strong className="text-foreground">Account verification:</strong> your official
+                email address is used to send a one-time registration code through Google&apos;s
+                email service.
+              </li>
+              <li>
                 <strong className="text-foreground">Technical logs:</strong> session records,
                 timestamps and aggregate page-view counts. We do not store your IP address in the
                 analytics table, and we never store query strings there.
               </li>
             </ul>
+            <p className="mt-3 text-muted-foreground">
+              Please provide only information needed to process a vehicle request. Avoid entering
+              sensitive personal information about yourself or others in the purpose or remarks
+              fields unless it is necessary for the request.
+            </p>
           </section>
 
           <section>
-            <h2 className="font-serif text-xl font-semibold">Why we use it</h2>
+            <h2 className="font-serif text-xl font-semibold">Purpose and lawful processing</h2>
             <p className="mt-2 text-muted-foreground">
-              We use this information to authenticate accounts, route requests through the fixed
-              three-stage approval order, produce the official trip ticket, keep an audit trail,
-              prevent misuse, and improve the service. We do not sell personal information or use it
-              for advertising.
+              Information is used only as needed to verify accounts, process and approve vehicle
+              requests, coordinate vehicles, prepare official trip tickets, maintain required
+              administrative records, protect the system, and support service operations. It is
+              processed for these stated purposes on a lawful basis under applicable law. Consent is
+              requested for optional analytics. We do not sell personal information or use it for
+              advertising.
+            </p>
+            <p className="mt-2 text-muted-foreground">
+              Access is limited to authorized users whose roles require the information. Google
+              provides the email service used for registration verification. Google Analytics is
+              used only if you accept optional analytics. These services process information as
+              needed to provide their respective features.
             </p>
           </section>
 
@@ -90,8 +120,8 @@ function PrivacyPage() {
             <h2 className="font-serif text-xl font-semibold">Who can see a request</h2>
             <div className="mt-2 space-y-2 text-muted-foreground">
               <p className="flex gap-2">
-                <UserCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
-                A requisitioner can only see requests filed by their own account.
+                <UserCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />A
+                requisitioner can only see requests filed by their own account.
               </p>
               <p className="flex gap-2">
                 <Lock className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
@@ -109,8 +139,8 @@ function PrivacyPage() {
               <span>
                 A strictly necessary session cookie keeps you signed in. It is httpOnly,
                 SameSite=Lax, and expires automatically. Optional analytics is off by default and
-                starts only after you choose <strong>Accept analytics</strong>. If you accept, we use
-                Google Analytics 4 with IP anonymization and a cookie-free first-party page-view
+                starts only after you choose <strong>Accept analytics</strong>. If you accept, we
+                use Google Analytics 4 with IP anonymization and a cookie-free first-party page-view
                 count. You can withdraw consent at any time with the button below; no analytics runs
                 while consent is declined.
               </span>
@@ -132,34 +162,54 @@ function PrivacyPage() {
             <h2 className="font-serif text-xl font-semibold">How long we keep it</h2>
             <p className="mt-2 text-muted-foreground">
               Request, signature and approval records are retained as part of the office&apos;s
-              administrative record for the period required by the institution. Sessions expire
-              automatically and expired sessions are removed. Aggregate analytics counts are kept for
-              service improvement and do not identify you.
+              administrative record in line with the institution&apos;s applicable retention
+              requirements. Sessions expire automatically and expired sessions are removed.
+              Aggregate analytics counts are retained for service improvement and do not identify
+              you in this system.
             </p>
           </section>
 
           <section>
             <h2 className="font-serif text-xl font-semibold">How we protect it</h2>
+            <p className="mt-2 text-muted-foreground">
+              Lyceum of Alabang&apos;s Data Privacy Statement describes the institution&apos;s
+              commitment to physical, organizational and technical safeguards. This system also
+              applies the following technical controls:
+            </p>
             <ul className="mt-2 list-disc space-y-1.5 pl-5 text-muted-foreground">
-              <li>Passwords are hashed with salted scrypt; sessions use random tokens stored only as hashes.</li>
-              <li>Database credentials stay in server-side configuration and are never sent to the browser.</li>
-              <li>The application uses a dedicated database account limited to the operations it needs.</li>
+              <li>
+                Passwords are hashed with salted scrypt; sessions use random tokens stored only as
+                hashes.
+              </li>
+              <li>
+                Database credentials stay in server-side configuration and are never sent to the
+                browser.
+              </li>
+              <li>
+                The application uses a dedicated database account limited to the operations it
+                needs.
+              </li>
               <li>All database queries are parameterized to prevent SQL injection.</li>
-              <li>Every page and server action validates input and re-checks the signed-in role.</li>
+              <li>
+                Every page and server action validates input and re-checks the signed-in role.
+              </li>
             </ul>
           </section>
 
           <section>
-            <h2 className="font-serif text-xl font-semibold">Your choices</h2>
+            <h2 className="font-serif text-xl font-semibold">Your privacy rights and choices</h2>
             <p className="mt-2 text-muted-foreground">
-              You may ask to access, correct or delete your account information, or object to
-              analytics. Some request records must be kept to preserve the approval and audit trail.
-              To make a request, contact{" "}
+              Subject to the Data Privacy Act and other applicable requirements, you may ask to be
+              informed about, access or correct your personal information, object to or request
+              blocking or erasure of information, and exercise other rights available to you under
+              the law. Some request records may need to be retained for institutional, legal or
+              audit purposes. You may decline or withdraw optional analytics consent at any time
+              using the control above. To make a privacy request, contact{" "}
               <a href={`mailto:${SITE.contactEmail}`} className="text-primary underline">
                 {SITE.contactEmail}
               </a>
-              . Email delivery is not connected to this system yet; notifications appear only inside
-              the application.
+              . Account verification codes may be sent to your official email; workflow
+              notifications and approved trip tickets are available inside the application.
             </p>
           </section>
 

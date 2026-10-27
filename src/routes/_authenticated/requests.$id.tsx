@@ -209,7 +209,7 @@ function RequestDetailPage() {
           }
         >
           {detail.tripTicketAttached
-            ? "The requisitioner can open the notification to view and download the ticket."
+            ? "The requisitioner can view and download the ticket."
             : "Use Send Trip Ticket above to attach the ticket to the requisitioner's notification."}
         </Notice>
       )}
@@ -641,7 +641,7 @@ function ActionPanel({
               />
             </div>
             <div className="min-w-0 sm:col-span-2">
-              <Label htmlFor="remarks">Review Remarks</Label>
+              <Label htmlFor="remarks">Review Remarks (optional)</Label>
               <Textarea
                 id="remarks"
                 rows={2}

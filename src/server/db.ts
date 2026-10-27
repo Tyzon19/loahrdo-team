@@ -1,11 +1,28 @@
 import type { Pool, PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { serverEnv, serverEnvOptional } from "./env";
 
-/**
- * MySQL access for TanStack Start server functions.
- * This module is only ever imported from server function handlers.
- */
+const DB_CONNECTION_LIMIT = 5;
+
 let poolPromise: Promise<Pool> | undefined;
+
+function slowQueryThresholdMs() {
+  const raw = serverEnvOptional("DB_SLOW_QUERY_MS");
+  if (!raw) return 500;
+
+  const threshold = Number(raw);
+  if (!Number.isInteger(threshold) || threshold < 50 || threshold > 60_000) {
+    throw new Error("DB_SLOW_QUERY_MS must be an integer between 50 and 60000.");
+  }
+  return threshold;
+}
+
+function logSlowQuery(sql: string, startedAt: number, thresholdMs: number) {
+  const durationMs = Date.now() - startedAt;
+  if (durationMs < thresholdMs) return;
+
+  const fingerprint = sql.replace(/\s+/g, " ").trim().slice(0, 180);
+  console.warn(`[db] Slow query (${durationMs}ms): ${fingerprint}`);
+}
 
 export async function getPool(): Promise<Pool> {
   if (typeof window !== "undefined") {
@@ -21,8 +38,8 @@ export async function getPool(): Promise<Pool> {
         password: serverEnv("DB_PASSWORD"),
         database: serverEnv("DB_NAME"),
         waitForConnections: true,
-        connectionLimit: 5,
-        maxIdle: 1,
+        connectionLimit: DB_CONNECTION_LIMIT,
+        maxIdle: DB_CONNECTION_LIMIT,
         idleTimeout: 30_000,
         queueLimit: 20,
         charset: "utf8mb4",
@@ -36,13 +53,15 @@ export async function getPool(): Promise<Pool> {
 
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
-    void poolPromise?.then((pool) => pool.end()).catch((error: unknown) => {
-      console.error(
-        `[db] Failed to close the previous development pool: ${
-          error instanceof Error ? error.message : "unknown error"
-        }`,
-      );
-    });
+    void poolPromise
+      ?.then((pool) => pool.end())
+      .catch((error: unknown) => {
+        console.error(
+          `[db] Failed to close the previous development pool: ${
+            error instanceof Error ? error.message : "unknown error"
+          }`,
+        );
+      });
   });
 }
 
@@ -55,18 +74,26 @@ export async function all<T extends RowDataPacket[]>(
   db?: Db,
 ): Promise<T> {
   const conn = db ?? (await getPool());
-  const [rows] = await conn.query<T>(sql, params);
-  return rows;
+  const thresholdMs = slowQueryThresholdMs();
+  const startedAt = Date.now();
+  try {
+    const [rows] = await conn.query<T>(sql, params);
+    return rows;
+  } finally {
+    logSlowQuery(sql, startedAt, thresholdMs);
+  }
 }
 
-export async function run(
-  sql: string,
-  params: unknown[] = [],
-  db?: Db,
-): Promise<ResultSetHeader> {
+export async function run(sql: string, params: unknown[] = [], db?: Db): Promise<ResultSetHeader> {
   const conn = db ?? (await getPool());
-  const [result] = await conn.query<ResultSetHeader>(sql, params);
-  return result;
+  const thresholdMs = slowQueryThresholdMs();
+  const startedAt = Date.now();
+  try {
+    const [result] = await conn.query<ResultSetHeader>(sql, params);
+    return result;
+  } finally {
+    logSlowQuery(sql, startedAt, thresholdMs);
+  }
 }
 
 export async function withTransaction<T>(fn: (conn: PoolConnection) => Promise<T>): Promise<T> {

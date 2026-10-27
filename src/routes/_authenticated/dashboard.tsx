@@ -28,10 +28,12 @@ function Dashboard() {
   const stats = useQuery({
     queryKey: ["dashboard-stats"],
     queryFn: () => unwrap(dashboardStatsFn()),
+    staleTime: 15_000,
   });
   const requests = useQuery({
     queryKey: ["requests", "all"],
     queryFn: () => unwrap(listRequestsFn({ data: { status: "all", q: "" } })),
+    staleTime: 15_000,
   });
   const notifications = useQuery({
     queryKey: ["notifications"],

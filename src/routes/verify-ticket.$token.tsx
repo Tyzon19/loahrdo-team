@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { CalendarDays, CircleCheck, CircleX, MapPin, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { fmtDate, fmtRange } from "@/lib/format";
@@ -113,9 +113,6 @@ function VerifyTicketPage() {
         <p className="mt-8 border-t pt-4 text-center text-xs text-muted-foreground">
           {SITE.office} · {SITE.institution}
         </p>
-        <Link to="/" className="mt-4 block text-center text-sm text-primary underline">
-          {SITE.name}
-        </Link>
       </section>
     </main>
   );
