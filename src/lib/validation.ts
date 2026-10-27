@@ -96,7 +96,7 @@ export const requestInputSchema = z
       .min(1, "Enter your destinations.")
       .max(10, "You can add up to 10 destinations."),
     passengers: z
-      .number({ invalid_type_error: "Enter the number of passengers." })
+      .number({ error: "Enter the number of passengers." })
       .int("Enter a whole number of passengers.")
       .min(1, "Enter at least one passenger.")
       .max(60, "For more than 60 passengers, please file separate requests."),
