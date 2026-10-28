@@ -50,7 +50,11 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   beforeLoad: async () => {
     const bootstrap = await bootstrapFn();
-    return { viewer: bootstrap.viewer, analytics: bootstrap.analytics };
+    return {
+      viewer: bootstrap.viewer,
+      hrdoViewer: bootstrap.hrdoViewer,
+      analytics: bootstrap.analytics,
+    };
   },
   head: ({ matches }) => {
     const isNotFound = matches[matches.length - 1]?.routeId === rootRouteId;

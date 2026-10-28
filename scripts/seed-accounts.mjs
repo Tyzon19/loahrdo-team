@@ -1,11 +1,3 @@
-#!/usr/bin/env node
-/**
- * Seeds the initial administrator and document header.
- * No demo requests, vehicles or notifications are created.
- *
- * Initial passwords are printed once. Only scrypt hashes are stored, and every
- * seeded account is forced to choose a new password at first sign-in.
- */
 import { readFileSync, existsSync } from "node:fs";
 import { randomBytes, randomUUID, scryptSync } from "node:crypto";
 import { resolve } from "node:path";
@@ -57,6 +49,47 @@ const accounts = [
     role: "admin",
     department: "Physical Facilities Management Office",
   },
+  {
+    name: "LOA Administrator",
+    email: "admin@lyceumalabang.edu.ph",
+    role: "admin",
+    department: "Physical Facilities Management Office",
+  },
+  {
+    name: "HRDO Administrator",
+    email: "hrdo_admin@lyceumalabang.edu.ph",
+    role: "hrdo_staff",
+    department: "Human Resources Development Office",
+    table: "hrdo_users",
+  },
+  {
+    name: "COE CEO",
+    email: "ceo@loa.edu.ph",
+    role: "hrdo_staff",
+    department: "Office of the President",
+    table: "hrdo_users",
+  },
+  {
+    name: "HRDO Administrator",
+    email: "admin.hrdo@loa.edu.ph",
+    role: "hrdo_staff",
+    department: "Human Resources Development Office",
+    table: "hrdo_users",
+  },
+  {
+    name: "HRDO HR Officer",
+    email: "hr@loa.edu.ph",
+    role: "hrdo_staff",
+    department: "Human Resources Development Office",
+    table: "hrdo_users",
+  },
+  {
+    name: "COE Employee User",
+    email: "employee@loa.edu.ph",
+    role: "employee",
+    department: "Human Resources Development Office",
+    table: "hrdo_users",
+  },
 ];
 
 const conn = await mysql.createConnection({
@@ -85,14 +118,15 @@ try {
 
   const created = [];
   for (const account of accounts) {
-    const [rows] = await conn.query("SELECT id FROM users WHERE email = ?", [account.email]);
+    const tableName = account.table ?? "users";
+    const [rows] = await conn.query(`SELECT id FROM ${tableName} WHERE email = ?`, [account.email]);
     if (rows.length) {
-      created.push({ ...account, password: null });
+      created.push({ ...account, table: tableName, password: null });
       continue;
     }
     const password = makePassword();
     await conn.query(
-      `INSERT INTO users (id, name, email, password_hash, role, department, must_change_password)
+      `INSERT INTO ${tableName} (id, name, email, password_hash, role, department, must_change_password)
        VALUES (?, ?, ?, ?, ?, ?, 1)`,
       [
         randomUUID(),
@@ -103,12 +137,12 @@ try {
         account.department,
       ],
     );
-    created.push({ ...account, password });
+    created.push({ ...account, table: tableName, password });
   }
 
   console.log("\nInitial application accounts ready.\n");
   for (const a of created) {
-    console.log(`- ${a.role.padEnd(15)} ${a.email}`);
+    console.log(`- ${a.table ?? "users"}`.padEnd(12) + ` ${a.role.padEnd(15)} ${a.email}`);
     if (a.password) {
       console.log(`  initial password: ${a.password}`);
       console.log("  (shown once — store it in your password manager; change on first sign-in)");

@@ -7,6 +7,7 @@ import {
   Car,
   ChevronDown,
   ClipboardList,
+  FileBadge,
   FilePlus2,
   LayoutDashboard,
   LogOut,
@@ -49,6 +50,12 @@ const ITEMS = {
     mobileLabel: "New request",
     icon: FilePlus2,
   },
+  coe: {
+    to: "/coe",
+    label: "COE Request",
+    mobileLabel: "COE",
+    icon: FileBadge,
+  },
   myReq: {
     to: "/requests",
     label: "My Requests",
@@ -89,6 +96,7 @@ export const NAV: Record<Role, NavItem[]> = {
   requisitioner: [
     ITEMS.dash,
     ITEMS.newReq,
+    ITEMS.coe,
     ITEMS.myReq,
     ITEMS.notif,
     ITEMS.phoneDirectory,

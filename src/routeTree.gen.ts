@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
+import { Route as HrdoRouteImport } from './routes/hrdo'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as RegisterRouteImport } from './routes/register'
@@ -21,15 +22,25 @@ import { Route as AuthenticatedPhoneDirectoryRouteImport } from './routes/_authe
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 import { Route as AuthenticatedTripArchiveRouteImport } from './routes/_authenticated/trip-archive'
 import { Route as AuthenticatedVehiclesRouteImport } from './routes/_authenticated/vehicles'
+import { Route as HrdoChangePasswordRouteImport } from './routes/hrdo/change-password'
+import { Route as HrdoCoeRouteImport } from './routes/hrdo/coe'
+import { Route as HrdoDashboardRouteImport } from './routes/hrdo/dashboard'
+import { Route as HrdoHistoryRouteImport } from './routes/hrdo/history'
+import { Route as HrdoLoginRouteImport } from './routes/hrdo/login'
+import { Route as HrdoProfileRouteImport } from './routes/hrdo/profile'
+import { Route as HrdoRequestsRouteImport } from './routes/hrdo/requests'
 import { Route as VerifyTicketTokenRouteImport } from './routes/verify-ticket.$token'
 import { Route as AuthenticatedPrintIdRouteImport } from './routes/_authenticated/print.$id'
 import { Route as AuthenticatedRequestsIndexRouteImport } from './routes/_authenticated/requests.index'
 import { Route as AuthenticatedRequestsIdRouteImport } from './routes/_authenticated/requests.$id'
 import { Route as AuthenticatedRequestsNewRouteImport } from './routes/_authenticated/requests.new'
 import { Route as AuthenticatedReviseIdRouteImport } from './routes/_authenticated/revise.$id'
+import { Route as ApiAuthGoogleRouteImport } from './routes/api.auth.google'
 import { Route as ApiGmailCallbackRouteImport } from './routes/api.gmail.callback'
 import { Route as ApiGmailConnectRouteImport } from './routes/api.gmail.connect'
 import { Route as ApiVerifyTicketTokenRouteImport } from './routes/api.verify-ticket.$token'
+import { Route as HrdoCoeIdRouteImport } from './routes/hrdo/coe_.$id'
+import { Route as ApiAuthGoogleCallbackRouteImport } from './routes/api.auth.google.callback'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -38,6 +49,11 @@ const IndexRoute = IndexRouteImport.update({
 } as any)
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HrdoRoute = HrdoRouteImport.update({
+  id: '/hrdo',
+  path: '/hrdo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -94,6 +110,41 @@ const AuthenticatedVehiclesRoute = AuthenticatedVehiclesRouteImport.update({
   path: '/vehicles',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const HrdoChangePasswordRoute = HrdoChangePasswordRouteImport.update({
+  id: '/change-password',
+  path: '/change-password',
+  getParentRoute: () => HrdoRoute,
+} as any)
+const HrdoCoeRoute = HrdoCoeRouteImport.update({
+  id: '/coe',
+  path: '/coe',
+  getParentRoute: () => HrdoRoute,
+} as any)
+const HrdoDashboardRoute = HrdoDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => HrdoRoute,
+} as any)
+const HrdoHistoryRoute = HrdoHistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
+  getParentRoute: () => HrdoRoute,
+} as any)
+const HrdoLoginRoute = HrdoLoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => HrdoRoute,
+} as any)
+const HrdoProfileRoute = HrdoProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => HrdoRoute,
+} as any)
+const HrdoRequestsRoute = HrdoRequestsRouteImport.update({
+  id: '/requests',
+  path: '/requests',
+  getParentRoute: () => HrdoRoute,
+} as any)
 const VerifyTicketTokenRoute = VerifyTicketTokenRouteImport.update({
   id: '/verify-ticket/$token',
   path: '/verify-ticket/$token',
@@ -126,6 +177,11 @@ const AuthenticatedReviseIdRoute = AuthenticatedReviseIdRouteImport.update({
   path: '/revise/$id',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const ApiAuthGoogleRoute = ApiAuthGoogleRouteImport.update({
+  id: '/api/auth/google',
+  path: '/api/auth/google',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiGmailCallbackRoute = ApiGmailCallbackRouteImport.update({
   id: '/api/gmail/callback',
   path: '/api/gmail/callback',
@@ -141,9 +197,20 @@ const ApiVerifyTicketTokenRoute = ApiVerifyTicketTokenRouteImport.update({
   path: '/api/verify-ticket/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HrdoCoeIdRoute = HrdoCoeIdRouteImport.update({
+  id: '/coe_/$id',
+  path: '/coe/$id',
+  getParentRoute: () => HrdoRoute,
+} as any)
+const ApiAuthGoogleCallbackRoute = ApiAuthGoogleCallbackRouteImport.update({
+  id: '/callback',
+  path: '/callback',
+  getParentRoute: () => ApiAuthGoogleRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/hrdo': typeof HrdoRouteWithChildren
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
   '/register': typeof RegisterRoute
@@ -154,18 +221,29 @@ export interface FileRoutesByFullPath {
   '/profile': typeof AuthenticatedProfileRoute
   '/trip-archive': typeof AuthenticatedTripArchiveRoute
   '/vehicles': typeof AuthenticatedVehiclesRoute
+  '/hrdo/change-password': typeof HrdoChangePasswordRoute
+  '/hrdo/coe': typeof HrdoCoeRoute
+  '/hrdo/dashboard': typeof HrdoDashboardRoute
+  '/hrdo/history': typeof HrdoHistoryRoute
+  '/hrdo/login': typeof HrdoLoginRoute
+  '/hrdo/profile': typeof HrdoProfileRoute
+  '/hrdo/requests': typeof HrdoRequestsRoute
   '/verify-ticket/$token': typeof VerifyTicketTokenRoute
   '/print/$id': typeof AuthenticatedPrintIdRoute
   '/requests/$id': typeof AuthenticatedRequestsIdRoute
   '/requests/new': typeof AuthenticatedRequestsNewRoute
   '/revise/$id': typeof AuthenticatedReviseIdRoute
+  '/api/auth/google': typeof ApiAuthGoogleRouteWithChildren
   '/api/gmail/callback': typeof ApiGmailCallbackRoute
   '/api/gmail/connect': typeof ApiGmailConnectRoute
   '/api/verify-ticket/$token': typeof ApiVerifyTicketTokenRoute
+  '/hrdo/coe/$id': typeof HrdoCoeIdRoute
   '/requests/': typeof AuthenticatedRequestsIndexRoute
+  '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/hrdo': typeof HrdoRouteWithChildren
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
   '/register': typeof RegisterRoute
@@ -176,20 +254,31 @@ export interface FileRoutesByTo {
   '/profile': typeof AuthenticatedProfileRoute
   '/trip-archive': typeof AuthenticatedTripArchiveRoute
   '/vehicles': typeof AuthenticatedVehiclesRoute
+  '/hrdo/change-password': typeof HrdoChangePasswordRoute
+  '/hrdo/coe': typeof HrdoCoeRoute
+  '/hrdo/dashboard': typeof HrdoDashboardRoute
+  '/hrdo/history': typeof HrdoHistoryRoute
+  '/hrdo/login': typeof HrdoLoginRoute
+  '/hrdo/profile': typeof HrdoProfileRoute
+  '/hrdo/requests': typeof HrdoRequestsRoute
   '/verify-ticket/$token': typeof VerifyTicketTokenRoute
   '/print/$id': typeof AuthenticatedPrintIdRoute
   '/requests/$id': typeof AuthenticatedRequestsIdRoute
   '/requests/new': typeof AuthenticatedRequestsNewRoute
   '/revise/$id': typeof AuthenticatedReviseIdRoute
+  '/api/auth/google': typeof ApiAuthGoogleRouteWithChildren
   '/api/gmail/callback': typeof ApiGmailCallbackRoute
   '/api/gmail/connect': typeof ApiGmailConnectRoute
   '/api/verify-ticket/$token': typeof ApiVerifyTicketTokenRoute
+  '/hrdo/coe/$id': typeof HrdoCoeIdRoute
   '/requests': typeof AuthenticatedRequestsIndexRoute
+  '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
+  '/hrdo': typeof HrdoRouteWithChildren
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
   '/register': typeof RegisterRoute
@@ -200,20 +289,31 @@ export interface FileRoutesById {
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/trip-archive': typeof AuthenticatedTripArchiveRoute
   '/_authenticated/vehicles': typeof AuthenticatedVehiclesRoute
+  '/hrdo/change-password': typeof HrdoChangePasswordRoute
+  '/hrdo/coe': typeof HrdoCoeRoute
+  '/hrdo/dashboard': typeof HrdoDashboardRoute
+  '/hrdo/history': typeof HrdoHistoryRoute
+  '/hrdo/login': typeof HrdoLoginRoute
+  '/hrdo/profile': typeof HrdoProfileRoute
+  '/hrdo/requests': typeof HrdoRequestsRoute
   '/verify-ticket/$token': typeof VerifyTicketTokenRoute
   '/_authenticated/print/$id': typeof AuthenticatedPrintIdRoute
   '/_authenticated/requests/$id': typeof AuthenticatedRequestsIdRoute
   '/_authenticated/requests/new': typeof AuthenticatedRequestsNewRoute
   '/_authenticated/revise/$id': typeof AuthenticatedReviseIdRoute
+  '/api/auth/google': typeof ApiAuthGoogleRouteWithChildren
   '/api/gmail/callback': typeof ApiGmailCallbackRoute
   '/api/gmail/connect': typeof ApiGmailConnectRoute
   '/api/verify-ticket/$token': typeof ApiVerifyTicketTokenRoute
+  '/hrdo/coe_/$id': typeof HrdoCoeIdRoute
   '/_authenticated/requests/': typeof AuthenticatedRequestsIndexRoute
+  '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/hrdo'
     | '/login'
     | '/privacy'
     | '/register'
@@ -224,18 +324,29 @@ export interface FileRouteTypes {
     | '/profile'
     | '/trip-archive'
     | '/vehicles'
+    | '/hrdo/change-password'
+    | '/hrdo/coe'
+    | '/hrdo/dashboard'
+    | '/hrdo/history'
+    | '/hrdo/login'
+    | '/hrdo/profile'
+    | '/hrdo/requests'
     | '/verify-ticket/$token'
     | '/print/$id'
     | '/requests/$id'
     | '/requests/new'
     | '/revise/$id'
+    | '/api/auth/google'
     | '/api/gmail/callback'
     | '/api/gmail/connect'
     | '/api/verify-ticket/$token'
+    | '/hrdo/coe/$id'
     | '/requests/'
+    | '/api/auth/google/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/hrdo'
     | '/login'
     | '/privacy'
     | '/register'
@@ -246,19 +357,30 @@ export interface FileRouteTypes {
     | '/profile'
     | '/trip-archive'
     | '/vehicles'
+    | '/hrdo/change-password'
+    | '/hrdo/coe'
+    | '/hrdo/dashboard'
+    | '/hrdo/history'
+    | '/hrdo/login'
+    | '/hrdo/profile'
+    | '/hrdo/requests'
     | '/verify-ticket/$token'
     | '/print/$id'
     | '/requests/$id'
     | '/requests/new'
     | '/revise/$id'
+    | '/api/auth/google'
     | '/api/gmail/callback'
     | '/api/gmail/connect'
     | '/api/verify-ticket/$token'
+    | '/hrdo/coe/$id'
     | '/requests'
+    | '/api/auth/google/callback'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
+    | '/hrdo'
     | '/login'
     | '/privacy'
     | '/register'
@@ -269,24 +391,36 @@ export interface FileRouteTypes {
     | '/_authenticated/profile'
     | '/_authenticated/trip-archive'
     | '/_authenticated/vehicles'
+    | '/hrdo/change-password'
+    | '/hrdo/coe'
+    | '/hrdo/dashboard'
+    | '/hrdo/history'
+    | '/hrdo/login'
+    | '/hrdo/profile'
+    | '/hrdo/requests'
     | '/verify-ticket/$token'
     | '/_authenticated/print/$id'
     | '/_authenticated/requests/$id'
     | '/_authenticated/requests/new'
     | '/_authenticated/revise/$id'
+    | '/api/auth/google'
     | '/api/gmail/callback'
     | '/api/gmail/connect'
     | '/api/verify-ticket/$token'
+    | '/hrdo/coe_/$id'
     | '/_authenticated/requests/'
+    | '/api/auth/google/callback'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
+  HrdoRoute: typeof HrdoRouteWithChildren
   LoginRoute: typeof LoginRoute
   PrivacyRoute: typeof PrivacyRoute
   RegisterRoute: typeof RegisterRoute
   VerifyTicketTokenRoute: typeof VerifyTicketTokenRoute
+  ApiAuthGoogleRoute: typeof ApiAuthGoogleRouteWithChildren
   ApiGmailCallbackRoute: typeof ApiGmailCallbackRoute
   ApiGmailConnectRoute: typeof ApiGmailConnectRoute
   ApiVerifyTicketTokenRoute: typeof ApiVerifyTicketTokenRoute
@@ -306,6 +440,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hrdo': {
+      id: '/hrdo'
+      path: '/hrdo'
+      fullPath: '/hrdo'
+      preLoaderRoute: typeof HrdoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -378,6 +519,55 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedVehiclesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/hrdo/change-password': {
+      id: '/hrdo/change-password'
+      path: '/change-password'
+      fullPath: '/hrdo/change-password'
+      preLoaderRoute: typeof HrdoChangePasswordRouteImport
+      parentRoute: typeof HrdoRoute
+    }
+    '/hrdo/coe': {
+      id: '/hrdo/coe'
+      path: '/coe'
+      fullPath: '/hrdo/coe'
+      preLoaderRoute: typeof HrdoCoeRouteImport
+      parentRoute: typeof HrdoRoute
+    }
+    '/hrdo/dashboard': {
+      id: '/hrdo/dashboard'
+      path: '/dashboard'
+      fullPath: '/hrdo/dashboard'
+      preLoaderRoute: typeof HrdoDashboardRouteImport
+      parentRoute: typeof HrdoRoute
+    }
+    '/hrdo/history': {
+      id: '/hrdo/history'
+      path: '/history'
+      fullPath: '/hrdo/history'
+      preLoaderRoute: typeof HrdoHistoryRouteImport
+      parentRoute: typeof HrdoRoute
+    }
+    '/hrdo/login': {
+      id: '/hrdo/login'
+      path: '/login'
+      fullPath: '/hrdo/login'
+      preLoaderRoute: typeof HrdoLoginRouteImport
+      parentRoute: typeof HrdoRoute
+    }
+    '/hrdo/profile': {
+      id: '/hrdo/profile'
+      path: '/profile'
+      fullPath: '/hrdo/profile'
+      preLoaderRoute: typeof HrdoProfileRouteImport
+      parentRoute: typeof HrdoRoute
+    }
+    '/hrdo/requests': {
+      id: '/hrdo/requests'
+      path: '/requests'
+      fullPath: '/hrdo/requests'
+      preLoaderRoute: typeof HrdoRequestsRouteImport
+      parentRoute: typeof HrdoRoute
+    }
     '/verify-ticket/$token': {
       id: '/verify-ticket/$token'
       path: '/verify-ticket/$token'
@@ -420,6 +610,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedReviseIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/api/auth/google': {
+      id: '/api/auth/google'
+      path: '/api/auth/google'
+      fullPath: '/api/auth/google'
+      preLoaderRoute: typeof ApiAuthGoogleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/gmail/callback': {
       id: '/api/gmail/callback'
       path: '/api/gmail/callback'
@@ -440,6 +637,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/verify-ticket/$token'
       preLoaderRoute: typeof ApiVerifyTicketTokenRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/hrdo/coe_/$id': {
+      id: '/hrdo/coe_/$id'
+      path: '/coe/$id'
+      fullPath: '/hrdo/coe/$id'
+      preLoaderRoute: typeof HrdoCoeIdRouteImport
+      parentRoute: typeof HrdoRoute
+    }
+    '/api/auth/google/callback': {
+      id: '/api/auth/google/callback'
+      path: '/callback'
+      fullPath: '/api/auth/google/callback'
+      preLoaderRoute: typeof ApiAuthGoogleCallbackRouteImport
+      parentRoute: typeof ApiAuthGoogleRoute
     }
   }
 }
@@ -478,13 +689,51 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
   AuthenticatedRouteChildren,
 )
 
+interface HrdoRouteChildren {
+  HrdoChangePasswordRoute: typeof HrdoChangePasswordRoute
+  HrdoCoeRoute: typeof HrdoCoeRoute
+  HrdoDashboardRoute: typeof HrdoDashboardRoute
+  HrdoHistoryRoute: typeof HrdoHistoryRoute
+  HrdoLoginRoute: typeof HrdoLoginRoute
+  HrdoProfileRoute: typeof HrdoProfileRoute
+  HrdoRequestsRoute: typeof HrdoRequestsRoute
+  HrdoCoeIdRoute: typeof HrdoCoeIdRoute
+}
+
+const HrdoRouteChildren: HrdoRouteChildren = {
+  HrdoChangePasswordRoute: HrdoChangePasswordRoute,
+  HrdoCoeRoute: HrdoCoeRoute,
+  HrdoDashboardRoute: HrdoDashboardRoute,
+  HrdoHistoryRoute: HrdoHistoryRoute,
+  HrdoLoginRoute: HrdoLoginRoute,
+  HrdoProfileRoute: HrdoProfileRoute,
+  HrdoRequestsRoute: HrdoRequestsRoute,
+  HrdoCoeIdRoute: HrdoCoeIdRoute,
+}
+
+const HrdoRouteWithChildren = HrdoRoute._addFileChildren(HrdoRouteChildren)
+
+interface ApiAuthGoogleRouteChildren {
+  ApiAuthGoogleCallbackRoute: typeof ApiAuthGoogleCallbackRoute
+}
+
+const ApiAuthGoogleRouteChildren: ApiAuthGoogleRouteChildren = {
+  ApiAuthGoogleCallbackRoute: ApiAuthGoogleCallbackRoute,
+}
+
+const ApiAuthGoogleRouteWithChildren = ApiAuthGoogleRoute._addFileChildren(
+  ApiAuthGoogleRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
+  HrdoRoute: HrdoRouteWithChildren,
   LoginRoute: LoginRoute,
   PrivacyRoute: PrivacyRoute,
   RegisterRoute: RegisterRoute,
   VerifyTicketTokenRoute: VerifyTicketTokenRoute,
+  ApiAuthGoogleRoute: ApiAuthGoogleRouteWithChildren,
   ApiGmailCallbackRoute: ApiGmailCallbackRoute,
   ApiGmailConnectRoute: ApiGmailConnectRoute,
   ApiVerifyTicketTokenRoute: ApiVerifyTicketTokenRoute,

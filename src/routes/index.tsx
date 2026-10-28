@@ -25,7 +25,7 @@ const SERVICES: Service[] = [
     title: "COE Request",
     description: "Submit a Certificate of Employment request and access its status.",
     icon: FileBadge,
-    available: false,
+    available: true,
   },
   {
     id: "permission-slip",
@@ -137,7 +137,7 @@ function EmployeePortal() {
           <div className="ml-auto flex shrink-0 items-center gap-2">
             {signedIn && (
               <Button asChild size="sm" variant="secondary">
-                <Link to="/dashboard" className="px-3 text-sm sm:text-base">
+                <Link to="/hrdo/dashboard" className="px-3 text-sm sm:text-base">
                   Open my dashboard
                 </Link>
               </Button>
@@ -178,11 +178,13 @@ function EmployeePortal() {
                     {service.available ? (
                       <Link
                         to={
-                          viewer?.role === "requisitioner"
-                            ? "/requests/new"
-                            : signedIn
-                              ? "/dashboard"
-                              : "/login"
+                          service.id === "coe"
+                            ? "/hrdo/coe"
+                            : viewer?.role === "requisitioner"
+                              ? "/requests/new"
+                              : signedIn
+                                ? "/hrdo/dashboard"
+                                : "/login"
                         }
                         className={className}
                       >

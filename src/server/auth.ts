@@ -31,8 +31,10 @@ import { AppError, isDuplicateKey, parseInput } from "@/lib/errors";
 import { DUMMY_HASH, hashPassword, verifyPassword } from "./password";
 import { sendRegistrationOtpEmail } from "./gmail";
 
+export const SESSION_COOKIE_NAME = "loa_session";
+
 function sessionCookieName() {
-  return "loa_session";
+  return SESSION_COOKIE_NAME;
 }
 function sessionHours() {
   return 8;
@@ -60,7 +62,21 @@ interface UserRow extends RowDataPacket {
 
 const loginAttempts = new Map<string, { count: number; resetAt: number }>();
 
+function isLocalEnvironmentIp(ip: string | null | undefined) {
+  if (!ip || ip === "unknown") return true;
+  return (
+    ["127.0.0.1", "::1"].includes(ip) ||
+    ip.startsWith("10.") ||
+    ip.startsWith("192.168.") ||
+    ip.startsWith("172.")
+  );
+}
+
 function checkIpRateLimit(ip: string) {
+  if (isLocalEnvironmentIp(ip) || process.env.NODE_ENV !== "production") {
+    return;
+  }
+
   const now = Date.now();
   const entry = loginAttempts.get(ip);
   if (!entry || entry.resetAt < now) {
@@ -69,7 +85,7 @@ function checkIpRateLimit(ip: string) {
     return;
   }
   entry.count += 1;
-  if (entry.count > 30) {
+  if (entry.count > 60) {
     throw new AppError("Too many sign-in attempts. Please wait a few minutes and try again.");
   }
 }
@@ -99,7 +115,8 @@ function cookieOptions(maxAge: number) {
   };
 }
 
-async function startSession(userId: string) {
+/** Creates a database session and returns the raw token for the response cookie. */
+export async function createSession(userId: string): Promise<{ token: string; maxAge: number }> {
   const cookieName = sessionCookieName();
   const previous = getCookie(cookieName);
   if (previous) {
@@ -114,7 +131,30 @@ async function startSession(userId: string) {
     [randomUUID(), userId, sha256(token), userAgent, sessionHours()],
   );
   await run("DELETE FROM sessions WHERE expires_at < DATE_SUB(NOW(), INTERVAL 7 DAY)");
-  setCookie(cookieName, token, cookieOptions(sessionSeconds()));
+  return { token, maxAge: sessionSeconds() };
+}
+
+async function startSession(userId: string) {
+  const { token, maxAge } = await createSession(userId);
+  setCookie(sessionCookieName(), token, cookieOptions(maxAge));
+}
+
+export interface GoogleSignInAccount {
+  id: string;
+  role: Role;
+  mustChangePassword: boolean;
+}
+
+/** Looks up an account for Google sign-in without starting a session. */
+export async function googleSignInAccount(email: string): Promise<GoogleSignInAccount | null> {
+  const rows = await all<UserRow[]>(
+    "SELECT id, role, must_change_password FROM users WHERE email = ? LIMIT 1",
+    [normaliseEmail(email)],
+  );
+  const row = rows[0];
+  return row
+    ? { id: row.id, role: row.role, mustChangePassword: Boolean(row.must_change_password) }
+    : null;
 }
 
 function clearSessionCookie() {

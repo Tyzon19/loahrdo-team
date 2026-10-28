@@ -23,7 +23,6 @@ const hasControlChars = (value: string) =>
     return code <= 0x1f || code === 0x7f;
   });
 
-/** Minimum 12 characters with upper case, lower case, a number and a symbol. */
 export function passwordIssues(value: string): string[] {
   const issues: string[] = [];
   if (value.length < 12) issues.push("at least 12 characters");
@@ -34,6 +33,7 @@ export function passwordIssues(value: string): string[] {
   if (!/[^A-Za-z0-9]/.test(value)) issues.push("a symbol");
   return issues;
 }
+
 
 export const password = z
   .string()

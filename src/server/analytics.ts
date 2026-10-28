@@ -110,8 +110,8 @@ export async function getTripArchive(input: unknown) {
     `SELECT DATE_FORMAT(r.date_start, '%Y-%m') AS month, COUNT(*) AS trips
      FROM requests r LEFT JOIN dispatch_records dr ON dr.request_id = r.id
      WHERE ${whereSql}
-     GROUP BY YEAR(r.date_start), MONTH(r.date_start)
-     ORDER BY YEAR(r.date_start) DESC, MONTH(r.date_start) DESC
+     GROUP BY DATE_FORMAT(r.date_start, '%Y-%m')
+     ORDER BY month DESC
      LIMIT 12`,
     params,
   );

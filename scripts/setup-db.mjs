@@ -228,6 +228,73 @@ try {
        FOREIGN KEY (assistant_user_id) REFERENCES users (id) ON DELETE SET NULL`,
     );
   }
+  const [coeColumnRows] = await conn.query(
+    `SELECT COLUMN_NAME AS columnName
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'hrdo_coe_requests'`,
+    [dbName],
+  );
+  const coeColumns = new Set(coeColumnRows.map((row) => String(row.columnName)));
+  const [coeStatusColumn] = await conn.query(
+    `SELECT COLUMN_TYPE AS columnType
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'hrdo_coe_requests' AND COLUMN_NAME = 'status'`,
+    [dbName],
+  );
+  const coeStatusEnum =
+    "ENUM('pending','under_review','correction_requested','processing','ready_for_pickup','released','rejected')";
+  if (coeColumns.size && !String(coeStatusColumn[0]?.columnType ?? "").includes("'released'")) {
+    // Map the previous four-state workflow onto the expanded lifecycle before narrowing the enum.
+    await conn.query(
+      `UPDATE hrdo_coe_requests
+       SET status = CASE status
+         WHEN 'approved' THEN 'ready_for_pickup'
+         WHEN 'pending' THEN 'pending'
+         WHEN 'processing' THEN 'processing'
+         ELSE 'rejected'
+       END`,
+    );
+    await conn.query(
+      `ALTER TABLE hrdo_coe_requests MODIFY status ${coeStatusEnum} NOT NULL DEFAULT 'pending'`,
+    );
+  }
+  for (const [column, definition] of [
+    ["employee_number", "VARCHAR(40) NOT NULL DEFAULT '' AFTER employee_email"],
+    ["copy_type", "ENUM('soft','original','both') NOT NULL DEFAULT 'original' AFTER note"],
+    ["correction_message", "TEXT NULL AFTER remarks"],
+    ["deadline_at", "DATETIME NULL AFTER correction_message"],
+    ["verified_at", "DATETIME NULL AFTER deadline_at"],
+    ["verified_by_name", "VARCHAR(120) NULL AFTER verified_at"],
+    ["correction_requested_at", "DATETIME NULL AFTER verified_by_name"],
+    ["finalized_at", "DATETIME NULL AFTER correction_requested_at"],
+    ["ready_at", "DATETIME NULL AFTER finalized_at"],
+    ["released_at", "DATETIME NULL AFTER ready_at"],
+    ["released_by_name", "VARCHAR(120) NULL AFTER released_at"],
+    ["received_by_name", "VARCHAR(120) NULL AFTER released_by_name"],
+  ]) {
+    if (coeColumns.size && !coeColumns.has(column)) {
+      await conn.query(`ALTER TABLE hrdo_coe_requests ADD COLUMN \`${column}\` ${definition}`);
+    }
+  }
+  if (coeColumns.size) {
+    await conn.query(
+      "UPDATE hrdo_coe_requests SET deadline_at = DATE_ADD(requested_at, INTERVAL 3 DAY) WHERE deadline_at IS NULL",
+    );
+    await conn.query("ALTER TABLE hrdo_coe_requests MODIFY deadline_at DATETIME NOT NULL");
+    const [coeDeadlineIndex] = await conn.query(
+      `SELECT COUNT(*) AS count
+       FROM information_schema.STATISTICS
+       WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'hrdo_coe_requests'
+         AND INDEX_NAME = 'hrdo_coe_deadline_idx'`,
+      [dbName],
+    );
+    if (Number(coeDeadlineIndex[0]?.count ?? 0) === 0) {
+      await conn.query(
+        "ALTER TABLE hrdo_coe_requests ADD INDEX hrdo_coe_deadline_idx (deadline_at)",
+      );
+    }
+  }
+
   const [registrationOtpNonceColumn] = await conn.query(
     `SELECT COUNT(*) AS count
      FROM information_schema.COLUMNS
@@ -264,6 +331,7 @@ const envContent = [
   `GOOGLE_CLIENT_ID=${existing.GOOGLE_CLIENT_ID || ""}`,
   `GOOGLE_CLIENT_SECRET=${existing.GOOGLE_CLIENT_SECRET || ""}`,
   `GOOGLE_REDIRECT_URI=${existing.GOOGLE_REDIRECT_URI || "http://localhost:8080/api/gmail/callback"}`,
+  `GOOGLE_SIGNIN_REDIRECT_URI=${existing.GOOGLE_SIGNIN_REDIRECT_URI || "http://localhost:8080/api/auth/google/callback"}`,
   `GOOGLE_SENDER_EMAIL=${existing.GOOGLE_SENDER_EMAIL || "markjosephturingan4@gmail.com"}`,
   `GOOGLE_REFRESH_TOKEN=${existing.GOOGLE_REFRESH_TOKEN || ""}`,
   "",

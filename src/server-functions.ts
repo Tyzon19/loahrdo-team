@@ -3,23 +3,31 @@ import { runSafely } from "@/lib/errors";
 
 export const bootstrapFn = createServerFn({ method: "GET" }).handler(async () => {
   try {
-    const [{ viewer }, { serverEnvOptional }] = await Promise.all([
+    const [{ viewer }, { hrdoViewer }, { serverEnvOptional }] = await Promise.all([
       import("./server/auth"),
+      import("./server/hrdo/auth"),
       import("./server/env"),
     ]);
     return {
       viewer: await viewer(),
+      hrdoViewer: await hrdoViewer(),
       analytics: { measurementId: serverEnvOptional("GA_MEASUREMENT_ID") ?? null },
     };
   } catch (error) {
     console.error(`[bootstrap] ${error instanceof Error ? error.message : "unknown"}`);
-    return { viewer: null, analytics: { measurementId: null } };
+    return { viewer: null, hrdoViewer: null, analytics: { measurementId: null } };
   }
 });
 
 export const loginFn = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) => runSafely(async () => (await import("./server/auth")).login(data)));
+
+export const hrdoLoginFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/hrdo/auth")).hrdoLogin(data)),
+  );
 
 export const requestRegistrationOtpFn = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
@@ -37,16 +45,110 @@ export const logoutFn = createServerFn({ method: "POST" }).handler(async () =>
   runSafely(async () => (await import("./server/auth")).logout()),
 );
 
+export const hrdoLogoutFn = createServerFn({ method: "POST" }).handler(async () =>
+  runSafely(async () => (await import("./server/hrdo/auth")).hrdoLogout()),
+);
+
 export const changePasswordFn = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) =>
     runSafely(async () => (await import("./server/auth")).changePassword(data)),
   );
 
+export const hrdoChangePasswordFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/hrdo/auth")).hrdoChangePassword(data)),
+  );
+
 export const updateProfileFn = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) =>
     runSafely(async () => (await import("./server/auth")).updateProfile(data)),
+  );
+
+export const hrdoUpdateProfileFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/hrdo/auth")).hrdoUpdateProfile(data)),
+  );
+
+export const submitCoeRequestFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/hrdo/coe")).submitCoeRequest(data)),
+  );
+
+export const listMyCoeRequestsFn = createServerFn({ method: "GET" }).handler(async () =>
+  runSafely(async () => (await import("./server/hrdo/coe")).listMyCoeRequests()),
+);
+
+export const listAllCoeRequestsFn = createServerFn({ method: "GET" }).handler(async () =>
+  runSafely(async () => (await import("./server/hrdo/coe")).listAllCoeRequests()),
+);
+
+export const getCoeRequestFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/hrdo/coe")).getCoeRequest(data)),
+  );
+
+export const resubmitCoeRequestFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/hrdo/coe")).resubmitCoeRequest(data)),
+  );
+
+export const listCoeHistoryFn = createServerFn({ method: "GET" }).handler(async () =>
+  runSafely(async () => (await import("./server/hrdo/coe")).listCoeHistory()),
+);
+
+export const verifyCoeRequestFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/hrdo/coe")).verifyCoeRequest(data)),
+  );
+
+export const startCoeProcessingFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/hrdo/coe")).startCoeProcessing(data)),
+  );
+
+export const requestCoeCorrectionFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/hrdo/coe")).requestCoeCorrection(data)),
+  );
+
+export const rejectCoeRequestFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/hrdo/coe")).rejectCoeRequest(data)),
+  );
+
+export const uploadCoeDocumentFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/hrdo/coe")).uploadCoeDocument(data)),
+  );
+
+export const markCoeReadyFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/hrdo/coe")).markCoeReady(data)),
+  );
+
+export const releaseCoeDocumentFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/hrdo/coe")).releaseCoeDocument(data)),
+  );
+
+export const getCoeDocumentFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/hrdo/coe")).getCoeDocument(data)),
   );
 
 export const listRequestsFn = createServerFn({ method: "POST" })

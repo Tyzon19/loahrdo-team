@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS sessions (
   expires_at DATETIME NOT NULL,
   PRIMARY KEY (id),
   UNIQUE KEY sessions_token_uq (token_hash),
+  KEY sessions_token_last_seen_idx (token_hash, last_seen_at),
   KEY sessions_user_idx (user_id),
   KEY sessions_expiry_idx (expires_at),
   CONSTRAINT sessions_user_fk FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
@@ -238,4 +239,108 @@ CREATE TABLE IF NOT EXISTS analytics_pageviews (
   PRIMARY KEY (id),
   KEY analytics_path_idx (path),
   KEY analytics_viewed_idx (viewed_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS hrdo_users (
+  id CHAR(36) NOT NULL,
+  name VARCHAR(120) NOT NULL,
+  email VARCHAR(190) NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  role ENUM('employee','hrdo_staff') NOT NULL DEFAULT 'employee',
+  department VARCHAR(190) NOT NULL DEFAULT '',
+  must_change_password TINYINT(1) NOT NULL DEFAULT 0,
+  failed_attempts INT NOT NULL DEFAULT 0,
+  locked_until DATETIME NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY hrdo_users_email_uq (email)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hrdo_sessions (
+  id CHAR(36) NOT NULL,
+  user_id CHAR(36) NOT NULL,
+  token_hash CHAR(64) NOT NULL,
+  user_agent VARCHAR(255) NOT NULL DEFAULT '',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  last_seen_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expires_at DATETIME NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY hrdo_sessions_token_uq (token_hash),
+  KEY hrdo_sessions_token_last_seen_idx (token_hash, last_seen_at),
+  KEY hrdo_sessions_user_idx (user_id),
+  KEY hrdo_sessions_expiry_idx (expires_at),
+  CONSTRAINT hrdo_sessions_user_fk FOREIGN KEY (user_id) REFERENCES hrdo_users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hrdo_registration_otps (
+  email VARCHAR(190) NOT NULL,
+  name VARCHAR(120) NOT NULL,
+  department VARCHAR(190) NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  code_hash CHAR(64) NOT NULL,
+  send_nonce CHAR(36) NOT NULL,
+  attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  last_sent_at DATETIME NOT NULL,
+  expires_at DATETIME NOT NULL,
+  PRIMARY KEY (email),
+  KEY hrdo_registration_otps_expiry_idx (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hrdo_coe_requests (
+  id CHAR(36) NOT NULL,
+  employee_id CHAR(36) NOT NULL,
+  employee_name VARCHAR(120) NOT NULL,
+  employee_email VARCHAR(190) NOT NULL,
+  employee_number VARCHAR(40) NOT NULL DEFAULT '',
+  department VARCHAR(190) NOT NULL DEFAULT '',
+  purpose VARCHAR(255) NOT NULL,
+  note TEXT NULL,
+  copy_type ENUM('soft','original','both') NOT NULL DEFAULT 'original',
+  status ENUM('pending','under_review','correction_requested','processing','ready_for_pickup','released','rejected') NOT NULL DEFAULT 'pending',
+  remarks TEXT NULL,
+  correction_message TEXT NULL,
+  deadline_at DATETIME NOT NULL,
+  verified_at DATETIME NULL,
+  verified_by_name VARCHAR(120) NULL,
+  correction_requested_at DATETIME NULL,
+  finalized_at DATETIME NULL,
+  ready_at DATETIME NULL,
+  released_at DATETIME NULL,
+  released_by_name VARCHAR(120) NULL,
+  received_by_name VARCHAR(120) NULL,
+  processed_by_id CHAR(36) NULL,
+  processed_by_name VARCHAR(120) NULL,
+  requested_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY hrdo_coe_employee_idx (employee_id, requested_at),
+  KEY hrdo_coe_status_idx (status),
+  KEY hrdo_coe_deadline_idx (deadline_at),
+  CONSTRAINT hrdo_coe_employee_fk FOREIGN KEY (employee_id) REFERENCES hrdo_users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hrdo_coe_documents (
+  request_id CHAR(36) NOT NULL,
+  file_name VARCHAR(255) NOT NULL,
+  mime VARCHAR(64) NOT NULL DEFAULT 'application/pdf',
+  size_bytes INT UNSIGNED NOT NULL,
+  content MEDIUMBLOB NOT NULL,
+  uploaded_by_id CHAR(36) NULL,
+  uploaded_by_name VARCHAR(120) NOT NULL,
+  uploaded_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (request_id),
+  CONSTRAINT hrdo_coe_documents_request_fk FOREIGN KEY (request_id) REFERENCES hrdo_coe_requests (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hrdo_coe_history (
+  id CHAR(36) NOT NULL,
+  request_id CHAR(36) NOT NULL,
+  actor_name VARCHAR(120) NOT NULL,
+  actor_role ENUM('employee','hrdo_staff','system') NOT NULL,
+  type ENUM('submitted','verified','correction_requested','resubmitted','processing','document_uploaded','ready_for_pickup','released','rejected') NOT NULL,
+  message VARCHAR(500) NOT NULL,
+  happened_at DATETIME NOT NULL,
+  PRIMARY KEY (id),
+  KEY hrdo_coe_history_request_idx (request_id, happened_at),
+  CONSTRAINT hrdo_coe_history_request_fk FOREIGN KEY (request_id) REFERENCES hrdo_coe_requests (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

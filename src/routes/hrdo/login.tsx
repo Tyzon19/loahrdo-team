@@ -1,0 +1,235 @@
+import {
+  createFileRoute,
+  Link,
+  redirect as routerRedirect,
+  useRouter,
+} from "@tanstack/react-router";
+import { useState, type FormEvent } from "react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { LoadingScreen } from "@/components/app/LoadingPanel";
+import { hrdoLoginFn } from "@/server-functions";
+import { SITE, canonical } from "@/lib/site";
+
+type LoginSearch = { redirect?: string | undefined };
+
+export const Route = createFileRoute("/hrdo/login")({
+  validateSearch: (search: Record<string, unknown>): LoginSearch => {
+    const target = search["redirect"];
+    const redirect =
+      typeof target === "string" && target.startsWith("/") && !target.startsWith("//")
+        ? target
+        : undefined;
+
+    return {
+      redirect: redirect && redirect !== "/hrdo/login" ? redirect : undefined,
+    };
+  },
+  beforeLoad: ({ context }) => {
+    if (context.hrdoViewer) {
+      throw routerRedirect({
+        to: context.hrdoViewer.mustChangePassword ? "/hrdo/change-password" : "/hrdo/dashboard",
+      });
+    }
+  },
+  head: () => ({
+    meta: [
+      { title: `HRDO sign in — ${SITE.name}` },
+      {
+        name: "description",
+        content: "Sign in to the LOA HRDO COE system with your institutional account.",
+      },
+      { name: "robots", content: "noindex, nofollow" },
+      { property: "og:title", content: `HRDO sign in — ${SITE.name}` },
+      { property: "og:description", content: "Sign in to the LOA HRDO COE system." },
+      { property: "og:url", content: canonical("/hrdo/login") },
+    ],
+    links: [{ rel: "canonical", href: canonical("/hrdo/login") }],
+  }),
+  component: LoginPage,
+});
+
+function LoginPage() {
+  const search = Route.useSearch();
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [remember, setRemember] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function handleAction(action: string) {
+    toast.info(`${action} is not enabled yet.`);
+  }
+
+  async function onSubmit(event: FormEvent) {
+    event.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await hrdoLoginFn({ data: { email, password } });
+      if (!result.ok) {
+        setError(result.error);
+        setBusy(false);
+        return;
+      }
+
+      await router.invalidate();
+      toast.success("Signed in.");
+      const target = result.data.mustChangePassword
+        ? "/hrdo/change-password"
+        : search.redirect && search.redirect !== "/hrdo/login"
+          ? search.redirect
+          : "/hrdo/dashboard";
+      window.location.assign(target);
+    } catch {
+      setError("We couldn't sign you in. Check your connection and try again.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="module-login-shell">
+      {busy && <LoadingScreen label="Signing in" mode="overlay" />}
+
+      <section className="module-login-brand" aria-labelledby="brand-heading">
+        <div className="module-login-cityscape" aria-hidden="true" />
+
+        <div className="module-login-brand-copy">
+          <div className="module-login-logo-center">
+            <img
+              src="/loa-loading.png"
+              alt="Lyceum of Alabang logo"
+              className="module-login-logo"
+            />
+          </div>
+
+          <h1 id="brand-heading">
+            Your Needs,
+            <br />
+            Our Priority.
+          </h1>
+
+          <p>&quot;LOA HRDO Desk makes your COE requests easier and more convenient.&quot;</p>
+        </div>
+      </section>
+
+      <section className="module-login-account" aria-labelledby="login-heading">
+        <div className="module-login-account-content">
+          <div className="module-login-form-logo-wrap">
+            <img
+              src="/loa-loading.png"
+              alt="Lyceum of Alabang HRDO logo"
+              className="module-login-form-logo"
+            />
+          </div>
+          <header className="module-login-form-heading">
+            <h2 id="login-heading">HRDO Sign In</h2>
+            <p>Use your institutional account only. Email must end with @lyceumalabang.edu.ph.</p>
+          </header>
+
+          <form className="module-login-form" onSubmit={onSubmit} noValidate>
+            {error && (
+              <div
+                role="alert"
+                className="flex gap-2 rounded-sm border border-destructive/40 bg-danger-soft p-4 text-base leading-relaxed"
+              >
+                <span>{error}</span>
+              </div>
+            )}
+
+            <div className="module-login-field">
+              <label htmlFor="email">Institutional email</label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                placeholder="name@lyceumalabang.edu.ph"
+                pattern="[A-Za-z0-9._%+-]+@lyceumalabang\.edu\.ph"
+                title="Use a valid @lyceumalabang.edu.ph email address."
+                required
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+              />
+            </div>
+
+            <div className="module-login-field">
+              <label htmlFor="password">Password</label>
+              <div className="module-login-password-wrap">
+                <Input
+                  id="password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  placeholder="Enter your password"
+                  required
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                />
+
+                <button
+                  className="module-login-password-toggle"
+                  type="button"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-pressed={showPassword}
+                  onClick={() => setShowPassword((current) => !current)}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    aria-hidden="true"
+                  >
+                    <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z" />
+                    <circle cx="12" cy="12" r="2.5" />
+                    {showPassword && <path d="m4 3 16 18" />}
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div className="module-login-options">
+              <label className="module-login-remember">
+                <input
+                  type="checkbox"
+                  name="remember"
+                  checked={remember}
+                  onChange={(event) => setRemember(event.target.checked)}
+                />
+                <span>Remember me for 30 days</span>
+              </label>
+
+              <button
+                className="module-login-text-button"
+                type="button"
+                onClick={() => handleAction("Password recovery")}
+              >
+                Forgot password ?
+              </button>
+            </div>
+
+            <Button type="submit" className="module-login-submit" disabled={busy}>
+              {busy ? "Signing in…" : "Sign In"}
+            </Button>
+          </form>
+
+          <p className="module-login-signup">
+            Need to return?{" "}
+            <Link to="/" className="module-login-text-button">
+              Back to home
+            </Link>
+          </p>
+
+          <p className="module-login-message" role="status" aria-live="polite">
+            {error ? "" : "Use your institutional account to continue."}
+          </p>
+        </div>
+      </section>
+    </div>
+  );
+}
