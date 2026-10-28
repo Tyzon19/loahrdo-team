@@ -128,7 +128,7 @@ function EmployeePortal() {
               Lyceum of Alabang
             </p>
             <p className="mt-0.5 font-serif text-xl font-semibold tracking-wide sm:text-2xl">
-              LOA DESK
+              HRDO LOA DESK
             </p>
             <p className="mt-0.5 hidden text-xs text-white/75 sm:block">
               Human Resources Development Office
@@ -153,10 +153,10 @@ function EmployeePortal() {
               Human Resources Development Office
             </p>
             <h1 className="mt-0.5 text-3xl font-bold tracking-tight text-primary sm:text-4xl">
-              LOA DESK
+              HRDO LOA DESK
             </h1>
             <p className="mt-2 text-base text-muted-foreground sm:text-lg">
-              Explore the services available to employees through LOA HRDO Desk.
+              Assisting Every Employee, Discovering the Services You Need at the LOA Desk.
             </p>
           </div>
 

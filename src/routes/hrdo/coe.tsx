@@ -8,6 +8,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -52,6 +62,7 @@ function CoeRequestPage() {
   const [note, setNote] = useState("");
   const [employeeNumber, setEmployeeNumber] = useState("");
   const [copyType, setCopyType] = useState<CoeCopyType>("original");
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const myRequests = useQuery({
     queryKey: ["coe", "mine"],
@@ -68,7 +79,10 @@ function CoeRequestPage() {
       setNote("");
       setEmployeeNumber("");
       setCopyType("original");
-      toast.success("Your COE request has been submitted.");
+      toast.success(
+        "Request submitted successfully. Your COE request is now under review and will be processed within 3 working days. It is not automatically approved.",
+        { duration: 6000 },
+      );
       await queryClient.invalidateQueries({ queryKey: ["coe"] });
       await navigate({ to: "/hrdo/coe/$id", params: { id: created.id } });
     },
@@ -88,6 +102,11 @@ function CoeRequestPage() {
       toast.error("Enter your Employee ID (at least 3 characters).");
       return;
     }
+    setShowConfirm(true);
+  }
+
+  function confirmSubmit() {
+    setShowConfirm(false);
     submit.mutate();
   }
 
@@ -95,7 +114,7 @@ function CoeRequestPage() {
     <>
       <PageHeader
         title="Certificate of Employment"
-        description="Request an employment certificate for employment, loan, scholarship, or other verification needs."
+        description="Request an employment certificate for employment, loan, scholarship, or other verification needs. Requests are not granted immediately — processing takes 3 working days."
         actions={
           <Button asChild variant="outline">
             <Link to="/hrdo/dashboard">Back to My COE Requests</Link>
@@ -191,11 +210,12 @@ function CoeRequestPage() {
               </p>
             )}
 
-            <div className="flex items-center gap-2 rounded-md border border-primary/20 bg-primary/5 p-3 text-sm text-muted-foreground">
-              <Info className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+            <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden />
               <span>
-                HRDO processes COE requests within three days of submission. You can track every
-                step on this page.
+                <strong>Note:</strong> COE requests are <strong>not automatically granted</strong>. HRDO
+                processes and reviews COE requests within <strong>3 working days</strong> from the date
+                of submission. You can track every step on this page.
               </span>
             </div>
 
@@ -259,6 +279,27 @@ function CoeRequestPage() {
           )}
         </Section>
       </div>
+
+      <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm COE Request Submission</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>Are you sure you want to submit this Certificate of Employment request?</p>
+              <p className="rounded-md bg-amber-50 p-2 text-sm text-amber-900">
+                <strong>Reminder:</strong> This request is <strong>not automatically granted</strong>.
+                HRDO will review and process it within <strong>3 working days</strong> from submission.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={submit.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmSubmit} disabled={submit.isPending}>
+              {submit.isPending ? <ButtonLoading label="Submitting…" /> : "Yes, Submit Request"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
