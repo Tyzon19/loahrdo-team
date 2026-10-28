@@ -50,7 +50,7 @@ import {
 } from "@/lib/workflow";
 import { requireViewer } from "./auth";
 import { all, getPool, likePattern, run, withTransaction } from "./db";
-import { AppError, isDuplicateKey, parseInput } from "@/lib/errors";
+import { AppError, isDuplicateKey, isMissingTableError, parseInput } from "@/lib/errors";
 import { serverEnv } from "./env";
 import { createTicketVerificationToken, ticketDataDigest } from "@/lib/ticket-verification";
 import { sendTripTicketEmail, sendWorkflowEmails, type EmailRecipientResult } from "./gmail";
@@ -1098,23 +1098,27 @@ export async function dashboardStats(): Promise<DashboardStats> {
   const where = scoped ? "WHERE requisitioner_id = ?" : "";
   const params = scoped ? [viewer.id] : [];
 
-  const [counts, pageViewRows] = await Promise.all([
-    all<RowDataPacket[]>(
-      `SELECT status, COUNT(*) AS n,
-              COALESCE(SUM(
-                submitted_at >= DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01')
-                AND submitted_at < DATE_ADD(DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
-              ), 0) AS month_n
-       FROM requests ${where}
-       GROUP BY status`,
-      params,
-    ),
-    viewer.role === "admin"
-      ? all<RowDataPacket[]>(
-          "SELECT COUNT(*) AS n FROM analytics_pageviews WHERE viewed_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)",
-        )
-      : Promise.resolve([] as RowDataPacket[]),
-  ]);
+  let pageViewRows: RowDataPacket[] = [];
+  const counts = await all<RowDataPacket[]>(
+    `SELECT status, COUNT(*) AS n,
+            COALESCE(SUM(
+              submitted_at >= DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01')
+              AND submitted_at < DATE_ADD(DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
+            ), 0) AS month_n
+     FROM requests ${where}
+     GROUP BY status`,
+    params,
+  );
+
+  if (viewer.role === "admin") {
+    try {
+      pageViewRows = await all<RowDataPacket[]>(
+        "SELECT COUNT(*) AS n FROM analytics_pageviews WHERE viewed_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)",
+      );
+    } catch (error) {
+      if (!isMissingTableError(error)) throw error;
+    }
+  }
   const byStatus = new Map<string, number>();
   let thisMonth = 0;
   for (const row of counts) {

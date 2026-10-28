@@ -189,6 +189,15 @@ function NotificationPreview({ email }: { email: EmailMessage }) {
   const stage = email.stage ? STAGES.find((item) => item.key === email.stage) : undefined;
   const r = request.data?.request;
   const returnedMessage = email.kind === "returned" ? splitReturnedReason(email.body) : undefined;
+  const deliveryStatus = (email.emailDeliveryStatus ?? "").trim().toLowerCase();
+  const deliveryStatusText =
+    deliveryStatus === "sent"
+      ? `Email sent to ${email.toEmail}.`
+      : deliveryStatus === "failed"
+        ? `Email not sent.${email.emailDeliveryMessage ? ` ${email.emailDeliveryMessage}` : ""}`
+        : deliveryStatus === "pending"
+          ? "Email delivery is pending or the delivery result has not been recorded yet."
+          : "This is an in-app notification. Email status is unavailable for older notifications.";
 
   function openRequest() {
     const target =
@@ -216,18 +225,12 @@ function NotificationPreview({ email }: { email: EmailMessage }) {
         <p
           className={cn(
             "mt-1",
-            email.emailDeliveryStatus === "failed" && "text-destructive",
-            email.emailDeliveryStatus === "sent" && "text-success",
-            email.emailDeliveryStatus === "pending" && "text-warning",
+            deliveryStatus === "failed" && "text-destructive",
+            deliveryStatus === "sent" && "text-success",
+            deliveryStatus === "pending" && "text-warning",
           )}
         >
-          {email.emailDeliveryStatus === "sent"
-            ? `Email sent to ${email.toEmail}.`
-            : email.emailDeliveryStatus === "failed"
-              ? `Email not sent.${email.emailDeliveryMessage ? ` ${email.emailDeliveryMessage}` : ""}`
-              : email.emailDeliveryStatus === "pending"
-                ? "Email delivery is pending or the delivery result has not been recorded yet."
-                : "This is an in-app notification. Email status is unavailable for older notifications."}
+          {deliveryStatusText}
         </p>
       </div>
       <div className="mx-auto min-w-0 max-w-xl p-4 sm:p-5">

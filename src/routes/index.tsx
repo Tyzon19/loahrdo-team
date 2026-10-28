@@ -135,25 +135,12 @@ function EmployeePortal() {
             </p>
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-2">
-            {signedIn ? (
+            {signedIn && (
               <Button asChild size="sm" variant="secondary">
                 <Link to="/dashboard" className="px-3 text-sm sm:text-base">
                   Open my dashboard
                 </Link>
               </Button>
-            ) : (
-              <>
-                <Button asChild size="sm" variant="ghost" className="text-primary-foreground">
-                  <Link to="/login" className="px-3 text-sm sm:text-base">
-                    Sign in
-                  </Link>
-                </Button>
-                <Button asChild size="sm" variant="secondary">
-                  <Link to="/register" className="px-3 text-sm sm:text-base">
-                    Request access
-                  </Link>
-                </Button>
-              </>
             )}
           </div>
         </div>
@@ -169,7 +156,7 @@ function EmployeePortal() {
               LOA DESK
             </h1>
             <p className="mt-2 text-base text-muted-foreground sm:text-lg">
-              Access employee services and submit requests through one convenient portal.
+              Explore the services available to employees through LOA HRDO Desk.
             </p>
           </div>
 

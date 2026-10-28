@@ -1,6 +1,3 @@
--- Lyceum of Alabang PFMO — Vehicle Reservation & Trip Ticket
--- MySQL 8 / MariaDB 10.4+ schema. Applied by `npm run db:setup`.
-
 SET NAMES utf8mb4;
 
 CREATE TABLE IF NOT EXISTS users (

@@ -23,7 +23,6 @@ export function aggregateDestinationTrips(rows: DestinationTrip[]): DestinationT
     }
     group.requestIds.add(row.requestId);
   }
-
   return [...groups.values()]
     .map(({ name, requestIds }) => ({ name, trips: requestIds.size }))
     .sort((a, b) => b.trips - a.trips || a.name.localeCompare(b.name))

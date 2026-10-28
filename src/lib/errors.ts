@@ -49,3 +49,13 @@ export function isDuplicateKey(error: unknown) {
     (error as { code?: unknown }).code === "ER_DUP_ENTRY"
   );
 }
+
+export function isMissingTableError(error: unknown) {
+  if (typeof error !== "object" || error === null || !("code" in error)) return false;
+  const code = (error as { code?: unknown }).code;
+  if (typeof code === "string" && (code === "ER_NO_SUCH_TABLE" || code === "ER_BAD_TABLE_ERROR")) {
+    return true;
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  return /no such table|doesn't exist|does not exist/i.test(message);
+}

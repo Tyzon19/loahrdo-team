@@ -1,6 +1,6 @@
 import { getRequestIP } from "@tanstack/react-start/server";
 import { analyticsPathSchema, tripArchiveFilterSchema } from "@/lib/validation";
-import { AppError, parseInput } from "@/lib/errors";
+import { AppError, isMissingTableError, parseInput } from "@/lib/errors";
 import type { RowDataPacket } from "mysql2/promise";
 import { aggregateDestinationTrips } from "@/lib/destination-analytics";
 import { all, likePattern, run } from "./db";
@@ -19,8 +19,15 @@ export async function recordPageView(input: unknown): Promise<{ recorded: boolea
   recent.set(key, now);
   if (recent.size > 2000) recent.clear();
 
-  await run("INSERT INTO analytics_pageviews (path) VALUES (?)", [parsed.data]);
-  return { recorded: true };
+  try {
+    await run("INSERT INTO analytics_pageviews (path) VALUES (?)", [parsed.data]);
+    return { recorded: true };
+  } catch (error) {
+    if (isMissingTableError(error)) {
+      return { recorded: false };
+    }
+    throw error;
+  }
 }
 
 const ARCHIVE_PAGE_SIZE = 20;
