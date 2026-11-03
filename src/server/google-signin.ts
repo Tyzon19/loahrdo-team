@@ -6,6 +6,13 @@ export const GOOGLE_SIGN_IN_COOKIE_PATH = GOOGLE_SIGN_IN_START_PATH;
 export const GOOGLE_STATE_COOKIE = "loa_google_state";
 export const GOOGLE_VERIFIER_COOKIE = "loa_google_verifier";
 export const GOOGLE_NEXT_COOKIE = "loa_google_next";
+export const GOOGLE_MODE_COOKIE = "loa_google_mode";
+
+export type GoogleSignInMode = "requisitioner" | "hrdo";
+
+export function googleSignInMode(requestUrl: URL): GoogleSignInMode {
+  return requestUrl.searchParams.get("mode") === "hrdo" ? "hrdo" : "requisitioner";
+}
 
 export function googleSignInCredentials() {
   return {
@@ -25,9 +32,15 @@ export function googleSignInRedirectUri(requestUrl: URL): string {
 
   const local = ["localhost", "127.0.0.1"].includes(requestUrl.hostname);
   const site = serverEnvOptional("SITE_URL");
-  if (!local && site) {
+  if (site) {
     try {
-      return `${new URL(site).origin}${GOOGLE_SIGN_IN_CALLBACK_PATH}`;
+      const siteUrl = new URL(site);
+      const siteIsLocal = ["localhost", "127.0.0.1"].includes(siteUrl.hostname);
+      // When the dev server is opened from another device, localhost would
+      // resolve to that device instead of the machine running the app.
+      if (local || !siteIsLocal) {
+        return `${siteUrl.origin}${GOOGLE_SIGN_IN_CALLBACK_PATH}`;
+      }
     } catch {
       // Fall through to the request origin when SITE_URL is malformed.
     }

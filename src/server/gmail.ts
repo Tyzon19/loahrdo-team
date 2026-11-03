@@ -32,6 +32,12 @@ export type EmailDeliveryResult =
       recipientResults?: EmailRecipientResult[] | undefined;
     };
 
+export interface EmailAttachment {
+  filename: string;
+  mime: string;
+  content: Buffer;
+}
+
 export interface EmailRecipientResult {
   notificationId: string;
   sent: boolean;
@@ -150,17 +156,66 @@ function createMimeMessage(
   logo: Buffer,
   ticketImage?: Buffer,
   ticketFilename?: string,
+  attachments: EmailAttachment[] = [],
 ): string {
   const relatedBoundary = `loa_related_${randomBytes(18).toString("hex")}`;
   const alternativeBoundary = `loa_alt_${randomBytes(18).toString("hex")}`;
   const ticketContentId = ticketImage ? "approved-trip-ticket" : undefined;
+
+  if (!attachments.length) {
+    const parts = [
+      `To: ${recipient}`,
+      `Subject: ${encodedHeader(subject)}`,
+      "MIME-Version: 1.0",
+      `Content-Type: multipart/related; boundary="${relatedBoundary}"`,
+      "",
+      `--${relatedBoundary}`,
+      `Content-Type: multipart/alternative; boundary="${alternativeBoundary}"`,
+      "",
+      `--${alternativeBoundary}`,
+      'Content-Type: text/plain; charset="UTF-8"',
+      "Content-Transfer-Encoding: base64",
+      "",
+      base64(text),
+      `--${alternativeBoundary}`,
+      'Content-Type: text/html; charset="UTF-8"',
+      "Content-Transfer-Encoding: base64",
+      "",
+      base64(html),
+      `--${alternativeBoundary}--`,
+      `--${relatedBoundary}`,
+      'Content-Type: image/png; name="loa-loading.png"',
+      "Content-Transfer-Encoding: base64",
+      `Content-ID: <${LOGO_CONTENT_ID}>`,
+      'Content-Disposition: inline; filename="loa-loading.png"',
+      "",
+      base64(logo),
+    ];
+
+    if (ticketImage && ticketFilename && ticketContentId) {
+      parts.push(
+        `--${relatedBoundary}`,
+        `Content-Type: image/png; name="${ticketFilename}"`,
+        "Content-Transfer-Encoding: base64",
+        `Content-ID: <${ticketContentId}>`,
+        `Content-Disposition: inline; filename="${ticketFilename}"`,
+        "",
+        base64(ticketImage),
+      );
+    }
+
+    parts.push(`--${relatedBoundary}--`, "");
+    return parts.join("\r\n");
+  }
+
+  const mixedBoundary = `loa_mixed_${randomBytes(18).toString("hex")}`;
   const parts = [
     `To: ${recipient}`,
     `Subject: ${encodedHeader(subject)}`,
     "MIME-Version: 1.0",
-    `Content-Type: multipart/related; boundary="${relatedBoundary}"`,
+    `Content-Type: multipart/mixed; boundary="${mixedBoundary}"`,
     "",
-    `--${relatedBoundary}`,
+    `--${mixedBoundary}`,
     `Content-Type: multipart/alternative; boundary="${alternativeBoundary}"`,
     "",
     `--${alternativeBoundary}`,
@@ -174,28 +229,20 @@ function createMimeMessage(
     "",
     base64(html),
     `--${alternativeBoundary}--`,
-    `--${relatedBoundary}`,
-    'Content-Type: image/png; name="loa-loading.png"',
-    "Content-Transfer-Encoding: base64",
-    `Content-ID: <${LOGO_CONTENT_ID}>`,
-    'Content-Disposition: inline; filename="loa-loading.png"',
-    "",
-    base64(logo),
   ];
 
-  if (ticketImage && ticketFilename && ticketContentId) {
+  for (const attachment of attachments) {
     parts.push(
-      `--${relatedBoundary}`,
-      `Content-Type: image/png; name="${ticketFilename}"`,
+      `--${mixedBoundary}`,
+      `Content-Type: ${attachment.mime}; name="${attachment.filename}"`,
       "Content-Transfer-Encoding: base64",
-      `Content-ID: <${ticketContentId}>`,
-      `Content-Disposition: inline; filename="${ticketFilename}"`,
+      `Content-Disposition: attachment; filename="${attachment.filename}"`,
       "",
-      base64(ticketImage),
+      base64(attachment.content),
     );
   }
 
-  parts.push(`--${relatedBoundary}--`, "");
+  parts.push(`--${mixedBoundary}--`, "");
   return parts.join("\r\n");
 }
 
@@ -361,6 +408,166 @@ export function sendTripTicketEmail(
   ticketImage: Buffer,
 ): Promise<EmailDeliveryResult> {
   return deliverNotifications([message], request, ticketImage);
+}
+
+export async function sendCoeReleaseEmail(input: {
+  recipientName: string;
+  recipientEmail: string;
+  requestId: string;
+  employeeName: string;
+  copyType: "soft" | "original" | "both";
+  attachment?: EmailAttachment;
+}): Promise<EmailDeliveryResult> {
+  try {
+    if (!validEmail(input.recipientEmail)) {
+      throw new AppError("The COE recipient email address is invalid.");
+    }
+
+    const siteUrl = siteUrlForEmail();
+    const subject = input.copyType === "soft" ? "Your COE is ready" : "Your COE request has been approved";
+    const text = [
+      `Dear ${input.recipientName},`,
+      "",
+      `Your COE request (${input.requestId}) has been approved by HRDO.`,
+      input.copyType === "soft"
+        ? "A signed copy is attached below for your records."
+        : "The approved COE has been prepared and is ready for collection or release.",
+      "",
+      `View the portal: ${new URL(`/hrdo/coe/${encodeURIComponent(input.requestId)}`, siteUrl.origin).toString()}`,
+      "",
+      "Thank you,",
+      "Lyceum of Alabang HRDO",
+    ].join("\n");
+    const html = `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
+        <p>Dear ${input.recipientName},</p>
+        <p>Your COE request (<strong>${input.requestId}</strong>) has been approved by HRDO.</p>
+        <p>${
+          input.copyType === "soft"
+            ? "A signed copy is attached below for your records."
+            : "The approved COE has been prepared and is ready for collection or release."
+        }</p>
+        <p><a href="${new URL(`/hrdo/coe/${encodeURIComponent(input.requestId)}`, siteUrl.origin).toString()}">Open your COE request</a></p>
+        <p>Thank you,<br/>Lyceum of Alabang HRDO</p>
+      </div>
+    `;
+
+    const token = await accessToken();
+    const logo = await readFile(join(process.cwd(), "public", "loa-loading.png"));
+    const mime = createMimeMessage(
+      input.recipientEmail,
+      subject,
+      text,
+      html,
+      logo,
+      undefined,
+      undefined,
+      input.attachment ? [input.attachment] : [],
+    );
+    await sendMimeMessage(token, mime);
+    return { sent: true, delivered: 1, failed: 0 };
+  } catch (error) {
+    console.error(
+      `[email] COE release email failed: ${error instanceof AppError ? error.message : error instanceof Error ? error.name : "unknown"}`,
+    );
+    return {
+      sent: false,
+      delivered: 0,
+      failed: 1,
+      message:
+        error instanceof AppError
+          ? error.message
+          : "The COE was approved, but its email could not be prepared.",
+    };
+  }
+}
+
+export async function sendCoeStatusEmail(input: {
+  recipientName: string;
+  recipientEmail: string;
+  requestId: string;
+  status:
+    | "pending"
+    | "under_review"
+    | "correction_requested"
+    | "rejected"
+    | "processing"
+    | "ready_for_pickup"
+    | "released";
+  title: string;
+  message: string;
+  attachment?: EmailAttachment;
+  subject?: string;
+}): Promise<EmailDeliveryResult> {
+  try {
+    if (!validEmail(input.recipientEmail)) {
+      throw new AppError("The COE status recipient email address is invalid.");
+    }
+
+    const siteUrl = siteUrlForEmail();
+    const subjectMap: Record<typeof input.status, string> = {
+      pending: "Your COE request is pending",
+      under_review: "Your COE request is under review",
+      correction_requested: "Action needed for your COE request",
+      rejected: "Your COE request was not approved",
+      processing: "Your COE request is being processed",
+      ready_for_pickup: "Your COE is ready for pickup",
+      released: "Your COE has been released",
+    };
+    const subject = input.subject || subjectMap[input.status];
+    const text = [
+      `Dear ${input.recipientName},`,
+      "",
+      `Update for your COE request (${input.requestId}):`,
+      "",
+      input.title,
+      "",
+      input.message,
+      "",
+      `View your request: ${new URL(`/hrdo/coe/${encodeURIComponent(input.requestId)}`, siteUrl.origin).toString()}`,
+      "",
+      "Thank you,",
+      "Lyceum of Alabang HRDO",
+    ].join("\n");
+    const html = `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
+        <p>Dear ${input.recipientName},</p>
+        <p><strong>Update for your COE request (${input.requestId})</strong></p>
+        <p>${input.title}</p>
+        <p>${input.message.replace(/\n/g, "<br />")}</p>
+        <p><a href="${new URL(`/hrdo/coe/${encodeURIComponent(input.requestId)}`, siteUrl.origin).toString()}">Open your COE request</a></p>
+        <p>Thank you,<br/>Lyceum of Alabang HRDO</p>
+      </div>
+    `;
+
+    const token = await accessToken();
+    const logo = await readFile(join(process.cwd(), "public", "loa-loading.png"));
+    const mime = createMimeMessage(
+      input.recipientEmail,
+      subject,
+      text,
+      html,
+      logo,
+      undefined,
+      undefined,
+      input.attachment ? [input.attachment] : [],
+    );
+    await sendMimeMessage(token, mime);
+    return { sent: true, delivered: 1, failed: 0 };
+  } catch (error) {
+    console.error(
+      `[email] COE status email failed: ${error instanceof AppError ? error.message : error instanceof Error ? error.name : "unknown"}`,
+    );
+    return {
+      sent: false,
+      delivered: 0,
+      failed: 1,
+      message:
+        error instanceof AppError
+          ? error.message
+          : "The COE status update could not be emailed to the requestor.",
+    };
+  }
 }
 
 export async function sendTemporaryPasswordEmail(input: {

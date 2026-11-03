@@ -11,13 +11,13 @@ export const Route = createFileRoute("/privacy")({
       {
         name: "description",
         content:
-          "How the Lyceum of Alabang PFMO vehicle reservation system collects, uses and protects account, request and analytics information.",
+          "How the Lyceum of Alabang HRDO Certificate of Employment system collects, uses and protects account, request and analytics information.",
       },
       { property: "og:title", content: `Privacy Policy — ${SITE.name}` },
       {
         property: "og:description",
         content:
-          "How the Lyceum of Alabang PFMO vehicle reservation system handles your information.",
+          "How the Lyceum of Alabang HRDO Certificate of Employment system handles your information.",
       },
       { property: "og:url", content: canonical("/privacy") },
       { property: "og:image", content: `${SITE.url}${SITE.ogImage}` },
@@ -32,7 +32,7 @@ function PrivacyPage() {
     <PublicShell>
       <article className="mx-auto w-full max-w-3xl px-4 py-12">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
-          {SITE.institution} · {SITE.office}
+          Lyceum of Alabang · Human Resources Development Office (HRDO)
         </p>
         <h1 className="mt-2 font-serif text-3xl font-bold sm:text-4xl">Privacy Policy</h1>
         <p className="mt-2 text-sm text-muted-foreground">Last updated: 27 October 2026</p>
@@ -41,8 +41,9 @@ function PrivacyPage() {
           <section>
             <h2 className="font-serif text-xl font-semibold">Who we are</h2>
             <p className="mt-2 text-muted-foreground">
-              This system is operated by the {SITE.office} of {SITE.institution} to manage school
-              vehicle reservations, approvals and trip tickets. It is intended to handle personal
+              This system is operated by the Lyceum of Alabang Human Resources Development Office
+              (HRDO) to manage Certificate of Employment (COE) requests and employment
+              verification. It is intended to handle personal
               information in line with Republic Act No. 10173, the Data Privacy Act of 2012, its
               Implementing Rules and Regulations, and the Lyceum of Alabang Data Privacy Statement.
               This notice explains how information is used in this system; it does not replace the
@@ -72,9 +73,10 @@ function PrivacyPage() {
                 store your password in readable form.
               </li>
               <li>
-                <strong className="text-foreground">Request details:</strong> destinations, travel
-                dates and times, passenger counts, purpose, vehicle assignments, signatures,
-                remarks, returns and approval history.
+                <strong className="text-foreground">Request details:</strong> employee and
+                verifier information, employment details, COE type, copy and delivery preference,
+                purpose, consent records, uploaded authorization documents, remarks, returns and
+                approval history.
               </li>
               <li>
                 <strong className="text-foreground">In-app notifications:</strong> alerts addressed
@@ -92,7 +94,7 @@ function PrivacyPage() {
               </li>
             </ul>
             <p className="mt-3 text-muted-foreground">
-              Please provide only information needed to process a vehicle request. Avoid entering
+              Please provide only information needed to process a COE or verification request. Avoid entering
               sensitive personal information about yourself or others in the purpose or remarks
               fields unless it is necessary for the request.
             </p>
@@ -101,9 +103,9 @@ function PrivacyPage() {
           <section>
             <h2 className="font-serif text-xl font-semibold">Purpose and lawful processing</h2>
             <p className="mt-2 text-muted-foreground">
-              Information is used only as needed to verify accounts, process and approve vehicle
-              requests, coordinate vehicles, prepare official trip tickets, maintain required
-              administrative records, protect the system, and support service operations. It is
+              Information is used only as needed to verify accounts, process and approve COE and
+              employment verification requests, prepare official employment documents, maintain
+              required administrative records, protect the system, and support HRDO operations. It is
               processed for these stated purposes on a lawful basis under applicable law. Consent is
               requested for optional analytics. We do not sell personal information or use it for
               advertising.
@@ -125,9 +127,9 @@ function PrivacyPage() {
               </p>
               <p className="flex gap-2">
                 <Lock className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
-                Approvers and authorized Transport Services staff can see requests because their
-                role requires it. Every server request re-checks your session and role; hiding a
-                button in the browser is never treated as protection.
+                HRDO staff and other authorized personnel can see requests because their role
+                requires it. Every server request re-checks your session and role; hiding a button
+                in the browser is never treated as protection.
               </p>
             </div>
           </section>
@@ -161,7 +163,7 @@ function PrivacyPage() {
           <section>
             <h2 className="font-serif text-xl font-semibold">How long we keep it</h2>
             <p className="mt-2 text-muted-foreground">
-              Request, signature and approval records are retained as part of the office&apos;s
+              COE, verification, uploaded document and approval records are retained as part of the office&apos;s
               administrative record in line with the institution&apos;s applicable retention
               requirements. Sessions expire automatically and expired sessions are removed.
               Aggregate analytics counts are retained for service improvement and do not identify
@@ -209,7 +211,7 @@ function PrivacyPage() {
                 {SITE.contactEmail}
               </a>
               . Account verification codes may be sent to your official email; workflow
-              notifications and approved trip tickets are available inside the application.
+              notifications and released COE documents are available inside the application.
             </p>
           </section>
 

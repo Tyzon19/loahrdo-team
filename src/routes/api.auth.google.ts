@@ -2,10 +2,12 @@ import { createHash, randomBytes } from "node:crypto";
 import { createFileRoute } from "@tanstack/react-router";
 import { safeSignInNext } from "@/lib/google-signin";
 import {
+  GOOGLE_MODE_COOKIE,
   GOOGLE_NEXT_COOKIE,
   GOOGLE_STATE_COOKIE,
   GOOGLE_VERIFIER_COOKIE,
   googleSignInCredentials,
+  googleSignInMode,
   googleSignInRedirectUri,
   signInCookie,
 } from "@/server/google-signin";
@@ -38,6 +40,7 @@ export const Route = createFileRoute("/api/auth/google")({
           return redirect("/login?error=google_unavailable");
         }
 
+        const mode = googleSignInMode(requestUrl);
         const state = randomBytes(32).toString("base64url");
         const verifier = randomBytes(32).toString("base64url");
         const challenge = createHash("sha256").update(verifier).digest("base64url");
@@ -59,6 +62,7 @@ export const Route = createFileRoute("/api/auth/google")({
           signInCookie(GOOGLE_STATE_COOKIE, state, secure),
           signInCookie(GOOGLE_VERIFIER_COOKIE, verifier, secure),
           signInCookie(GOOGLE_NEXT_COOKIE, encodeURIComponent(next), secure),
+          signInCookie(GOOGLE_MODE_COOKIE, mode, secure),
         ]);
       },
     },

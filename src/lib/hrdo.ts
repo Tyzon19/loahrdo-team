@@ -40,9 +40,9 @@ export type CoeCopyType = "soft" | "original" | "both";
 export const COE_COPY_TYPES: CoeCopyType[] = ["soft", "original", "both"];
 
 export const COE_COPY_TYPE_LABELS: Record<CoeCopyType, string> = {
-  soft: "Soft copy",
-  original: "Original",
-  both: "Both",
+  soft: "Soft copy only",
+  original: "Hardcopy (original)",
+  both: "Softcopy and hardcopy",
 };
 
 export const COE_COPY_TYPE_HINTS: Record<CoeCopyType, string> = {

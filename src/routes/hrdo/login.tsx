@@ -11,12 +11,14 @@ import { Input } from "@/components/ui/input";
 import { LoadingScreen } from "@/components/app/LoadingPanel";
 import { hrdoLoginFn } from "@/server-functions";
 import { SITE, canonical } from "@/lib/site";
+import { googleSignInErrorMessage } from "@/lib/google-signin";
 
-type LoginSearch = { redirect?: string | undefined };
+type LoginSearch = { redirect?: string | undefined; error?: string | undefined };
 
 export const Route = createFileRoute("/hrdo/login")({
   validateSearch: (search: Record<string, unknown>): LoginSearch => {
     const target = search["redirect"];
+    const issue = search["error"];
     const redirect =
       typeof target === "string" && target.startsWith("/") && !target.startsWith("//")
         ? target
@@ -24,6 +26,7 @@ export const Route = createFileRoute("/hrdo/login")({
 
     return {
       redirect: redirect && redirect !== "/hrdo/login" ? redirect : undefined,
+      error: typeof issue === "string" && /^google_[a-z_]+$/.test(issue) ? issue : undefined,
     };
   },
   beforeLoad: ({ context }) => {
@@ -58,7 +61,10 @@ function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() => googleSignInErrorMessage(search.error));
+  const googleHref = search.redirect
+    ? `/api/auth/google?mode=hrdo&redirect=${encodeURIComponent(search.redirect)}`
+    : "/api/auth/google?mode=hrdo";
 
   function handleAction(action: string) {
     toast.info(`${action} is not enabled yet.`);
@@ -99,14 +105,6 @@ function LoginPage() {
         <div className="module-login-cityscape" aria-hidden="true" />
 
         <div className="module-login-brand-copy">
-          <div className="module-login-logo-center">
-            <img
-              src="/loa-loading.png"
-              alt="Lyceum of Alabang logo"
-              className="module-login-logo"
-            />
-          </div>
-
           <h1 id="brand-heading">
             Your Needs,
             <br />
@@ -216,7 +214,49 @@ function LoginPage() {
             <Button type="submit" className="module-login-submit" disabled={busy}>
               {busy ? "Signing in…" : "Sign In"}
             </Button>
+            <Link
+              to="/register"
+              search={email.trim() ? { email: email.trim() } : undefined}
+              className="module-login-text-button mt-2 self-start"
+            >
+              Continue with email
+            </Link>
           </form>
+
+          <div className="module-login-divider">
+            <span>or continue with</span>
+          </div>
+
+          <div
+            className="module-login-social-options"
+            role="group"
+            aria-label="Other sign-in methods"
+          >
+            <a
+              className="module-login-social-button module-login-social-google"
+              href={googleHref}
+              aria-label="Continue with your Lyceum Google account"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  fill="#4285F4"
+                  d="M21.6 12.23c0-.71-.06-1.39-.18-2.05H12v3.88h5.38a4.59 4.59 0 0 1-2 3.01v2.5h3.23c1.9-1.75 2.99-4.33 2.99-7.34Z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 22c2.7 0 4.96-.9 6.61-2.43l-3.23-2.5c-.9.6-2.05.96-3.38.96-2.6 0-4.8-1.76-5.59-4.12H3.07v2.59A10 10 0 0 0 12 22Z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M6.41 13.91a6 6 0 0 1 0-3.82V7.5H3.07a10 10 0 0 0 0 9l3.34-2.59Z"
+                />
+                <path
+                  fill="#EA4335"
+                  d="M12 5.97c1.47 0 2.79.5 3.82 1.49l2.87-2.87A9.62 9.62 0 0 0 12 2a10 10 0 0 0-8.93 5.5l3.34 2.59A6.01 6.01 0 0 1 12 5.97Z"
+                />
+              </svg>
+            </a>
+          </div>
 
           <p className="module-login-signup">
             Need to return?{" "}

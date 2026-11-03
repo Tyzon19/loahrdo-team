@@ -69,7 +69,7 @@ function NewRequest() {
   }
 
   return (
-    <>
+    <div className="mx-auto w-full max-w-6xl">
       <PageHeader title="New Vehicle Request" description="Fill in the details below." />
       <RequestForm
         key={viewer.id}
@@ -78,6 +78,6 @@ function NewRequest() {
         submitLabel="Submit Request"
         onSubmit={onSubmit}
       />
-    </>
+    </div>
   );
 }

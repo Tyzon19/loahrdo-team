@@ -68,7 +68,7 @@ function CoeHistoryPage() {
   const current = Math.min(page, pages - 1);
 
   return (
-    <>
+    <div className="mx-auto w-full max-w-6xl">
       <PageHeader
         title="Request History"
         description="Every submitted request, correction, release and deadline action in one paperless record."
@@ -159,6 +159,6 @@ function CoeHistoryPage() {
           </>
         )}
       </Section>
-    </>
+    </div>
   );
 }

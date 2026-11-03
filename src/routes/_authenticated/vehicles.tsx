@@ -90,8 +90,8 @@ function Vehicles() {
               </Button>
             </div>
           ) : (
-            <div className="-m-4 overflow-x-auto">
-              <table className="w-full min-w-[640px] text-sm">
+            <div className="-m-4">
+              <table className="w-full table-fixed text-sm">
                 <thead className="border-b bg-muted text-left text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
                     <th className="px-3 py-2 font-medium">Vehicle Type</th>

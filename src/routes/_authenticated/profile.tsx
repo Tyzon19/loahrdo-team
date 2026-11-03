@@ -9,11 +9,13 @@ import { SignatoryAssistantSettings } from "@/components/app/SignatoryAssistantS
 import { ButtonLoading } from "@/components/app/LoadingPanel";
 import { ROLE_TITLES } from "@/lib/workflow";
 import { updateProfileFn } from "@/server-functions";
+import { joinFullName, splitFullName } from "@/lib/name";
 import { SITE } from "@/lib/site";
+
 export const Route = createFileRoute("/_authenticated/profile")({
   head: () => ({
     meta: [
-      { title: `Profile — ${SITE.name}` },
+      { title: `Profile ? ${SITE.name}` },
       { name: "description", content: "Your account details." },
       { name: "robots", content: "noindex, nofollow" },
     ],
@@ -24,22 +26,49 @@ export const Route = createFileRoute("/_authenticated/profile")({
 function Profile() {
   const { viewer } = Route.useRouteContext();
   const router = useRouter();
-  const [form, setForm] = useState({
-    name: viewer?.name ?? "",
-    department: viewer?.department ?? "",
+  const [form, setForm] = useState(() => {
+    const split = splitFullName(viewer?.name ?? "");
+    return {
+      firstName: split.firstName,
+      middleName: split.middleName,
+      lastName: split.lastName,
+      department: viewer?.department ?? "",
+    };
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+
   useEffect(() => {
-    if (viewer) setForm({ name: viewer.name, department: viewer.department });
+    if (!viewer) return;
+    const split = splitFullName(viewer.name);
+    setForm({
+      firstName: split.firstName,
+      middleName: split.middleName,
+      lastName: split.lastName,
+      department: viewer.department,
+    });
   }, [viewer?.id, viewer?.name, viewer?.department]);
+
   if (!viewer) return null;
+
   async function save(event: React.FormEvent) {
     event.preventDefault();
     if (busy) return;
     setBusy(true);
     setErrors({});
-    const result = await updateProfileFn({ data: form });
+
+    const fullName = joinFullName({
+      firstName: form.firstName,
+      middleName: form.middleName,
+      lastName: form.lastName,
+    });
+
+    const result = await updateProfileFn({
+      data: {
+        name: fullName,
+        department: form.department,
+      },
+    });
     setBusy(false);
     if (!result.ok) {
       setErrors(result.fieldErrors ?? {});
@@ -49,23 +78,43 @@ function Profile() {
     toast.success("Profile saved. New requests will use this name.");
     await router.invalidate();
   }
+
   return (
-    <>
-      <PageHeader
-        title="Profile"
-        description="Your name here is used on requests."
-      />
+    <div className="mx-auto w-full max-w-6xl">
+      <PageHeader title="Profile" description="Your name here is used on requests." />
       <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
         <Section title="Account">
           <form className="grid gap-4 sm:grid-cols-2" onSubmit={save} noValidate>
             <div>
-              <Label htmlFor="profile-name">Full Name</Label>
+              <Label htmlFor="profile-first-name">First name</Label>
               <Input
-                id="profile-name"
+                id="profile-first-name"
                 className="mt-1"
-                maxLength={120}
-                value={form.name}
-                onChange={(event) => setForm({ ...form, name: event.target.value })}
+                maxLength={60}
+                value={form.firstName}
+                onChange={(event) => setForm({ ...form, firstName: event.target.value })}
+                aria-invalid={Boolean(errors["name"])}
+              />
+              {errors["name"] && <p className="mt-1 text-sm text-destructive">{errors["name"]}</p>}
+            </div>
+            <div>
+              <Label htmlFor="profile-middle-name">Middle name</Label>
+              <Input
+                id="profile-middle-name"
+                className="mt-1"
+                maxLength={60}
+                value={form.middleName}
+                onChange={(event) => setForm({ ...form, middleName: event.target.value })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="profile-last-name">Last name</Label>
+              <Input
+                id="profile-last-name"
+                className="mt-1"
+                maxLength={60}
+                value={form.lastName}
+                onChange={(event) => setForm({ ...form, lastName: event.target.value })}
                 aria-invalid={Boolean(errors["name"])}
               />
               {errors["name"] && <p className="mt-1 text-sm text-destructive">{errors["name"]}</p>}
@@ -73,7 +122,7 @@ function Profile() {
             <dl>
               <Field label="Role">{ROLE_TITLES[viewer.role]}</Field>
             </dl>
-            <div>
+            <div className="sm:col-span-2">
               <Label htmlFor="profile-department">Department / Office</Label>
               <Input
                 id="profile-department"
@@ -87,7 +136,7 @@ function Profile() {
                 <p className="mt-1 text-sm text-destructive">{errors["department"]}</p>
               )}
             </div>
-            <div>
+            <div className="sm:col-span-2">
               <Label htmlFor="profile-email">Email</Label>
               <Input
                 id="profile-email"
@@ -97,10 +146,10 @@ function Profile() {
                 readOnly
                 aria-describedby="profile-email-help"
               />
-              </div>
+            </div>
             <div className="sm:col-span-2">
               <Button type="submit" disabled={busy}>
-                {busy ? <ButtonLoading label="Saving…" /> : "Save profile"}
+                {busy ? <ButtonLoading label="Saving?" /> : "Save profile"}
               </Button>
             </div>
           </form>
@@ -116,6 +165,6 @@ function Profile() {
         </aside>
       </div>
       {viewer.role === "admin" && <SignatoryAssistantSettings />}
-    </>
+    </div>
   );
 }

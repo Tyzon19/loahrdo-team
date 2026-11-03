@@ -66,7 +66,7 @@ function Notifications() {
   }
 
   return (
-    <>
+    <div className="mx-auto w-full max-w-6xl">
       <div className={cn(showMobileDetails && "hidden lg:block")}>
         <PageHeader
           title="Notifications"
@@ -171,7 +171,7 @@ function Notifications() {
           )}
         </div>
       )}
-    </>
+    </div>
   );
 }
 

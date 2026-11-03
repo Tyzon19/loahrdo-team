@@ -174,7 +174,7 @@ function HrDashboard() {
             }
           />
 
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_300px]">
             <Section
               title={
                 queue === "all"

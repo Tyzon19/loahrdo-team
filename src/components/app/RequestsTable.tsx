@@ -63,60 +63,64 @@ export function RequestsTable({
           </li>
         ))}
       </ul>
-      <div className="hidden overflow-x-auto lg:block">
-        <table className="w-full min-w-[720px] text-sm">
-          <thead className="border-b bg-muted text-left text-xs uppercase tracking-wide text-muted-foreground">
-            <tr>
-              <th className="px-3 py-2 font-medium">Request No.</th>
-              <th className="px-3 py-2 font-medium">Submitted</th>
-              {showRequester && <th className="px-3 py-2 font-medium">Requisitioner</th>}
-              <th className="px-3 py-2 font-medium">Destination</th>
-              <th className="px-3 py-2 font-medium">Travel Dates</th>
-              <th className="px-3 py-2 font-medium">Status</th>
-              <th className="px-3 py-2 font-medium">Pending With</th>
-              <th className="px-3 py-2">
-                <span className="sr-only">Action</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.id} className="border-b last:border-0 hover:bg-muted/60">
-                <td className="px-3 py-2 font-medium">
-                  <Link
-                    to="/requests/$id"
-                    params={{ id: r.id }}
-                    className="text-primary hover:underline"
-                  >
-                    {r.number}
-                  </Link>
-                </td>
-                <td className="font-medium">{fmtDate(r.submittedAt)}</td>
-                {showRequester && <td className="px-3 py-2 font-medium">{r.requisitionerName}</td>}
-                <td
-                  className="max-w-[220px] truncate px-3 py-2 font-medium"
-                  title={r.destinations.join("; ")}
-                >
-                  {r.destinations.join("; ")}
-                </td>
-                <td className="px-3 py-2 font-medium">{fmtRange(r.dateStart, r.dateEnd)}</td>
-                <td className="px-3 py-2 font-medium">
-                  <StatusBadge status={r.status} />
-                </td>
-                <td className="px-3 py-2 text-muted-foreground">{pendingWith(r.status)}</td>
-                <td className="px-3 py-2 text-right font-medium">
-                  <Link
-                    to="/requests/$id"
-                    params={{ id: r.id }}
-                    className="text-primary hover:underline"
-                  >
-                    View details
-                  </Link>
-                </td>
+      <div className="hidden lg:block">
+        <div className="overflow-hidden rounded-md border">
+          <table className="w-full table-fixed border-separate border-spacing-0 text-sm">
+            <thead className="border-b bg-muted text-left text-[11px] uppercase tracking-wide text-foreground/75">
+              <tr>
+                <th className="px-3 py-2 font-medium text-foreground/80">Request No.</th>
+                <th className="px-3 py-2 font-medium text-foreground/80">Submitted</th>
+                {showRequester && <th className="px-3 py-2 font-medium text-foreground/80">Requisitioner</th>}
+                <th className="px-3 py-2 font-medium text-foreground/80">Destination</th>
+                <th className="px-3 py-2 font-medium text-foreground/80">Travel Dates</th>
+                <th className="px-3 py-2 font-medium text-foreground/80">Status</th>
+                <th className="px-3 py-2 font-medium text-foreground/80">Pending With</th>
+                <th className="px-3 py-2">
+                  <span className="sr-only">Action</span>
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id} className="border-b last:border-0 align-top hover:bg-muted/60">
+                  <td className="px-3 py-2 font-medium break-words">
+                    <Link
+                      to="/requests/$id"
+                      params={{ id: r.id }}
+                      className="text-primary hover:underline"
+                    >
+                      {r.number}
+                    </Link>
+                  </td>
+                  <td className="px-3 py-2 font-medium break-words">{fmtDate(r.submittedAt)}</td>
+                  {showRequester && (
+                    <td className="px-3 py-2 font-medium break-words">{r.requisitionerName}</td>
+                  )}
+                  <td
+                    className="px-3 py-2 font-medium break-words"
+                    title={r.destinations.join("; ")}
+                  >
+                    {r.destinations.join("; ")}
+                  </td>
+                  <td className="px-3 py-2 font-medium break-words">{fmtRange(r.dateStart, r.dateEnd)}</td>
+                  <td className="px-3 py-2 font-medium">
+                    <StatusBadge status={r.status} />
+                  </td>
+                  <td className="px-3 py-2 break-words text-foreground/80">{pendingWith(r.status)}</td>
+                  <td className="px-3 py-2 text-right font-medium">
+                    <Link
+                      to="/requests/$id"
+                      params={{ id: r.id }}
+                      className="whitespace-nowrap text-primary hover:underline"
+                    >
+                      View details
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </>
   );

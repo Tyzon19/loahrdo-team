@@ -49,13 +49,13 @@ export function StatsCards({
     <dl className="mb-4 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3 xl:grid-cols-4">
       {cards.map((card) => (
         <div key={card.label} className="panel min-w-0 p-3 sm:p-4">
-          <dt className="break-words text-[10px] font-medium uppercase leading-tight tracking-wide text-muted-foreground sm:text-xs">
+          <dt className="break-words text-[10px] font-medium uppercase leading-tight tracking-wide text-foreground/70 sm:text-xs">
             {card.label}
           </dt>
-          <dd className="mt-1 break-words text-xl font-semibold tabular-nums sm:text-2xl">
+          <dd className="mt-1 break-words text-xl font-semibold tabular-nums text-foreground sm:text-2xl">
             {card.value}
           </dd>
-          <p className="mt-1 break-words text-[10px] leading-tight text-muted-foreground sm:text-xs">
+          <p className="mt-1 break-words text-[10px] leading-tight text-foreground/70 sm:text-xs">
             {card.hint}
           </p>
         </div>

@@ -29,6 +29,7 @@ import { Route as HrdoHistoryRouteImport } from './routes/hrdo/history'
 import { Route as HrdoLoginRouteImport } from './routes/hrdo/login'
 import { Route as HrdoProfileRouteImport } from './routes/hrdo/profile'
 import { Route as HrdoRequestsRouteImport } from './routes/hrdo/requests'
+import { Route as ServiceSlugRouteImport } from './routes/service.$slug'
 import { Route as VerifyTicketTokenRouteImport } from './routes/verify-ticket.$token'
 import { Route as AuthenticatedPrintIdRouteImport } from './routes/_authenticated/print.$id'
 import { Route as AuthenticatedRequestsIndexRouteImport } from './routes/_authenticated/requests.index'
@@ -145,6 +146,11 @@ const HrdoRequestsRoute = HrdoRequestsRouteImport.update({
   path: '/requests',
   getParentRoute: () => HrdoRoute,
 } as any)
+const ServiceSlugRoute = ServiceSlugRouteImport.update({
+  id: '/service/$slug',
+  path: '/service/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const VerifyTicketTokenRoute = VerifyTicketTokenRouteImport.update({
   id: '/verify-ticket/$token',
   path: '/verify-ticket/$token',
@@ -228,6 +234,7 @@ export interface FileRoutesByFullPath {
   '/hrdo/login': typeof HrdoLoginRoute
   '/hrdo/profile': typeof HrdoProfileRoute
   '/hrdo/requests': typeof HrdoRequestsRoute
+  '/service/$slug': typeof ServiceSlugRoute
   '/verify-ticket/$token': typeof VerifyTicketTokenRoute
   '/print/$id': typeof AuthenticatedPrintIdRoute
   '/requests/$id': typeof AuthenticatedRequestsIdRoute
@@ -261,6 +268,7 @@ export interface FileRoutesByTo {
   '/hrdo/login': typeof HrdoLoginRoute
   '/hrdo/profile': typeof HrdoProfileRoute
   '/hrdo/requests': typeof HrdoRequestsRoute
+  '/service/$slug': typeof ServiceSlugRoute
   '/verify-ticket/$token': typeof VerifyTicketTokenRoute
   '/print/$id': typeof AuthenticatedPrintIdRoute
   '/requests/$id': typeof AuthenticatedRequestsIdRoute
@@ -296,6 +304,7 @@ export interface FileRoutesById {
   '/hrdo/login': typeof HrdoLoginRoute
   '/hrdo/profile': typeof HrdoProfileRoute
   '/hrdo/requests': typeof HrdoRequestsRoute
+  '/service/$slug': typeof ServiceSlugRoute
   '/verify-ticket/$token': typeof VerifyTicketTokenRoute
   '/_authenticated/print/$id': typeof AuthenticatedPrintIdRoute
   '/_authenticated/requests/$id': typeof AuthenticatedRequestsIdRoute
@@ -331,6 +340,7 @@ export interface FileRouteTypes {
     | '/hrdo/login'
     | '/hrdo/profile'
     | '/hrdo/requests'
+    | '/service/$slug'
     | '/verify-ticket/$token'
     | '/print/$id'
     | '/requests/$id'
@@ -364,6 +374,7 @@ export interface FileRouteTypes {
     | '/hrdo/login'
     | '/hrdo/profile'
     | '/hrdo/requests'
+    | '/service/$slug'
     | '/verify-ticket/$token'
     | '/print/$id'
     | '/requests/$id'
@@ -398,6 +409,7 @@ export interface FileRouteTypes {
     | '/hrdo/login'
     | '/hrdo/profile'
     | '/hrdo/requests'
+    | '/service/$slug'
     | '/verify-ticket/$token'
     | '/_authenticated/print/$id'
     | '/_authenticated/requests/$id'
@@ -419,6 +431,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   PrivacyRoute: typeof PrivacyRoute
   RegisterRoute: typeof RegisterRoute
+  ServiceSlugRoute: typeof ServiceSlugRoute
   VerifyTicketTokenRoute: typeof VerifyTicketTokenRoute
   ApiAuthGoogleRoute: typeof ApiAuthGoogleRouteWithChildren
   ApiGmailCallbackRoute: typeof ApiGmailCallbackRoute
@@ -567,6 +580,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/hrdo/requests'
       preLoaderRoute: typeof HrdoRequestsRouteImport
       parentRoute: typeof HrdoRoute
+    }
+    '/service/$slug': {
+      id: '/service/$slug'
+      path: '/service/$slug'
+      fullPath: '/service/$slug'
+      preLoaderRoute: typeof ServiceSlugRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/verify-ticket/$token': {
       id: '/verify-ticket/$token'
@@ -732,6 +752,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   PrivacyRoute: PrivacyRoute,
   RegisterRoute: RegisterRoute,
+  ServiceSlugRoute: ServiceSlugRoute,
   VerifyTicketTokenRoute: VerifyTicketTokenRoute,
   ApiAuthGoogleRoute: ApiAuthGoogleRouteWithChildren,
   ApiGmailCallbackRoute: ApiGmailCallbackRoute,

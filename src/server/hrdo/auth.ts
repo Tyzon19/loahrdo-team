@@ -33,6 +33,9 @@ import { sendRegistrationOtpEmail } from "../gmail";
 function sessionCookieName() {
   return "loa_hrdo_session";
 }
+export function hrdoSessionCookieName() {
+  return sessionCookieName();
+}
 function sessionHours() {
   return 8;
 }
@@ -106,6 +109,62 @@ function cookieOptions(maxAge: number) {
     path: "/",
     maxAge,
   };
+}
+
+export async function hrdoCreateSession(userId: string) {
+  const cookieName = sessionCookieName();
+  const previous = getCookie(cookieName);
+  if (previous) {
+    await run("DELETE FROM hrdo_sessions WHERE token_hash = ?", [sha256(previous)]);
+  }
+
+  const token = randomBytes(32).toString("base64url");
+  const userAgent = (getRequestHeader("user-agent") ?? "").slice(0, 255);
+  await run(
+    `INSERT INTO hrdo_sessions (id, user_id, token_hash, user_agent, expires_at)
+     VALUES (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? HOUR))`,
+    [randomUUID(), userId, sha256(token), userAgent, sessionHours()],
+  );
+  await run("DELETE FROM hrdo_sessions WHERE expires_at < DATE_SUB(NOW(), INTERVAL 7 DAY)");
+  return { token, maxAge: sessionSeconds() };
+}
+
+export interface HrdoGoogleSignInAccount {
+  id: string;
+  role: HrdoRole;
+  mustChangePassword: boolean;
+}
+
+export async function hrdoGoogleSignInAccount(email: string): Promise<HrdoGoogleSignInAccount | null> {
+  const rows = await all<HrdoUserRow[]>(
+    "SELECT id, role, must_change_password FROM hrdo_users WHERE email = ? LIMIT 1",
+    [normaliseEmail(email)],
+  );
+  const row = rows[0];
+  return row
+    ? { id: row.id, role: row.role, mustChangePassword: Boolean(row.must_change_password) }
+    : null;
+}
+
+export async function ensureHrdoGoogleAccount(email: string): Promise<HrdoGoogleSignInAccount> {
+  const normalised = normaliseEmail(email);
+  const existing = await hrdoGoogleSignInAccount(normalised);
+  if (existing) return existing;
+
+  if (!institutionalEmailAllowed(normalised)) {
+    throw new AppError("Use your official Lyceum of Alabang email address.");
+  }
+
+  const localName = normalised.split("@")[0].replace(/[._-]+/g, " ").trim();
+  const name = localName || "Institutional User";
+  const id = randomUUID();
+  await run(
+    `INSERT INTO hrdo_users (id, name, email, password_hash, role, department, must_change_password)
+     VALUES (?, ?, ?, ?, 'employee', 'General', 0)`,
+    [id, name, normalised, DUMMY_HASH],
+  );
+
+  return { id, role: "employee", mustChangePassword: false };
 }
 
 async function startSession(userId: string) {

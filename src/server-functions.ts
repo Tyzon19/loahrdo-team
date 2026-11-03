@@ -133,6 +133,12 @@ export const uploadCoeDocumentFn = createServerFn({ method: "POST" })
     runSafely(async () => (await import("./server/hrdo/coe")).uploadCoeDocument(data)),
   );
 
+export const generateCoeTemplateFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/hrdo/coe")).generateCoeTemplate(data)),
+  );
+
 export const markCoeReadyFn = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) =>

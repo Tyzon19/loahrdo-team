@@ -15,8 +15,8 @@ describe("Google sign-in eligibility", () => {
     expect(googleAccountProblem("teacher@loa.edu.ph", "requisitioner")).toBe("google_domain");
   });
 
-  it("refuses institutional addresses with no account", () => {
-    expect(googleAccountProblem("teacher@lyceumalabang.edu.ph", null)).toBe("google_no_account");
+  it("accepts institutional addresses even when no account record exists yet", () => {
+    expect(googleAccountProblem("teacher@lyceumalabang.edu.ph", null)).toBeNull();
   });
 
   it("refuses staff accounts", () => {
@@ -30,8 +30,11 @@ describe("Google sign-in eligibility", () => {
 describe("Google sign-in redirect target", () => {
   it("keeps only same-site paths", () => {
     expect(safeSignInNext("/requests/123")).toBe("/requests/123");
+    expect(safeSignInNext("%2Frequests%2F123")).toBe("/requests/123");
     expect(safeSignInNext("//evil.example")).toBe("/dashboard");
     expect(safeSignInNext("https://evil.example")).toBe("/dashboard");
+    expect(safeSignInNext("https%3A%2F%2Fevil.example")).toBe("/dashboard");
+    expect(safeSignInNext("/bad%0Apath")).toBe("/dashboard");
     expect(safeSignInNext("")).toBe("/dashboard");
     expect(safeSignInNext(undefined)).toBe("/dashboard");
   });
@@ -40,7 +43,7 @@ describe("Google sign-in redirect target", () => {
 describe("Google sign-in messages", () => {
   it("explains each failure code and falls back to a generic message", () => {
     expect(googleSignInErrorMessage("google_domain")).toContain("@lyceumalabang.edu.ph");
-    expect(googleSignInErrorMessage("google_no_account")).toContain("Create an account");
+    expect(googleSignInErrorMessage("google_no_account")).toContain("created automatically");
     expect(googleSignInErrorMessage("google_role")).toContain("HRDO");
     expect(googleSignInErrorMessage("something_else")).toBe(
       googleSignInErrorMessage("google_failed"),

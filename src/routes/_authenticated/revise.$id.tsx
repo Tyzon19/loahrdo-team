@@ -36,10 +36,10 @@ function Revise() {
 
   if (query.isPending) {
     return (
-      <>
+      <div className="mx-auto w-full max-w-6xl">
         <PageHeader title="Revise request" description="Loading the latest record…" />
         <LoadingPanel label="Loading request" rows={8} />
-      </>
+      </div>
     );
   }
 
@@ -49,17 +49,19 @@ function Revise() {
   const canReviseReturned = r?.status === "returned";
   if (!r || r.requisitionerId !== viewer.id || (!canEditPending && !canReviseReturned)) {
     return (
-      <Section title="Revision not available">
-        <EmptyState title="This request can't be edited right now.">
-          Only the original requisitioner can edit a request while it is awaiting the Head of
-          Transport Services, or revise it after it has been returned.{" "}
-          {r && (
-            <Link to="/requests/$id" params={{ id: r.id }} className="text-primary underline">
-              View request
-            </Link>
-          )}
-        </EmptyState>
-      </Section>
+      <div className="mx-auto w-full max-w-6xl">
+        <Section title="Revision not available">
+          <EmptyState title="This request can't be edited right now.">
+            Only the original requisitioner can edit a request while it is awaiting the Head of
+            Transport Services, or revise it after it has been returned.{" "}
+            {r && (
+              <Link to="/requests/$id" params={{ id: r.id }} className="text-primary underline">
+                View request
+              </Link>
+            )}
+          </EmptyState>
+        </Section>
+      </div>
     );
   }
 
@@ -107,7 +109,7 @@ function Revise() {
   }
 
   return (
-    <>
+    <div className="mx-auto w-full max-w-6xl">
       <PageHeader
         title={canEditPending ? `Edit ${r.number}` : `Revise ${r.number}`}
         description={
@@ -140,6 +142,6 @@ function Revise() {
         allowExistingPastStartDate={canEditPending}
         onSubmit={onSubmit}
       />
-    </>
+    </div>
   );
 }

@@ -27,7 +27,7 @@ function PhoneDirectory() {
   });
 
   return (
-    <>
+    <div className="mx-auto w-full max-w-6xl">
       <PageHeader
         title="LOA Phone Directory"
         description="Contact the assigned signatories when a request needs attention."
@@ -77,6 +77,6 @@ function PhoneDirectory() {
           </ul>
         </Section>
       )}
-    </>
+    </div>
   );
 }

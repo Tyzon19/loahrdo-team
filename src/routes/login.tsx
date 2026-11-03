@@ -106,14 +106,6 @@ function LoginPage() {
         <div className="module-login-cityscape" aria-hidden="true" />
 
         <div className="module-login-brand-copy">
-          <div className="module-login-logo-center">
-            <img
-              src="/loa-loading.png"
-              alt="Lyceum of Alabang logo"
-              className="module-login-logo"
-            />
-          </div>
-
           <h1 id="brand-heading">
             Sign in to continue
             <br />
@@ -224,6 +216,13 @@ function LoginPage() {
             <Button type="submit" className="module-login-submit" disabled={busy}>
               {busy ? "Signing in…" : "Sign In"}
             </Button>
+            <Link
+              to="/register"
+              search={email.trim() ? { email: email.trim() } : undefined}
+              className="module-login-text-button mt-2 self-start"
+            >
+              Continue with email
+            </Link>
           </form>
 
           <div className="module-login-divider">
@@ -263,13 +262,9 @@ function LoginPage() {
 
           <p className="module-login-signup">
             New here? Create an account! <span aria-hidden="true">→</span>{" "}
-            <button
-              className="module-login-text-button"
-              type="button"
-              onClick={() => handleAction("Account registration")}
-            >
+            <Link to="/register" className="module-login-text-button">
               Sign up
-            </button>
+            </Link>
           </p>
 
           <p className="module-login-message" role="status" aria-live="polite">

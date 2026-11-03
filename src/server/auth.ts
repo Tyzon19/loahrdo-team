@@ -157,6 +157,27 @@ export async function googleSignInAccount(email: string): Promise<GoogleSignInAc
     : null;
 }
 
+export async function ensureGoogleRequisitionerAccount(email: string): Promise<GoogleSignInAccount> {
+  const normalised = normaliseEmail(email);
+  const existing = await googleSignInAccount(normalised);
+  if (existing) return existing;
+
+  if (!institutionalEmailAllowed(normalised)) {
+    throw new AppError("Use your official Lyceum of Alabang email address.");
+  }
+
+  const localName = normalised.split("@")[0].replace(/[._-]+/g, " ").trim();
+  const name = localName || "Institutional User";
+  const id = randomUUID();
+  await run(
+    `INSERT INTO users (id, name, email, password_hash, role, department, must_change_password)
+     VALUES (?, ?, ?, ?, 'requisitioner', 'General', 1)`,
+    [id, name, normalised, DUMMY_HASH],
+  );
+
+  return { id, role: "requisitioner", mustChangePassword: true };
+}
+
 function clearSessionCookie() {
   deleteCookie(sessionCookieName(), { path: "/" });
 }

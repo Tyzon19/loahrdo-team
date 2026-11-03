@@ -13,7 +13,6 @@ function localDate(date: Date) {
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
-
 export function AdminAnalytics() {
   const today = new Date();
   const from = localDate(new Date(today.getFullYear(), today.getMonth() - 11, 1));

@@ -7,7 +7,6 @@ import {
   Car,
   ChevronDown,
   ClipboardList,
-  FileBadge,
   FilePlus2,
   LayoutDashboard,
   LogOut,
@@ -50,12 +49,6 @@ const ITEMS = {
     mobileLabel: "New request",
     icon: FilePlus2,
   },
-  coe: {
-    to: "/coe",
-    label: "COE Request",
-    mobileLabel: "COE",
-    icon: FileBadge,
-  },
   myReq: {
     to: "/requests",
     label: "My Requests",
@@ -96,7 +89,6 @@ export const NAV: Record<Role, NavItem[]> = {
   requisitioner: [
     ITEMS.dash,
     ITEMS.newReq,
-    ITEMS.coe,
     ITEMS.myReq,
     ITEMS.notif,
     ITEMS.phoneDirectory,
@@ -322,7 +314,7 @@ export function AppShell({ user, children }: { user: Viewer; children: ReactNode
         </header>
         <main
           id="main-content"
-          className="mx-auto w-full max-w-6xl flex-1 px-3 pb-24 pt-5 sm:px-6 md:pb-5"
+          className="w-full flex-1 px-3 pb-24 pt-5 sm:px-6 md:pb-5"
         >
           {children}
         </main>

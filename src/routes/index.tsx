@@ -1,301 +1,283 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowUpRight, Bus, CalendarClock, FileBadge, FileCheck2, Mail } from "lucide-react";
+import {
+  BriefcaseBusiness,
+  BusFront,
+  ChevronDown,
+  CircleHelp,
+  FileBadge,
+  FileText,
+  FolderKanban,
+  Phone,
+  ShieldCheck,
+  Mail,
+  Facebook,
+  X,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { SITE, canonical } from "@/lib/site";
+import { canonical } from "@/lib/site";
 
-type Service = {
-  id: string;
-  title: string;
-  description: string;
-  icon: LucideIcon;
-  available: boolean;
-};
-
-const SERVICES: Service[] = [
+const popularServices = [
   {
-    id: "vehicle",
-    title: "Vehicle Reservation & Trip Ticket",
-    description: "Access vehicle reservation and official trip ticket services.",
-    icon: Bus,
-    available: true,
+    title: "Vehicle Reservation",
+    icon: BusFront,
+    to: "/login",
   },
   {
-    id: "coe",
     title: "COE Request",
-    description: "Submit a Certificate of Employment request and access its status.",
     icon: FileBadge,
-    available: true,
+    to: "/hrdo/coe",
   },
   {
-    id: "permission-slip",
-    title: "Permission Slip Request",
-    description: "Access and submit permission slip requests.",
-    icon: FileCheck2,
-    available: false,
+    title: "Permission Slip",
+    icon: FolderKanban,
+    to: "/hrdo/requests",
   },
   {
-    id: "late-absences",
-    title: "Late/Absences (Notification)",
-    description: "View notifications and information related to employee lateness and absences.",
-    icon: CalendarClock,
-    available: false,
+    title: "Late & Absences",
+    icon: BriefcaseBusiness,
+    to: "/hrdo/history",
   },
-];
+  {
+    title: "Employee Records",
+    icon: ShieldCheck,
+    to: "/hrdo/profile",
+  },
+  {
+    title: "View All Services",
+    icon: CircleHelp,
+    to: "/hrdo/dashboard",
+    highlight: true,
+  },
+] as const satisfies Array<{
+  title: string;
+  icon: LucideIcon;
+  to: string;
+  highlight?: boolean;
+}>;
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "LOA HRDO DESK | Lyceum of Alabang" },
+      { title: "LOA HRDO eServices" },
       {
         name: "description",
-        content:
-          "Access Lyceum of Alabang employee services and submit requests through one convenient portal.",
+        content: "HRDO eServices portal for employee requests, official documents, and office services.",
       },
-      { property: "og:title", content: "LOA HRDO DESK | Lyceum of Alabang" },
+      { property: "og:title", content: "LOA HRDO eServices" },
       {
         property: "og:description",
-        content: "Employee services of the Human Resources Development Office, Lyceum of Alabang.",
+        content: "A digital employee services portal for faster, smarter, and more convenient HRDO access.",
       },
       { property: "og:url", content: canonical("/") },
-      { property: "og:image", content: `${SITE.url}${SITE.ogImage}` },
-      { property: "og:image:alt", content: SITE.ogImageAlt },
-      { name: "twitter:card", content: "summary_large_image" },
-      { name: "robots", content: "index, follow" },
     ],
     links: [{ rel: "canonical", href: canonical("/") }],
   }),
-  component: EmployeePortal,
+  component: LandingPage,
 });
 
-function EmployeePortal() {
-  const { viewer } = Route.useRouteContext();
-  const signedIn = Boolean(viewer);
-
+function LandingPage() {
   return (
-    <div id="top" className="flex min-h-screen flex-col bg-background">
-      <nav aria-label="Primary" className="bg-slate-800 text-white">
-        <div className="mx-auto flex w-full max-w-screen-2xl flex-wrap items-center justify-between gap-x-6 px-4 sm:px-6 lg:px-8">
-          <ul className="-ml-3 flex flex-wrap items-center">
-            <li>
-              <a
-                href="#top"
-                className="block px-3 py-2.5 text-sm font-medium transition-colors hover:bg-white/10 sm:text-base"
-              >
-                Home
-              </a>
-            </li>
-            <li>
-              <a
-                href="#services"
-                className="block px-3 py-2.5 text-sm font-medium transition-colors hover:bg-white/10 sm:text-base"
-              >
-                Employee Services
-              </a>
-            </li>
-            <li>
-              <a
-                href="#announcements"
-                className="block px-3 py-2.5 text-sm font-medium transition-colors hover:bg-white/10 sm:text-base"
-              >
-                Announcements
-              </a>
-            </li>
-          </ul>
-          <a
-            href="https://www.lyceumalabang.edu.ph/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hidden py-2.5 text-sm text-white/80 transition-colors hover:text-white sm:block sm:text-base"
-          >
-            lyceumalabang.edu.ph
-            <span className="sr-only"> (opens in a new tab)</span>
-          </a>
-        </div>
-      </nav>
-
-      <header className="border-b-[3px] border-amber-400 bg-primary text-primary-foreground">
-        <div className="mx-auto flex w-full max-w-screen-2xl items-center gap-3 px-4 py-2.5 sm:px-6 md:gap-4 lg:px-8">
-          <img
-            src="/loa-logo.png"
-            alt="Lyceum of Alabang official seal"
-            width={56}
-            height={56}
-            className="h-12 w-12 shrink-0 rounded-full bg-white p-0.5 sm:h-14 sm:w-14"
-          />
-          <div className="min-w-0 leading-tight">
-            <p className="font-serif text-[11px] uppercase tracking-[0.16em] text-white/75 sm:text-xs">
-              Lyceum of Alabang
-            </p>
-            <p className="mt-0.5 font-serif text-xl font-semibold tracking-wide sm:text-2xl">
-              HRDO LOA DESK
-            </p>
-            <p className="mt-0.5 hidden text-xs text-white/75 sm:block">
-              Human Resources Development Office
-            </p>
+    <div className="min-h-screen bg-white text-[#222] antialiased">
+      <header className="sticky top-0 z-30 border-b border-[#e1edf7] bg-white/95 backdrop-blur-sm shadow-[0_1px_0_rgba(10,44,79,0.04)]">
+        <div className="mx-auto flex h-[95px] max-w-[1340px] items-center justify-between gap-5 px-6">
+          <div className="flex items-center gap-3">
+            <img
+              src="/loa-loading.png"
+              alt="LOA eServices logo"
+              className="h-[200px] w-[200px] object-contain"
+            />
           </div>
-          <div className="ml-auto flex shrink-0 items-center gap-2">
-            {signedIn && (
-              <Button asChild size="sm" variant="secondary">
-                <Link to="/hrdo/dashboard" className="px-3 text-sm sm:text-base">
-                  Open my dashboard
-                </Link>
-              </Button>
-            )}
+
+          <div className="flex items-center gap-6">
+            <nav aria-label="Main navigation" className="hidden items-center gap-7 md:flex">
+              <div className="group relative">
+                <button
+                  type="button"
+                  className="flex items-center gap-1 text-[15px] font-semibold uppercase tracking-[0.01em] text-[#0F5C85] transition-colors hover:text-[#0b4670]"
+                >
+                  <span>Services</span>
+                  <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
+
+                <div className="absolute right-0 top-full z-20 mt-3 hidden min-w-[240px] rounded-md border border-[#dfeaf3] bg-white p-2 shadow-lg group-hover:block group-focus-within:block">
+                  {[
+                    { label: "Vehicle Trip Ticketing", href: "/login" },
+                    { label: "COE Request", href: "/hrdo/coe" },
+                    { label: "Permission Slip", href: "/hrdo/requests" },
+                    { label: "Late & Absences", href: "/hrdo/history" },
+                    { label: "Employee Records", href: "/hrdo/profile" },
+                    { label: "HRDO Dashboard", href: "/hrdo/dashboard" },
+                  ].map((item) => (
+                    <Link
+                      key={item.label}
+                      to={item.href}
+                      className="block rounded-sm px-3 py-2 text-left text-[14px] font-medium text-[#0F5C85] transition-colors hover:bg-[#eef7ff] hover:text-[#0b4670]"
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+
+              <Link
+                to="/hrdo/dashboard"
+                className="text-[15px] font-semibold uppercase tracking-[0.01em] text-[#0F5C85] transition-colors hover:text-[#0b4670]"
+              >
+                About
+              </Link>
+            </nav>
+
+            <div className="flex items-center gap-3">
+              <Link
+                to="/register"
+                className="inline-flex h-[37px] items-center justify-center rounded-[6px] bg-[#0F5C85] px-5 text-[15px] font-bold text-white shadow-sm transition-colors hover:bg-[#0b4d76]"
+              >
+                Register
+              </Link>
+            </div>
           </div>
         </div>
       </header>
 
-      <main id="main-content" className="flex flex-1 flex-col">
-        <div className="mx-auto flex w-full max-w-screen-2xl flex-1 flex-col justify-center px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-7">
-          <div className="mx-auto max-w-3xl text-center">
-            <p className="text-xl font-semibold text-muted-foreground sm:text-2xl">
-              Human Resources Development Office
-            </p>
-            <h1 className="mt-0.5 text-3xl font-bold tracking-tight text-primary sm:text-4xl">
-              HRDO LOA DESK
-            </h1>
-            <p className="mt-2 text-base text-muted-foreground sm:text-lg">
-              Assisting Every Employee, Discovering the Services You Need at the LOA Desk.
-            </p>
+      <main>
+        <section className="relative h-[548px] overflow-hidden bg-[#d8ebf8]">
+          <div
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+            style={{
+              backgroundImage: "url('/lyceum-building.png.png')",
+            }}
+          />
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(11,44,59,0.72)_0%,rgba(29,93,127,0.45)_38%,rgba(126,179,218,0.24)_100%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.04))]" />
+
+          <svg
+            aria-hidden="true"
+            className="absolute left-0 top-0 h-full w-[42%] opacity-75"
+            viewBox="0 0 760 548"
+            preserveAspectRatio="none"
+          >
+            <polygon points="0,0 760,0 760,548 0,548 0,450 120,430 160,350 220,250 300,180 430,170 610,240 700,220 760,200 760,0" fill="rgba(255,255,255,0.07)" />
+          </svg>
+
+          <svg
+            aria-hidden="true"
+            className="absolute bottom-[-28px] left-[-4%] h-[170px] w-[108%]"
+            viewBox="0 0 1600 220"
+            preserveAspectRatio="none"
+          >
+            <path
+              d="M0,128 L60,114 L130,118 L210,110 L310,120 L430,100 L520,110 L620,82 L760,96 L860,70 L960,102 L1040,84 L1120,98 L1190,72 L1290,94 L1380,84 L1480,100 L1600,90 L1600,220 L0,220 Z"
+              fill="rgba(13,123,181,0.92)"
+            />
+          </svg>
+
+          <div className="relative mx-auto flex h-full max-w-[1340px] items-start px-6">
+            <div className="max-w-[680px] pt-[180px] text-white">
+              <p className="mb-4 text-[40px] font-medium uppercase tracking-[-0.04em] text-white/95">
+                Welcome to
+              </p>
+              <h1 className="mb-5 text-[57px] font-bold leading-[1.08] tracking-[-0.04em] text-white">
+                LOA HRDO DESK
+              </h1>
+              <p className="max-w-[680px] text-[28px] font-normal leading-[1] text-white/95">
+                Transforming employee services for a faster, convenient, and smarter digital experience for staff and stakeholders.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <div className="mx-auto max-w-[1340px] px-6">
+          <div className="flex items-center gap-3 py-[26px] text-[16px] font-semibold text-[#0F5C85]">
+            <a href="#" className="font-bold uppercase underline decoration-2 underline-offset-4">
+              Explore our services
+            </a>
           </div>
 
-          <section
-            id="services"
-            aria-labelledby="services-heading"
-            className="mt-5 scroll-mt-4 sm:mt-6 lg:mt-7"
-          >
-            <h2 id="services-heading" className="sr-only">
-              Employee services
-            </h2>
-            <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-4 lg:gap-2.5">
-              {SERVICES.map((service) => {
-                const Icon = service.icon;
-                const className =
-                  "group flex h-full w-full items-start gap-4 rounded-lg border border-border bg-card p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/50 hover:bg-secondary hover:shadow-md focus-visible:border-primary sm:min-h-48 sm:flex-col sm:items-center sm:justify-center sm:gap-4 sm:p-5 sm:text-center lg:min-h-52 lg:p-6";
+          <section className="pt-1">
+            <h2 className="pb-[16px] text-[22px] font-semibold text-[#444]">Our Services</h2>
+
+            <div className="grid grid-cols-1 gap-x-[30px] gap-y-[16px] md:grid-cols-2 xl:grid-cols-3">
+              {popularServices.map(({ title, icon: Icon, highlight, to }) => {
+                const isHighlighted = highlight;
                 return (
-                  <li key={service.id}>
-                    {service.available ? (
-                      <Link
-                        to={
-                          service.id === "coe"
-                            ? "/hrdo/coe"
-                            : viewer?.role === "requisitioner"
-                              ? "/requests/new"
-                              : signedIn
-                                ? "/hrdo/dashboard"
-                                : "/login"
-                        }
-                        className={className}
-                      >
-                        <Icon
-                          aria-hidden="true"
-                          strokeWidth={1.5}
-                          className="mt-0.5 h-10 w-10 shrink-0 text-primary sm:mt-0 sm:h-14 sm:w-14"
-                        />
-                        <span className="min-w-0">
-                          <span className="block text-lg font-bold leading-snug text-foreground group-hover:text-primary sm:text-xl">
-                            {service.title}
-                          </span>
-                          <span className="mt-1.5 block text-sm leading-relaxed text-muted-foreground sm:text-base">
-                            {service.description}
-                          </span>
-                        </span>
-                      </Link>
-                    ) : (
-                      <div className={`${className} cursor-not-allowed opacity-75`}>
-                        <Icon
-                          aria-hidden="true"
-                          strokeWidth={1.5}
-                          className="mt-0.5 h-10 w-10 shrink-0 text-primary sm:mt-0 sm:h-14 sm:w-14"
-                        />
-                        <span className="min-w-0">
-                          <span className="block text-lg font-bold leading-snug text-foreground sm:text-xl">
-                            {service.title}
-                          </span>
-                          <span className="mt-1.5 block text-sm leading-relaxed text-muted-foreground sm:text-base">
-                            {service.description}
-                          </span>
-                          <span className="mt-2 inline-block rounded-sm bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
-                            Not available online yet
-                          </span>
-                        </span>
-                      </div>
-                    )}
-                  </li>
+                  <Link
+                    key={title}
+                    to={to}
+                    className={`group flex h-[136px] flex-col items-center justify-center rounded-[10px] border border-[#7DBDEB] bg-white px-4 py-4 text-center shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg ${
+                      isHighlighted ? "bg-[#0F5C85] text-white" : "bg-white text-[#0F5C85]"
+                    }`}
+                  >
+                    <div
+                      className={`mb-4 flex h-[80px] w-[80px] items-center justify-center rounded-[12px] ${
+                        isHighlighted ? "bg-[rgba(255,255,255,0.14)]" : "bg-[#D6E9F8]"
+                      }`}
+                    >
+                      <Icon
+                        className={`h-[44px] w-[44px] ${isHighlighted ? "text-white" : "text-[#0F5C85]"}`}
+                        strokeWidth={1.8}
+                        aria-hidden="true"
+                      />
+                    </div>
+                    <div
+                      className={`text-[17px] font-bold ${isHighlighted ? "text-white" : "text-[#0F5C85]"}`}
+                    >
+                      {title}
+                    </div>
+                  </Link>
                 );
               })}
-            </ul>
+            </div>
           </section>
 
-          <section
-            id="announcements"
-            aria-labelledby="announcements-heading"
-            className="mt-5 scroll-mt-4 border-l-4 border-sky-300 py-2 pl-4 sm:mt-6 sm:pl-5"
-          >
-            <h2
-              id="announcements-heading"
-              className="text-base font-bold uppercase tracking-wide text-primary sm:text-lg"
-            >
-              Announcements
-            </h2>
-            <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground sm:text-base">
-              There are no announcements from the Human Resources Development Office at this time.
-            </p>
-          </section>
         </div>
       </main>
 
-      <footer className="bg-slate-800 text-white">
-        <div className="mx-auto grid w-full max-w-screen-2xl gap-4 px-4 py-4 sm:px-6 md:grid-cols-2 md:items-center md:gap-0 lg:px-8">
-          <div className="flex items-center gap-3 md:pr-8">
-            <img
-              src="/loa-logo.png"
-              alt=""
-              width={40}
-              height={40}
-              className="h-10 w-10 shrink-0 rounded-full bg-white p-0.5"
-            />
-            <div className="leading-snug">
-              <p className="font-serif text-base font-semibold uppercase tracking-wide sm:text-lg">
-                Lyceum of Alabang
-              </p>
-              <p className="text-xs uppercase tracking-wide text-white/70 sm:text-sm">
-                Human Resources Development Office
-              </p>
-              <p className="mt-1 text-xs text-white/70 sm:text-sm">LOA DESK</p>
-            </div>
-          </div>
-          <div className="border-t border-white/20 pt-3 md:border-l md:border-t-0 md:py-1 md:pl-8">
-            <h2 className="text-sm font-semibold uppercase tracking-wide">Contact &amp; links</h2>
-            <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-white/75">
-              <li>
+      <footer className="mt-[48px] bg-gradient-to-r from-[#135F87] via-[#155d86] to-[#1B6A92] text-white">
+        <div className="mx-auto max-w-[1340px] px-6 py-[18px]">
+          <div className="flex min-h-[120px] flex-col items-center justify-center gap-4 lg:flex-row lg:justify-between">
+            <div className="flex items-center gap-4">
+              <span className="text-[14px] font-bold uppercase tracking-[0.08em]">Follow us</span>
+              <div className="flex items-center gap-3">
                 <a
-                  href={`mailto:${SITE.contactEmail}`}
-                  className="inline-flex items-center gap-2 hover:text-white hover:underline"
-                >
-                  <Mail className="h-4 w-4" aria-hidden />
-                  {SITE.contactEmail}
-                </a>
-              </li>
-              <li>
-                <Link to="/privacy" className="hover:text-white hover:underline">
-                  Privacy Policy
-                </Link>
-              </li>
-              <li>
-                <a
-                  href="https://www.lyceumalabang.edu.ph/"
+                  href="https://www.facebook.com/lyceumhrdo"
                   target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 hover:text-white hover:underline"
+                  rel="noreferrer"
+                  aria-label="Lyceum HRDO Facebook"
+                  className="flex h-[38px] w-[38px] items-center justify-center rounded-full border border-white/70 bg-white/10 text-white transition-colors hover:bg-white/15"
                 >
-                  Lyceum of Alabang Website
-                  <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
-                  <span className="sr-only">(opens in a new tab)</span>
+                  <Facebook className="h-[18px] w-[18px]" aria-hidden="true" />
                 </a>
-              </li>
-            </ul>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 text-[15px] font-medium text-white">
+              <div className="flex items-center gap-2">
+                <Phone className="h-[16px] w-[16px]" aria-hidden="true" />
+                <span>156</span>
+              </div>
+              <div className="h-[30px] w-px bg-white/40" />
+              <div className="flex items-center gap-2">
+                <Mail className="h-[16px] w-[16px]" aria-hidden="true" />
+                <span>hrdo@lyceumalabang.edu.ph</span>
+              </div>
+            </div>
+
+            <nav aria-label="Footer links" className="flex items-center gap-6 text-[14px] font-bold uppercase tracking-[0.02em] text-white">
+              <a href="/privacy" className="transition-opacity hover:opacity-80">
+                Terms of Service
+              </a>
+              <a href="#faqs" className="transition-opacity hover:opacity-80">
+                FAQs
+              </a>
+              <a href="/privacy" className="transition-opacity hover:opacity-80">
+                Privacy Policy
+              </a>
+            </nav>
+          </div>
+
+          <div id="faqs" className="mt-4 h-px w-full bg-white/30" />
+          <div id="privacy-policy" className="pt-3 text-center text-[12px] text-white/85">
+            © 2025 Lyceum of Alabang HRDO. All rights reserved.
           </div>
         </div>
       </footer>

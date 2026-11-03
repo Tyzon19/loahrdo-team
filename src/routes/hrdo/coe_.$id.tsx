@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   Clock3,
   Download,
+  FileDown,
   FileCheck2,
   Info,
   RefreshCw,
@@ -16,6 +17,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -31,6 +39,7 @@ import { CoeHistoryList } from "@/components/hrdo/CoeHistoryList";
 import {
   getCoeDocumentFn,
   getCoeRequestFn,
+  generateCoeTemplateFn,
   markCoeReadyFn,
   rejectCoeRequestFn,
   releaseCoeDocumentFn,
@@ -95,6 +104,48 @@ const ACTION_SUCCESS: Record<ActionPayload["kind"], string> = {
   reject: "Request rejected.",
 };
 
+const OTHER_PURPOSE_OPTION = "Other (Please Specify)" as const;
+
+const COE_PURPOSE_OPTIONS = [
+  "Bank / Loan Application",
+  "Credit Card Application",
+  "Visa / Immigration",
+  "Travel Requirements",
+  "Employment Verification",
+  "Government Requirements",
+  "Housing / Rental Application",
+  "Personal Records",
+  OTHER_PURPOSE_OPTION,
+] as const;
+
+function formatRequestNote(note: string) {
+  const lines = note.split("\n");
+  const metadataIndex = lines.findIndex((line) => /(?:^|\| )Requestor type:/.test(line));
+  const customNote =
+    metadataIndex > 0
+      ? lines.slice(0, metadataIndex).join("\n")
+      : metadataIndex === -1
+        ? note
+        : "";
+  const metadata =
+    metadataIndex >= 0 ? lines.slice(metadataIndex).join("\n") : lines.join("\n");
+  const fields = metadata
+    ? metadata.split(/\s*\|\s*/).flatMap((part) => {
+        const separator = part.indexOf(": ");
+        return separator === -1
+          ? []
+          : [[part.slice(0, separator), part.slice(separator + 2)] as const];
+      })
+    : [];
+  return { customNote, fields };
+}
+
+function normalizePurposeChoice(value: string) {
+  return COE_PURPOSE_OPTIONS.includes(value as (typeof COE_PURPOSE_OPTIONS)[number])
+    ? value
+    : OTHER_PURPOSE_OPTION;
+}
+
 type ActionPayload =
   | { kind: "verify" }
   | { kind: "process" }
@@ -115,6 +166,16 @@ function CoeDetailPage() {
   const [receivedBy, setReceivedBy] = useState("");
   const [file, setFile] = useState<{ name: string; dataUrl: string } | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [templateFields, setTemplateFields] = useState({
+    employeeName: "",
+    dateHired: "",
+    position: "",
+    compensationWords: "",
+    compensationAmount: "",
+    purpose: "",
+    issueDate: new Date().toISOString().slice(0, 10),
+    preparedByName: "",
+  });
 
   const query = useQuery({
     queryKey: ["coe", "request", id],
@@ -149,7 +210,7 @@ function CoeDetailPage() {
     },
     onSuccess: async (_result, payload) => {
       toast.success(ACTION_SUCCESS[payload.kind]);
-      setActive(null);
+      setActive(payload.kind === "process" ? "process" : null);
       setCorrection("");
       setReceivedBy("");
       setFile(null);
@@ -215,6 +276,9 @@ function CoeDetailPage() {
 
   const actions = isStaff ? coeStaffActions(request) : [];
   const canDownload = coeCanDownloadDocument(request, isStaff ? "staff" : "requestor");
+  const includesCompensation =
+    /With compensation review/i.test(request.note) ||
+    /COE type:\s*COE with Compensation/i.test(request.note);
 
   function pickFile(event: React.ChangeEvent<HTMLInputElement>) {
     const selected = event.target.files?.[0];
@@ -234,6 +298,37 @@ function CoeDetailPage() {
     reader.readAsDataURL(selected);
   }
 
+  async function generateTemplate() {
+    try {
+      const result = await unwrap(
+        generateCoeTemplateFn({
+          data: {
+            id,
+            employeeName: templateFields.employeeName.trim() || request.employeeName,
+            dateHired: templateFields.dateHired,
+            position: templateFields.position,
+            department: request.department,
+            compensationWords: templateFields.compensationWords,
+            compensationAmount: templateFields.compensationAmount,
+            purpose: templateFields.purpose.trim() || request.purpose,
+            issueDate: templateFields.issueDate,
+            preparedByName: templateFields.preparedByName.trim() || hrdoViewer.name,
+            includeCompensation: includesCompensation,
+          },
+        }),
+      );
+      const bytes = Uint8Array.from(atob(result.base64), (char) => char.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: result.mime }));
+      const link = window.document.createElement("a");
+      link.href = url;
+      link.download = result.fileName;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "We couldn't generate the COE template.");
+    }
+  }
+
   async function downloadDocument() {
     setDownloading(true);
     try {
@@ -250,6 +345,7 @@ function CoeDetailPage() {
     } finally {
       setDownloading(false);
     }
+
   }
 
   return (
@@ -280,7 +376,7 @@ function CoeDetailPage() {
 
       <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0 space-y-4">
-          <Section title="Request details">
+          <Section title="COE Request Details">
             <dl className="grid gap-4 sm:grid-cols-2">
               <Field label="Request ID" comfortable>
                 <span className="font-mono text-[13px] font-medium">{request.id}</span>
@@ -288,7 +384,7 @@ function CoeDetailPage() {
               <Field label="Date Requested" comfortable>
                 <span className="font-medium">{fmtDateTime(request.requestedAt)}</span>
               </Field>
-              <Field label="Employee Name" comfortable>
+              <Field label="Name of requestor" comfortable>
                 <span className="font-medium">{request.employeeName}</span>
               </Field>
               <Field label="Employee ID" comfortable>
@@ -318,9 +414,31 @@ function CoeDetailPage() {
               </div>
               <div className="sm:col-span-2">
                 <Field label="Additional Note" comfortable>
-                  <span className="whitespace-pre-line font-medium">
-                    {request.note || "No additional note was provided."}
-                  </span>
+                  {request.note ? (
+                    <div className="space-y-3">
+                      {formatRequestNote(request.note).customNote && (
+                        <p className="whitespace-pre-line font-medium">
+                          {formatRequestNote(request.note).customNote}
+                        </p>
+                      )}
+                      {formatRequestNote(request.note).fields.length > 0 && (
+                        <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
+                          {formatRequestNote(request.note).fields.map(([label, value]) => (
+                            <div key={label} className="min-w-0">
+                              <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                {label}
+                              </dt>
+                              <dd className="mt-0.5 whitespace-pre-line break-words font-medium">
+                                {value}
+                              </dd>
+                            </div>
+                          ))}
+                        </dl>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="font-medium">No additional note was provided.</span>
+                  )}
                 </Field>
               </div>
               {request.remarks && (
@@ -332,6 +450,97 @@ function CoeDetailPage() {
               )}
             </dl>
           </Section>
+
+          {isStaff && active === "process" && (
+            <Dialog
+              open={active === "process"}
+              onOpenChange={(open) => {
+                if (!open) setActive(null);
+              }}
+            >
+              <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+                <DialogHeader>
+                  <DialogTitle>COE template details</DialogTitle>
+                  <DialogDescription>
+                    Review the details, start processing, and generate the filled Word template.
+                    The generated document will also be emailed to the requestor.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {[
+                      ["employeeName", "Employee name", request.employeeName],
+                      ["dateHired", "Date hired", ""],
+                      ["position", "Position / designation", ""],
+                      ...(includesCompensation
+                        ? [
+                            ["compensationWords", "Compensation in words", ""],
+                            ["compensationAmount", "Compensation amount", ""],
+                          ]
+                        : []),
+                      ["purpose", "Purpose", request.purpose],
+                      ["issueDate", "Issue date", templateFields.issueDate],
+                      ["preparedByName", "Prepared by", hrdoViewer.name],
+                    ].map(([keyName, label, placeholder]) => (
+                      <div key={keyName}>
+                        <Label htmlFor={`template-${keyName}`}>{label}</Label>
+                        <Input
+                          id={`template-${keyName}`}
+                          className="mt-1"
+                          type={keyName === "issueDate" ? "date" : "text"}
+                          value={templateFields[keyName as keyof typeof templateFields]}
+                          placeholder={placeholder}
+                          onChange={(event) =>
+                            setTemplateFields((current) => ({
+                              ...current,
+                              [keyName]: event.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                    ))}
+                    <div>
+                      <Label htmlFor="template-department">Department / office</Label>
+                      <Input
+                        id="template-department"
+                        className="mt-1"
+                        value={request.department}
+                        readOnly
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    {request.status !== "processing" && (
+                      <Button
+                        type="button"
+                        className="sm:flex-1"
+                        disabled={action.isPending}
+                        onClick={() => action.mutate({ kind: "process" })}
+                      >
+                        {action.isPending ? "Starting processing…" : "Start processing"}
+                      </Button>
+                    )}
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="sm:flex-1"
+                      onClick={() => void generateTemplate()}
+                      disabled={request.status !== "processing"}
+                    >
+                      <FileDown className="h-4 w-4" aria-hidden />
+                      Generate and email Word template
+                    </Button>
+                  </div>
+                  <Button asChild type="button" variant="outline" className="w-full">
+                    <a href="/COE%20FORMAT.docx" download="COE FORMAT.docx">
+                      <FileDown className="h-4 w-4" aria-hidden />
+                      Download blank COE template
+                    </a>
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
 
           {isStaff && request.status === "correction_requested" && (
             <Section title="Waiting for the employee">
@@ -408,6 +617,16 @@ function CoeDetailPage() {
 
           {isStaff && (
             <Section title="HRDO actions">
+              {request.status === "processing" && (
+                <Button
+                  type="button"
+                  className="mb-2 w-full justify-start"
+                  onClick={() => setActive("process")}
+                >
+                  <FileCheck2 className="h-4 w-4" aria-hidden />
+                  Open COE template details
+                </Button>
+              )}
               {actions.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   No action is available while this request is{" "}
@@ -438,7 +657,7 @@ function CoeDetailPage() {
                         <div className="mt-2 space-y-2 rounded-md border bg-muted/30 p-3">
                           {key === "request_correction" && (
                             <>
-                              <Label htmlFor="correction-message">Message to the employee</Label>
+                              <Label htmlFor="correction-message">Message to the requestor</Label>
                               <Textarea
                                 id="correction-message"
                                 className="min-h-24"
@@ -494,13 +713,15 @@ function CoeDetailPage() {
                             </>
                           )}
                           {(key === "verify" || key === "process" || key === "mark_ready") && (
-                            <p className="text-xs text-muted-foreground">
-                              {key === "verify"
-                                ? "Confirm the name, Employee ID, department and employment details against HR records before continuing."
-                                : key === "process"
-                                  ? "Preparing the COE uses the approved Lyceum of Alabang format and authorized signatory."
-                                  : "The printed, signed COE is now waiting at the HRDO desk."}
-                            </p>
+                            <div className="space-y-2 text-xs text-muted-foreground">
+                              <p>
+                                {key === "verify"
+                                  ? "Confirm the name, Employee ID, department and employment details against HR records before continuing."
+                                  : key === "process"
+                                    ? "Start processing first, then download the approved template, fill it with the request details, export it as a PDF, have it signed, and upload the signed PDF."
+                                    : "The printed, signed COE is now waiting at the HRDO desk."}
+                              </p>
+                            </div>
                           )}
 
                           <Button
@@ -709,16 +930,29 @@ function DocumentPanel({
 
 function CorrectionForm({ request }: { request: CoeRequest }) {
   const queryClient = useQueryClient();
-  const [purpose, setPurpose] = useState(request.purpose);
+  const [purpose, setPurpose] = useState(() => normalizePurposeChoice(request.purpose));
+  const [customPurpose, setCustomPurpose] = useState(() =>
+    normalizePurposeChoice(request.purpose) === OTHER_PURPOSE_OPTION ? request.purpose : "",
+  );
   const [note, setNote] = useState(request.note);
+  const [employeeEmail, setEmployeeEmail] = useState(request.employeeEmail);
   const [employeeNumber, setEmployeeNumber] = useState(request.employeeNumber);
   const [copyType, setCopyType] = useState<CoeCopyType>(request.copyType);
+
+  const selectedPurpose = purpose === OTHER_PURPOSE_OPTION ? customPurpose : purpose;
 
   const resubmit = useMutation({
     mutationFn: async () =>
       unwrap(
         resubmitCoeRequestFn({
-          data: { id: request.id, purpose, note, employeeNumber, copyType },
+          data: {
+            id: request.id,
+            purpose: selectedPurpose.trim(),
+            note,
+            employeeEmail: employeeEmail.trim(),
+            employeeNumber: employeeNumber.trim(),
+            copyType,
+          },
         }),
       ),
     onSuccess: async () => {
@@ -737,19 +971,37 @@ function CorrectionForm({ request }: { request: CoeRequest }) {
         noValidate
         onSubmit={(event) => {
           event.preventDefault();
-          if (purpose.trim().length < 5) {
-            toast.error("Describe the purpose of the request (at least 5 characters).");
+          const trimmedPurpose = selectedPurpose.trim();
+          const trimmedEmployeeEmail = employeeEmail.trim();
+          const trimmedEmployeeNumber = employeeNumber.trim();
+          if (!trimmedEmployeeEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmployeeEmail)) {
+            toast.error("Enter a valid email address.");
             return;
           }
-          if (employeeNumber.trim().length < 3) {
-            toast.error("Enter your Employee ID (at least 3 characters).");
+          if (trimmedPurpose.length < 5) {
+            toast.error("Choose or enter a valid purpose for the request.");
+            return;
+          }
+          if (trimmedEmployeeNumber && trimmedEmployeeNumber.length < 3) {
+            toast.error("Employee ID must be 3 or more characters if provided.");
             return;
           }
           resubmit.mutate();
         }}
       >
         <div>
-          <Label htmlFor="resubmit-employee-number">Employee ID</Label>
+          <Label htmlFor="resubmit-employee-email">Email address</Label>
+          <Input
+            id="resubmit-employee-email"
+            className="mt-1"
+            type="email"
+            value={employeeEmail}
+            onChange={(event) => setEmployeeEmail(event.target.value)}
+            placeholder="name@lyceumalabang.edu.ph"
+          />
+        </div>
+        <div>
+          <Label htmlFor="resubmit-employee-number">Employee ID (optional)</Label>
           <Input
             id="resubmit-employee-number"
             className="mt-1"
@@ -760,13 +1012,31 @@ function CorrectionForm({ request }: { request: CoeRequest }) {
         </div>
         <div>
           <Label htmlFor="resubmit-purpose">Purpose of request</Label>
-          <Input
-            id="resubmit-purpose"
-            className="mt-1"
-            value={purpose}
-            onChange={(event) => setPurpose(event.target.value)}
-            maxLength={255}
-          />
+          <Select value={purpose} onValueChange={(value) => setPurpose(value)}>
+            <SelectTrigger id="resubmit-purpose" className="mt-1">
+              <SelectValue placeholder="Choose a purpose" />
+            </SelectTrigger>
+            <SelectContent>
+              {COE_PURPOSE_OPTIONS.map((value) => (
+                <SelectItem key={value} value={value}>
+                  {value}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {purpose === OTHER_PURPOSE_OPTION && (
+            <div className="mt-3">
+              <Label htmlFor="resubmit-custom-purpose">Other (Please Specify)</Label>
+              <Input
+                id="resubmit-custom-purpose"
+                className="mt-1"
+                value={customPurpose}
+                onChange={(event) => setCustomPurpose(event.target.value)}
+                placeholder="Please specify the purpose"
+                maxLength={255}
+              />
+            </div>
+          )}
         </div>
         <div>
           <Label htmlFor="resubmit-copy-type">Type of copy</Label>

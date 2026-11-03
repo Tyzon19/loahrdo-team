@@ -447,7 +447,7 @@ function TripArchive() {
                     ))}
                   </div>
                   <div className="hidden xl:block">
-                    <Table className="min-w-[1050px]">
+                    <Table className="w-full">
                       <TableHeader>
                         <TableRow className="bg-muted/50 hover:bg-muted/50">
                           <TableHead>Ticket</TableHead>

@@ -1,11 +1,14 @@
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { ArrowUpRight, Info } from "lucide-react";
+import { Info } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import {
   AlertDialog,
@@ -24,19 +27,43 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { EmptyState, PageHeader, Section } from "@/components/app/PageHeader";
-import { LoadingPanel, ButtonLoading } from "@/components/app/LoadingPanel";
-import { CoeStatusBadge } from "@/components/hrdo/CoeStatusBadge";
-import { listMyCoeRequestsFn, submitCoeRequestFn } from "@/server-functions";
+import { PageHeader } from "@/components/app/PageHeader";
+import { ButtonLoading } from "@/components/app/LoadingPanel";
+import { submitCoeRequestFn } from "@/server-functions";
 import { unwrap } from "@/lib/api";
-import {
-  COE_COPY_TYPES,
-  COE_COPY_TYPE_HINTS,
-  COE_COPY_TYPE_LABELS,
-  type CoeCopyType,
-} from "@/lib/hrdo";
-import { fmtDateTime } from "@/lib/format";
+import { joinFullName } from "@/lib/name";
+import { COE_COPY_TYPE_LABELS, type CoeCopyType } from "@/lib/hrdo";
 import { SITE } from "@/lib/site";
+
+const DESCRIPTION_OTHER = "Others";
+const DESCRIPTION_OPTIONS = [
+  "Certificate of Employment",
+  "Letter of",
+  "Affidavit of",
+  "With compensation review",
+  "Service Record",
+  "Form of",
+  DESCRIPTION_OTHER,
+] as const;
+const DESCRIPTION_TEXT_OPTIONS = new Set(["Letter of", "Affidavit of", "Form of"]);
+
+function localDateValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function addWorkingDays(start: Date, count: number) {
+  const date = new Date(start);
+  let remaining = count;
+  while (remaining > 0) {
+    date.setDate(date.getDate() + 1);
+    const weekday = date.getDay();
+    if (weekday !== 0 && weekday !== 6) remaining -= 1;
+  }
+  return localDateValue(date);
+}
 
 export const Route = createFileRoute("/hrdo/coe")({
   beforeLoad: ({ context }) => {
@@ -58,27 +85,136 @@ function CoeRequestPage() {
   const { hrdoViewer } = Route.useRouteContext();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [requestorType, setRequestorType] = useState<"internal" | "third_party">("internal");
   const [purpose, setPurpose] = useState("");
+  const [descriptionOptions, setDescriptionOptions] = useState<string[]>([]);
+  const [descriptionDetails, setDescriptionDetails] = useState<Record<string, string>>({});
+  const [customDescription, setCustomDescription] = useState("");
   const [note, setNote] = useState("");
+  const [dateNeeded, setDateNeeded] = useState(() => addWorkingDays(new Date(), 3));
+  const [employeeEmail, setEmployeeEmail] = useState(hrdoViewer.email);
   const [employeeNumber, setEmployeeNumber] = useState("");
-  const [copyType, setCopyType] = useState<CoeCopyType>("original");
-  const [showConfirm, setShowConfirm] = useState(false);
-
-  const myRequests = useQuery({
-    queryKey: ["coe", "mine"],
-    queryFn: () => unwrap(listMyCoeRequestsFn()),
-    staleTime: 10_000,
-    enabled: Boolean(hrdoViewer),
+  const [employeeName, setEmployeeName] = useState({
+    firstName: "",
+    middleName: "",
+    lastName: "",
   });
+  const [employeeTitle, setEmployeeTitle] = useState("");
+  const [department, setDepartment] = useState("");
+  const [customDepartment, setCustomDepartment] = useState("");
+  const [employmentStatus, setEmploymentStatus] = useState("");
+  const [copyType, setCopyType] = useState<CoeCopyType>("original");
+  const [verifierCompany, setVerifierCompany] = useState("");
+  const [verifierName, setVerifierName] = useState("");
+  const [verifierEmail, setVerifierEmail] = useState("");
+  const [verifierContact, setVerifierContact] = useState("");
+  const [subjectName, setSubjectName] = useState("");
+  const [subjectTitle, setSubjectTitle] = useState("");
+  const [subjectDob, setSubjectDob] = useState("");
+  const [privacyChecked, setPrivacyChecked] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
+
+  const dateRequested = localDateValue(new Date());
+  const minimumDateNeeded = addWorkingDays(new Date(), 3);
+  const previewEmployeeName = joinFullName(employeeName);
 
   const submit = useMutation({
-    mutationFn: async () =>
-      unwrap(submitCoeRequestFn({ data: { purpose, note, employeeNumber, copyType } })),
+    mutationFn: async () => {
+      const internalDepartment = department === "Other" ? customDepartment.trim() : department.trim();
+      const combinedNote = [
+        note.trim(),
+        requestorType === "internal"
+          ? [
+              `Requestor type: Internal Employee`,
+              `Title: ${employeeTitle}`,
+              `Department: ${internalDepartment || "Not provided"}`,
+              `Date requested: ${dateRequested}`,
+              `Date needed: ${dateNeeded}`,
+              `Description: ${
+                descriptionOptions
+                  .map((option) => `${option}${descriptionDetails[option] ? ` ${descriptionDetails[option]}` : ""}`)
+                  .join(", ") || "Not provided"
+              }${customDescription.trim() ? ` - ${customDescription.trim()}` : ""}`,
+              `Employment status: ${employmentStatus || "Not provided"}`,
+              `Copy/delivery: ${COE_COPY_TYPE_LABELS[copyType]}`,
+            ].join(" | ")
+          : [
+              `Requestor type: Third-Party Verifier`,
+              `Subject title: ${subjectTitle}`,
+              `Verifier company: ${verifierCompany || "Not provided"}`,
+              `Authorized representative: ${verifierName || "Not provided"}`,
+              `Employee to verify: ${subjectName || "Not provided"}`,
+              `Employee DOB: ${subjectDob || "Not provided"}`,
+              `Date requested: ${dateRequested}`,
+              `Date needed: ${dateNeeded}`,
+              `Description: ${
+                descriptionOptions
+                  .map((option) => `${option}${descriptionDetails[option] ? ` ${descriptionDetails[option]}` : ""}`)
+                  .join(", ") || "Not provided"
+              }${customDescription.trim() ? ` - ${customDescription.trim()}` : ""}`,
+            ].join(" | "),
+      ]
+        .filter(Boolean)
+        .join("\n");
+
+      const submittedDepartment =
+        requestorType === "internal"
+          ? department === "Other"
+            ? customDepartment.trim()
+            : department.trim()
+          : "Third-party verification";
+
+      return unwrap(
+        submitCoeRequestFn({
+          data: {
+            purpose:
+              requestorType === "third_party"
+                ? "Third-party verification / employment verification"
+                  : purpose.trim(),
+            note: combinedNote,
+            employeeEmail:
+              requestorType === "third_party" ? verifierEmail.trim() : employeeEmail.trim(),
+            employeeNumber: employeeNumber.trim(),
+            employeeName:
+              requestorType === "third_party" ? subjectName.trim() : joinFullName(employeeName),
+            department: submittedDepartment,
+            copyType,
+          },
+        }),
+      );
+    },
     onSuccess: async (created) => {
       setPurpose("");
+      setDescriptionOptions([]);
+      setDescriptionDetails({});
+      setCustomDescription("");
       setNote("");
+      setDateNeeded(addWorkingDays(new Date(), 3));
+      setEmployeeEmail(hrdoViewer.email);
       setEmployeeNumber("");
+      setEmployeeName({
+        firstName: "",
+        middleName: "",
+        lastName: "",
+      });
+      setEmployeeTitle("");
+      setDepartment("");
+      setCustomDepartment("");
+      setEmploymentStatus("");
       setCopyType("original");
+      setVerifierCompany("");
+      setVerifierName("");
+      setVerifierEmail("");
+      setVerifierContact("");
+      setSubjectName("");
+      setSubjectTitle("");
+      setSubjectDob("");
+      setDescriptionOptions([]);
+      setDescriptionDetails({});
+      setCustomDescription("");
+      setPrivacyChecked(false);
+      setRequestorType("internal");
       toast.success(
         "Request submitted successfully. Your COE request is now under review and will be processed within 3 working days. It is not automatically approved.",
         { duration: 6000 },
@@ -90,18 +226,133 @@ function CoeRequestPage() {
 
   if (!hrdoViewer) return null;
 
-  const recent = (myRequests.data ?? []).slice(0, 4);
-
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (purpose.trim().length < 5) {
-      toast.error("Describe the purpose of the request (at least 5 characters).");
+
+    if (currentStep === 0) {
+      setCurrentStep(1);
       return;
     }
-    if (employeeNumber.trim().length < 3) {
-      toast.error("Enter your Employee ID (at least 3 characters).");
+
+    const fullEmployeeName = joinFullName(employeeName);
+    const trimmedEmployeeEmail = employeeEmail.trim();
+    const trimmedEmployeeNumber = employeeNumber.trim();
+    const trimmedPurpose = purpose.trim();
+    if (!dateNeeded || dateNeeded < minimumDateNeeded) {
+      toast.error("Choose a date needed at least 3 working days from today.");
       return;
     }
+
+    if (requestorType === "internal") {
+      if (!employeeTitle) {
+        toast.error("Select a title for the employee.");
+        return;
+      }
+      if (employeeName.firstName.trim().length < 2) {
+        toast.error("Enter your first name.");
+        return;
+      }
+      if (employeeName.lastName.trim().length < 2) {
+        toast.error("Enter last name.");
+        return;
+      }
+      if (!trimmedEmployeeEmail || !/^[^\s@]+@lyceumalabang\.edu\.ph$/i.test(trimmedEmployeeEmail)) {
+        toast.error("Use your official institutional email: name@lyceumalabang.edu.ph");
+        return;
+      }
+      if (trimmedEmployeeNumber && trimmedEmployeeNumber.length < 3) {
+        toast.error("Employee ID must be 3 or more characters if provided.");
+        return;
+      }
+      const departmentName = department === "Other" ? customDepartment.trim() : department.trim();
+      if (!departmentName) {
+        toast.error("Choose your department or office, or specify Other.");
+        return;
+      }
+      if (!employmentStatus) {
+        toast.error("Select your employment status.");
+        return;
+      }
+      if (!trimmedPurpose || trimmedPurpose.length < 5) {
+        toast.error("Enter the purpose of use.");
+        return;
+      }
+      if (!descriptionOptions.length) {
+        toast.error("Select at least one description.");
+        return;
+      }
+      if (descriptionOptions.includes(DESCRIPTION_OTHER) && !customDescription.trim()) {
+        toast.error("Specify the other description.");
+        return;
+      }
+      const missingDescriptionDetail = descriptionOptions.find(
+        (option) => DESCRIPTION_TEXT_OPTIONS.has(option) && !descriptionDetails[option]?.trim(),
+      );
+      if (missingDescriptionDetail) {
+        toast.error(`Complete the "${missingDescriptionDetail}" field.`);
+        return;
+      }
+    } else {
+      if (!verifierCompany.trim()) {
+        toast.error("Enter the verifying company or agency name.");
+        return;
+      }
+      if (!verifierName.trim()) {
+        toast.error("Enter the authorized representative name.");
+        return;
+      }
+      if (!verifierEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(verifierEmail)) {
+        toast.error("Enter a valid official business email.");
+        return;
+      }
+      if (!verifierContact.trim()) {
+        toast.error("Enter a contact number.");
+        return;
+      }
+      if (!subjectName.trim()) {
+        toast.error("Enter the employee full name to verify.");
+        return;
+      }
+      if (!subjectTitle) {
+        toast.error("Select a title for the employee to verify.");
+        return;
+      }
+      if (!subjectDob) {
+        toast.error("Enter the employee hiring date.");
+        return;
+      }
+      if (!descriptionOptions.length) {
+        toast.error("Select at least one description.");
+        return;
+      }
+      if (descriptionOptions.includes(DESCRIPTION_OTHER) && !customDescription.trim()) {
+        toast.error("Specify the other description.");
+        return;
+      }
+      const missingDescriptionDetail = descriptionOptions.find(
+        (option) => DESCRIPTION_TEXT_OPTIONS.has(option) && !descriptionDetails[option]?.trim(),
+      );
+      if (missingDescriptionDetail) {
+        toast.error(`Complete the "${missingDescriptionDetail}" field.`);
+        return;
+      }
+    }
+
+    if (currentStep === 1) {
+      setCurrentStep(2);
+      return;
+    }
+
+    if (!privacyChecked) {
+      toast.error("Please agree to the data privacy statement before submitting.");
+      return;
+    }
+
+    if (requestorType === "internal" && fullEmployeeName.length < 5) {
+      toast.error("Enter employee name.");
+      return;
+    }
+
     setShowConfirm(true);
   }
 
@@ -113,171 +364,736 @@ function CoeRequestPage() {
   return (
     <>
       <PageHeader
-        title="Certificate of Employment"
-        description="Request an employment certificate for employment, loan, scholarship, or other verification needs. Requests are not granted immediately — processing takes 3 working days."
-        actions={
-          <Button asChild variant="outline">
-            <Link to="/hrdo/dashboard">Back to My COE Requests</Link>
-          </Button>
-        }
+        title="Certificate of Employment (COE) & Verification Form"
+        description="Submit a request for employment verification or certification."
       />
 
-      <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-        <Section title="Request COE">
-          <form className="space-y-4" onSubmit={onSubmit} noValidate>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <Label htmlFor="employee-name">Employee name</Label>
-                <Input id="employee-name" className="mt-1" value={hrdoViewer.name} readOnly />
-              </div>
-              <div>
-                <Label htmlFor="employee-email">Email address</Label>
-                <Input id="employee-email" className="mt-1" value={hrdoViewer.email} readOnly />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="employee-number">Employee ID</Label>
-              <Input
-                id="employee-number"
-                className="mt-1"
-                value={employeeNumber}
-                onChange={(event) => setEmployeeNumber(event.target.value)}
-                placeholder="Your official employee number"
-                maxLength={40}
-                required
-                aria-describedby="employee-number-help"
-              />
-              <p id="employee-number-help" className="mt-1 text-xs text-muted-foreground">
-                HRDO verifies this against official HR records before processing.
-              </p>
-            </div>
-
-            <div>
-              <Label htmlFor="copy-type">Type of copy</Label>
-              <Select value={copyType} onValueChange={(value) => setCopyType(value as CoeCopyType)}>
-                <SelectTrigger id="copy-type" className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {COE_COPY_TYPES.map((key) => (
-                    <SelectItem key={key} value={key}>
-                      {COE_COPY_TYPE_LABELS[key]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="mt-1 text-xs text-muted-foreground">{COE_COPY_TYPE_HINTS[copyType]}</p>
-            </div>
-
-            <div>
-              <Label htmlFor="purpose">Purpose of request</Label>
-              <Input
-                id="purpose"
-                className="mt-1"
-                value={purpose}
-                onChange={(event) => setPurpose(event.target.value)}
-                placeholder="Example: Scholarship application / loan requirement / employment certification"
-                maxLength={255}
-                required
-                aria-describedby="purpose-help"
-              />
-              <p id="purpose-help" className="mt-1 text-xs text-muted-foreground">
-                Required. At least 5 characters, up to 255.
-              </p>
-            </div>
-
-            <div>
-              <Label htmlFor="note">Additional note (optional)</Label>
-              <Textarea
-                id="note"
-                className="mt-1 min-h-28"
-                value={note}
-                onChange={(event) => setNote(event.target.value)}
-                placeholder="Add any notes, preferred pickup date, or request details."
-                maxLength={2000}
-              />
-            </div>
-
-            {submit.isError && (
-              <p
-                role="alert"
-                className="rounded-sm border border-destructive/30 bg-danger-soft p-3 text-sm"
-              >
-                {submit.error instanceof Error
-                  ? submit.error.message
-                  : "We couldn't submit your request. Please try again."}
-              </p>
-            )}
-
-            <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-              <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden />
-              <span>
-                <strong>Note:</strong> COE requests are <strong>not automatically granted</strong>. HRDO
-                processes and reviews COE requests within <strong>3 working days</strong> from the date
-                of submission. You can track every step on this page.
-              </span>
-            </div>
-
-            <div className="flex justify-end">
-              <Button type="submit" disabled={submit.isPending}>
-                {submit.isPending ? <ButtonLoading label="Submitting…" /> : "Submit COE Request"}
-              </Button>
-            </div>
-          </form>
-        </Section>
-
-        <Section
-          title="My recent COE requests"
-          actions={
-            <Link to="/hrdo/dashboard" className="text-sm font-medium text-primary hover:underline">
-              View all
-            </Link>
-          }
-        >
-          {myRequests.isPending ? (
-            <LoadingPanel label="Loading your COE requests" rows={3} />
-          ) : myRequests.isError ? (
-            <p
-              role="alert"
-              className="rounded-sm border border-destructive/30 bg-danger-soft p-3 text-sm"
-            >
-              We couldn&apos;t load your COE requests. Open the dashboard to retry.
-            </p>
-          ) : !recent.length ? (
-            <EmptyState title="No COE requests yet.">
-              Submitted requests appear here and on your dashboard.
-            </EmptyState>
-          ) : (
-            <ul className="space-y-3">
-              {recent.map((item) => (
-                <li key={item.id} className="rounded-md border bg-muted/30 p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate font-medium" title={item.purpose}>
-                        {item.purpose}
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Requested {fmtDateTime(item.requestedAt)}
-                      </p>
-                    </div>
-                    <CoeStatusBadge status={item.status} />
-                  </div>
-                  {item.note && (
-                    <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{item.note}</p>
-                  )}
-                  <Link
-                    to="/hrdo/coe/$id"
-                    params={{ id: item.id }}
-                    className="mt-2 inline-flex min-h-9 items-center gap-1 text-xs font-medium text-primary hover:underline"
+      <div className="mx-auto max-w-5xl py-6">
+        <Card className="shadow-sm">
+          <CardHeader className="border-b bg-muted/30">
+            <div className="flex items-center justify-between gap-4">
+              <CardTitle className="text-xl">COE Request</CardTitle>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                {[0, 1, 2].map((step) => (
+                  <div
+                    key={step}
+                    className={[
+                      "flex h-7 w-7 items-center justify-center rounded-full border text-[10px] font-semibold",
+                      currentStep === step
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : currentStep > step
+                          ? "border-emerald-500 bg-emerald-500 text-white"
+                          : "bg-background text-muted-foreground",
+                    ].join(" ")}
                   >
-                    View details <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Section>
+                    {step + 1}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardHeader>
+
+          <CardContent className="pt-6">
+            <form className="space-y-6" onSubmit={onSubmit} noValidate>
+              {currentStep === 0 && (
+                <div className="rounded-md border bg-muted/20 p-4">
+                  <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                    Step 1: Form Router
+                  </p>
+                  <RadioGroup
+                    value={requestorType}
+                    onValueChange={(value) => setRequestorType(value as "internal" | "third_party")}
+                    className="space-y-3"
+                  >
+                    <div className="flex items-center space-x-2 rounded-md border bg-background p-3">
+                      <RadioGroupItem value="internal" id="requestor-internal" />
+                      <Label htmlFor="requestor-internal" className="cursor-pointer font-medium">
+                        Internal Employee
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2 rounded-md border bg-background p-3">
+                      <RadioGroupItem value="third_party" id="requestor-third-party" />
+                      <Label htmlFor="requestor-third-party" className="cursor-pointer font-medium">
+                        Third-Party Verifier / External Agency
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+              )}
+
+              {currentStep === 1 && (
+                <>
+                  <div className="rounded-md border bg-muted/20 p-4">
+                    <p className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                      Request schedule
+                    </p>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <Label htmlFor="date-requested">Date requested</Label>
+                        <Input
+                          id="date-requested"
+                          className="mt-1"
+                          type="date"
+                          value={dateRequested}
+                          readOnly
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="date-needed">Date needed</Label>
+                        <Input
+                          id="date-needed"
+                          className="mt-1"
+                          type="date"
+                          min={minimumDateNeeded}
+                          value={dateNeeded}
+                          onChange={(event) => setDateNeeded(event.target.value)}
+                          required
+                        />
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Select a date at least 3 working days from today.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  {requestorType === "internal" ? (
+                    <div className="space-y-5">
+                      <div className="rounded-md border bg-muted/20 p-4">
+                        <p className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                          Section A: Internal Employee Request
+                        </p>
+
+                        <div className="space-y-4">
+                          <div className="max-w-xs">
+                            <Label htmlFor="employee-title">Title</Label>
+                            <Select value={employeeTitle} onValueChange={setEmployeeTitle}>
+                              <SelectTrigger id="employee-title" className="mt-1">
+                                <SelectValue placeholder="Select title" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {["Mr", "Ms", "Mrs", "Dr", "Atty", "Engr", "Prof", "Mx"].map(
+                                  (title) => (
+                                    <SelectItem key={title} value={title}>
+                                      {title}
+                                    </SelectItem>
+                                  ),
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="grid gap-4 sm:grid-cols-3">
+                            <div>
+                              <Label htmlFor="employee-first-name">First name</Label>
+                              <Input
+                                id="employee-first-name"
+                                className="mt-1"
+                                value={employeeName.firstName}
+                                onChange={(event) =>
+                                  setEmployeeName((current) => ({
+                                    ...current,
+                                    firstName: event.target.value,
+                                  }))
+                                }
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="employee-middle-name">Middle name</Label>
+                              <Input
+                                id="employee-middle-name"
+                                className="mt-1"
+                                value={employeeName.middleName}
+                                onChange={(event) =>
+                                  setEmployeeName((current) => ({
+                                    ...current,
+                                    middleName: event.target.value,
+                                  }))
+                                }
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="employee-last-name">Last name</Label>
+                              <Input
+                                id="employee-last-name"
+                                className="mt-1"
+                                value={employeeName.lastName}
+                                onChange={(event) =>
+                                  setEmployeeName((current) => ({
+                                    ...current,
+                                    lastName: event.target.value,
+                                  }))
+                                }
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div>
+                              <Label htmlFor="employee-email">Official email address</Label>
+                              <Input
+                                id="employee-email"
+                                className="mt-1"
+                                value={employeeEmail}
+                                onChange={(event) => setEmployeeEmail(event.target.value)}
+                                type="email"
+                                placeholder="name@lyceumalabang.edu.ph"
+                                autoComplete="email"
+                              />
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                Must end with @lyceumalabang.edu.ph.
+                              </p>
+                            </div>
+
+                            <div>
+                              <Label htmlFor="employee-number">Employee ID</Label>
+                              <Input
+                                id="employee-number"
+                                className="mt-1"
+                                value={employeeNumber}
+                                onChange={(event) => setEmployeeNumber(event.target.value)}
+                                placeholder="Optional"
+                                maxLength={40}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div>
+                              <Label htmlFor="department">Department / College / Office</Label>
+                              <Select
+                                value={department || undefined}
+                                onValueChange={(value) => {
+                                  setDepartment(value);
+                                  if (value !== "Other") setCustomDepartment("");
+                                }}
+                              >
+                                <SelectTrigger id="department" className="mt-1">
+                                  <SelectValue placeholder="Select department" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {[
+                                    "Admission Office",
+                                    "College of Law",
+                                    "Basic Education Library",
+                                    "Customs Administration",
+                                    "Bookstore",
+                                    "Center forCreer and Alumni Services",
+                                    "CCS",
+                                    "CCTV Office",
+                                    "Clinic",
+                                    "College Library & SHS Library",
+                                    "Finance",
+                                    "General Education & COED",
+                                    "LOA Care Center (Guidance & Testing)",
+                                    "HRM - CTHM Faculty",
+                                    "HRM - Stockroom / TESDA Custodian",
+                                    "Human Resource Dept.",
+                                    "Inches & Pixels",
+                                    "Quality Assurance Office",
+                                    "ITM",
+                                    "VCAT / Monitoring Office",
+                                    "Office of Academic Affairs",
+                                    "Office of Studies Affairs & Services",
+                                    "Prefect Discipline Office (beD)",
+                                    "PFMO",
+                                    "Principal's Office DepEd",
+                                    "Purchasing Office",
+                                    "Property Office",
+                                    "Registrar",
+                                    "REM Department",
+                                    "CRID (Research Department)",
+                                    "Security",
+                                    "Sounds and Lights DVA Gym",
+                                    "Tesda - Assesment",
+                                    "Technology Department (TESDA",
+                                    "Warehouse",
+                                    "Office of the President",
+                                    "Senior Highschool Faculty"
+                                  ].map((item) => (
+                                    <SelectItem key={item} value={item}>
+                                      {item}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              {department === "Other" && (
+                                <div className="mt-3">
+                                  <Label htmlFor="department-other">Other department / college / office</Label>
+                                  <Input
+                                    id="department-other"
+                                    className="mt-1"
+                                    value={customDepartment}
+                                    onChange={(event) => setCustomDepartment(event.target.value)}
+                                    placeholder="Please specify"
+                                  />
+                                </div>
+                              )}
+                            </div>
+
+                            <div>
+                              <Label>Employment status</Label>
+                              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                                {[
+                                  "Full-time / Regular",
+                                  "Part-time",
+                                  "Probationary",
+                                  "Contractual / Contract of Service",
+                                ].map((status) => (
+                                  <label
+                                    key={status}
+                                    className="flex items-center gap-2 rounded-md border bg-background px-3 py-2"
+                                  >
+                                    <input
+                                      type="radio"
+                                      name="employment-status"
+                                      checked={employmentStatus === status}
+                                      onChange={() => setEmploymentStatus(status)}
+                                    />
+                                    <span className="text-sm">{status}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div>
+                            <Label>Type of copy &amp; delivery</Label>
+                            <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                              {[
+                                { value: "original", label: "Hardcopy (Original)" },
+                                { value: "soft", label: "Softcopy (Digital PDF)" },
+                                { value: "both", label: "Both (Hardcopy & Softcopy)" },
+                              ].map((option) => (
+                                <label
+                                  key={option.value}
+                                  className="flex items-center gap-2 rounded-md border bg-background px-3 py-2"
+                                >
+                                  <input
+                                    type="radio"
+                                    name="copy-type"
+                                    checked={copyType === option.value}
+                                    onChange={() => setCopyType(option.value as CoeCopyType)}
+                                  />
+                                  <span className="text-sm">{option.label}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div>
+                            <Label htmlFor="purpose">Purpose of use</Label>
+                            <Textarea
+                              id="purpose"
+                              className="mt-1 min-h-24"
+                              value={purpose}
+                              onChange={(event) => setPurpose(event.target.value)}
+                              placeholder="Enter the purpose of use"
+                              maxLength={255}
+                              required
+                            />
+                          </div>
+
+                          <div>
+                            <Label>Description</Label>
+                            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                              {DESCRIPTION_OPTIONS.map((option) => (
+                                <label
+                                  key={option}
+                                  className="flex min-w-0 items-center gap-2 rounded-md border bg-background px-3 py-2"
+                                >
+                                  <Checkbox
+                                    checked={descriptionOptions.includes(option)}
+                                    onCheckedChange={(checked) =>
+                                      setDescriptionOptions((current) =>
+                                        checked
+                                          ? [...current, option]
+                                          : current.filter((value) => value !== option),
+                                      )
+                                    }
+                                  />
+                                  {DESCRIPTION_TEXT_OPTIONS.has(option) ? (
+                                    <span className="flex min-w-0 flex-1 items-center gap-1 text-sm">
+                                      <span className="shrink-0">{option}</span>
+                                      <Input
+                                        aria-label={`${option} details`}
+                                        className="h-8 min-w-0 flex-1"
+                                        value={descriptionDetails[option] ?? ""}
+                                        onChange={(event) =>
+                                          setDescriptionDetails((current) => ({
+                                            ...current,
+                                            [option]: event.target.value,
+                                          }))
+                                        }
+                                        placeholder="Specify"
+                                        maxLength={255}
+                                        disabled={!descriptionOptions.includes(option)}
+                                        onClick={(event) => event.stopPropagation()}
+                                      />
+                                    </span>
+                                  ) : (
+                                    <span className="text-sm">{option}</span>
+                                  )}
+                                </label>
+                              ))}
+                            </div>
+                            {descriptionOptions.includes(DESCRIPTION_OTHER) && (
+                              <Input
+                                id="custom-description"
+                                className="mt-3"
+                                value={customDescription}
+                                onChange={(event) => setCustomDescription(event.target.value)}
+                                placeholder="Specify other description"
+                                maxLength={255}
+                              />
+                            )}
+                          </div>
+
+                          <div>
+                            <Label htmlFor="note">Additional note / special instructions</Label>
+                            <Textarea
+                              id="note"
+                              className="mt-1 min-h-28"
+                              value={note}
+                              onChange={(event) => setNote(event.target.value)}
+                              placeholder="e.g., Please address to BDO Bank"
+                              maxLength={2000}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-5">
+                      <div className="rounded-md border bg-muted/20 p-4">
+                        <p className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                          Section B: Third-Party Employment Verification
+                        </p>
+
+                        <div className="space-y-4">
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div>
+                              <Label htmlFor="verifier-company">Verifying company / agency name</Label>
+                              <Input
+                                id="verifier-company"
+                                className="mt-1"
+                                value={verifierCompany}
+                                onChange={(event) => setVerifierCompany(event.target.value)}
+                                placeholder="e.g., Accenture HR"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="verifier-name">Authorized representative name</Label>
+                              <Input
+                                id="verifier-name"
+                                className="mt-1"
+                                value={verifierName}
+                                onChange={(event) => setVerifierName(event.target.value)}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div>
+                              <Label htmlFor="verifier-email">Official business email</Label>
+                              <Input
+                                id="verifier-email"
+                                className="mt-1"
+                                value={verifierEmail}
+                                onChange={(event) => setVerifierEmail(event.target.value)}
+                                type="email"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="verifier-contact">Contact number</Label>
+                              <Input
+                                id="verifier-contact"
+                                className="mt-1"
+                                value={verifierContact}
+                                onChange={(event) => setVerifierContact(event.target.value)}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div>
+                              <Label htmlFor="subject-title">Title of employee to verify</Label>
+                              <Select value={subjectTitle} onValueChange={setSubjectTitle}>
+                                <SelectTrigger id="subject-title" className="mt-1">
+                                  <SelectValue placeholder="Select title" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {["Mr", "Ms", "Mrs", "Dr", "Atty", "Engr", "Prof", "Mx"].map(
+                                    (title) => (
+                                      <SelectItem key={title} value={title}>
+                                        {title}
+                                      </SelectItem>
+                                    ),
+                                  )}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label htmlFor="subject-name">Employee full name to verify</Label>
+                              <Input
+                                id="subject-name"
+                                className="mt-1"
+                                value={subjectName}
+                                onChange={(event) => setSubjectName(event.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="subject-dob">Date Hired</Label>
+                              <Input
+                                id="subject-dob"
+                                className="mt-1"
+                                type="date"
+                                value={subjectDob}
+                                onChange={(event) => setSubjectDob(event.target.value)}
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <Label>Description</Label>
+                            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                              {DESCRIPTION_OPTIONS.map((option) => (
+                                <label
+                                  key={option}
+                                  className="flex min-w-0 items-center gap-2 rounded-md border bg-background px-3 py-2"
+                                >
+                                  <Checkbox
+                                    checked={descriptionOptions.includes(option)}
+                                    onCheckedChange={(checked) =>
+                                      setDescriptionOptions((current) =>
+                                        checked
+                                          ? [...current, option]
+                                          : current.filter((value) => value !== option),
+                                      )
+                                    }
+                                  />
+                                  {DESCRIPTION_TEXT_OPTIONS.has(option) ? (
+                                    <span className="min-w-0 flex-1">
+                                      <span className="text-sm">{option}</span>
+                                      <Input
+                                        className="mt-1 h-8"
+                                        value={descriptionDetails[option] || ""}
+                                        onChange={(event) =>
+                                          setDescriptionDetails((current) => ({
+                                            ...current,
+                                            [option]: event.target.value,
+                                          }))
+                                        }
+                                        placeholder="Specify"
+                                        maxLength={255}
+                                        disabled={!descriptionOptions.includes(option)}
+                                        onClick={(event) => event.stopPropagation()}
+                                      />
+                                    </span>
+                                  ) : (
+                                    <span className="text-sm">{option}</span>
+                                  )}
+                                </label>
+                              ))}
+                            </div>
+                            {descriptionOptions.includes(DESCRIPTION_OTHER) && (
+                              <Input
+                                id="third-party-custom-description"
+                                className="mt-3"
+                                value={customDescription}
+                                onChange={(event) => setCustomDescription(event.target.value)}
+                                placeholder="Specify other description"
+                                maxLength={255}
+                              />
+                            )}
+                          </div>
+
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {currentStep === 2 && (
+                <div className="space-y-5">
+                  <div className="rounded-md border bg-background p-4">
+                    <p className="mb-1 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                      Preview your request
+                    </p>
+                    <p className="mb-4 text-sm text-muted-foreground">
+                      Review the information below before submitting. Use Back if you need to make
+                      changes.
+                    </p>
+                    <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                      <div>
+                        <dt className="text-muted-foreground">Request type</dt>
+                        <dd className="font-medium">
+                          {requestorType === "internal"
+                            ? "Internal Employee"
+                            : "Third-Party Employment Verification"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-muted-foreground">Date needed</dt>
+                        <dd className="font-medium">{dateNeeded}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-muted-foreground">Date requested</dt>
+                        <dd className="font-medium">{dateRequested}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-muted-foreground">Copy / delivery</dt>
+                        <dd className="font-medium">{COE_COPY_TYPE_LABELS[copyType]}</dd>
+                      </div>
+                      {requestorType === "internal" ? (
+                        <>
+                          <div>
+                            <dt className="text-muted-foreground">Employee</dt>
+                            <dd className="font-medium">
+                              {employeeTitle}. {previewEmployeeName}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-muted-foreground">Department / office</dt>
+                            <dd className="font-medium">
+                              {department === "Other" ? customDepartment : department}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-muted-foreground">Email</dt>
+                            <dd className="break-all font-medium">{employeeEmail}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-muted-foreground">Employee ID</dt>
+                            <dd className="font-medium">{employeeNumber || "Not provided"}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-muted-foreground">Employment status</dt>
+                            <dd className="font-medium">{employmentStatus}</dd>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div>
+                            <dt className="text-muted-foreground">Verifying company / agency</dt>
+                            <dd className="font-medium">{verifierCompany}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-muted-foreground">Authorized representative</dt>
+                            <dd className="font-medium">{verifierName}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-muted-foreground">Business email</dt>
+                            <dd className="break-all font-medium">{verifierEmail}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-muted-foreground">Contact number</dt>
+                            <dd className="font-medium">{verifierContact}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-muted-foreground">Employee to verify</dt>
+                            <dd className="font-medium">
+                              {subjectTitle}. {subjectName}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-muted-foreground">Date hired</dt>
+                            <dd className="font-medium">{subjectDob}</dd>
+                          </div>
+                        </>
+                      )}
+                      <div className="sm:col-span-2">
+                        <dt className="text-muted-foreground">Description</dt>
+                        <dd className="font-medium">
+                          {descriptionOptions
+                            .map(
+                              (option) =>
+                                `${option}${descriptionDetails[option] ? ` ${descriptionDetails[option]}` : ""}`,
+                            )
+                            .join(", ")}
+                          {customDescription.trim() ? ` — ${customDescription.trim()}` : ""}
+                        </dd>
+                      </div>
+                      {requestorType === "internal" && (
+                        <div className="sm:col-span-2">
+                          <dt className="text-muted-foreground">Purpose of use</dt>
+                          <dd className="whitespace-pre-line font-medium">{purpose}</dd>
+                        </div>
+                      )}
+                      {note.trim() && (
+                        <div className="sm:col-span-2">
+                          <dt className="text-muted-foreground">Additional note</dt>
+                          <dd className="whitespace-pre-line font-medium">{note.trim()}</dd>
+                        </div>
+                      )}
+                    </dl>
+                  </div>
+
+                  <div className="rounded-md border bg-muted/20 p-4">
+                    <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                      Final confirmation
+                    </p>
+                    <div className="space-y-3 rounded-md bg-background p-3 text-sm text-muted-foreground">
+                      <p>
+                        <strong>Processing SLA Notice:</strong> Standard processing time for all requests is
+                        3 to 5 working days. You will receive an automated notification once your request
+                        has been updated by HRDO.
+                      </p>
+                      <label className="flex items-start gap-2 rounded-md border p-3">
+                        <Checkbox
+                          checked={privacyChecked}
+                          onCheckedChange={(checked) => setPrivacyChecked(checked === true)}
+                        />
+                        <span className="text-sm text-foreground">
+                          I certify that all information provided is true and correct, and I consent to the
+                          processing of this data for verification/certification purposes.
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden />
+                    <span>
+                      <strong>Important:</strong> All COE requests have a <strong>standard processing time</strong>
+                      of <strong><span style={{ color: "#d9534f" }}>three (3) working days</span></strong>{" "}
+                      (excluding weekends and holidays).
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {submit.isError && (
+                <p
+                  role="alert"
+                  className="rounded-sm border border-destructive/30 bg-danger-soft p-3 text-sm"
+                >
+                  {submit.error instanceof Error
+                    ? submit.error.message
+                    : "We couldn't submit your request. Please try again."}
+                </p>
+              )}
+
+              <div className="flex items-center justify-between gap-3 border-t pt-4">
+                <div>
+                  {currentStep > 0 && (
+                    <Button type="button" variant="outline" onClick={() => setCurrentStep((step) => Math.max(0, step - 1))}>
+                      Back
+                    </Button>
+                  )}
+                </div>
+
+                <Button type="submit" disabled={submit.isPending}>
+                  {submit.isPending ? (
+                    <ButtonLoading label="Submitting…" />
+                  ) : currentStep === 2 ? (
+                    "Submit COE Request"
+                  ) : (
+                    "Next"
+                  )}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
       </div>
 
       <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>

@@ -245,7 +245,7 @@ export function HrdoShell({ user, children }: { user: HrdoViewer; children: Reac
         </header>
         <main
           id="main-content"
-          className="mx-auto w-full max-w-6xl flex-1 px-3 pb-24 pt-5 sm:px-6 md:pb-5"
+          className="w-full flex-1 px-3 pb-24 pt-5 sm:px-6 md:pb-5"
         >
           {children}
         </main>

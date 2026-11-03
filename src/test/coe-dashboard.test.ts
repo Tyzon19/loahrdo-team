@@ -14,7 +14,7 @@ function request(overrides: Partial<CoeRequest>): CoeRequest {
   return {
     id: "11111111-1111-4111-8111-111111111111",
     employeeId: "22222222-2222-4222-8222-222222222222",
-    employeeName: "COE Employee User",
+    employeeName: "Employee User",
     employeeEmail: "employee@loa.edu.ph",
     employeeNumber: "EMP-001",
     department: "Human Resources Development Office",
