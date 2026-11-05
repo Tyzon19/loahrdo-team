@@ -143,6 +143,7 @@ function LoginPage() {
             required
           />
           <FakeCaptcha />
+          
 
           <Link
             to="/hrdo/forgot-password"

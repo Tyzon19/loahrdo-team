@@ -1,14 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
-import { ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Lock, Mail, Send } from "lucide-react";
 import InputOTPWithResendTimer from "@/components/shadcn-studio/input-otp/input-otp-04";
 import {
   requestHrdoPasswordRecoveryFn,
   resetHrdoPasswordWithRecoveryCodeFn,
 } from "@/server-functions";
 import { passwordIssues } from "@/lib/validation";
+import { AuthLayout, FakeCaptcha, Field, SubmitButton } from "@/components/AuthLayout";
 
 export const Route = createFileRoute("/hrdo/forgot-password")({ component: HrdoForgotPassword });
 
@@ -27,14 +26,19 @@ function HrdoForgotPassword() {
     setBusy(true);
     setError("");
     setMessage("");
-    const result = await requestHrdoPasswordRecoveryFn({ data: { email } });
-    setBusy(false);
-    if (!result.ok) {
-      setError(result.error);
-      return;
+    try {
+      const result = await requestHrdoPasswordRecoveryFn({ data: { email } });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setSent(true);
+      setMessage("If an HRDO account exists for this email, a recovery code has been sent.");
+    } catch {
+      setError("We couldn't send a recovery code. Please try again.");
+    } finally {
+      setBusy(false);
     }
-    setSent(true);
-    setMessage("If an HRDO account exists for this email, a recovery code has been sent.");
   }
 
   async function reset(event: FormEvent) {
@@ -47,88 +51,88 @@ function HrdoForgotPassword() {
     }
     setBusy(true);
     setError("");
-    const result = await resetHrdoPasswordWithRecoveryCodeFn({
-      data: { email, code, newPassword },
-    });
-    setBusy(false);
-    if (!result.ok) {
-      setError(result.error);
-      return;
+    try {
+      const result = await resetHrdoPasswordWithRecoveryCodeFn({
+        data: { email, code, newPassword },
+      });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      window.location.assign("/hrdo/login?reset=success");
+    } catch {
+      setError("We couldn't update your password. Please try again.");
+    } finally {
+      setBusy(false);
     }
-    window.location.assign("/hrdo/login?reset=success");
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-muted/30 px-4 py-10">
-      <section className="w-full max-w-md rounded-lg border bg-card p-6 shadow-sm sm:p-8">
-        <Link
-          to="/hrdo/login"
-          className="mb-4 inline-flex w-fit items-center gap-1.5 text-sm font-semibold text-primary hover:underline"
-        >
-          <ArrowLeft className="h-4 w-4" aria-hidden />
-          Back to Sign In
-        </Link>
-        <h1 className="text-2xl font-semibold">Recover HRDO password</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Use your HRDO account email to receive a six-digit code.
+    <AuthLayout title="Reset Password" back backTo="/hrdo/login">
+      <p className="mb-4 text-sm text-muted-foreground">
+        Enter the email address linked to your HRDO account and we&apos;ll send you a code to reset
+        your password.
+      </p>
+      {error && (
+        <p role="alert" className="mb-3 text-sm text-destructive">
+          {error}
         </p>
-        {error && (
-          <p className="mt-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
-        )}
-        {message && (
-          <p className="mt-4 rounded-md bg-success/10 p-3 text-sm text-success">{message}</p>
-        )}
-        {!sent ? (
-          <form onSubmit={sendCode} className="mt-6 space-y-4">
-            <label className="block space-y-1.5 text-sm font-medium">
-              HRDO account email
-              <Input
-                type="email"
-                name="recovery-email"
-                autoComplete="email"
-                required
-                placeholder="name@lyceumalabang.edu.ph"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-              />
-            </label>
-            <Button className="w-full" disabled={busy}>
-              {busy ? "Sending…" : "Send recovery code"}
-            </Button>
-          </form>
-        ) : (
-          <form onSubmit={reset} className="mt-6 space-y-4">
-            <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
-              <span className="text-muted-foreground">Recovery email</span>
-              <p className="mt-0.5 font-medium">{email}</p>
-            </div>
-            <InputOTPWithResendTimer
-              value={code}
-              onChange={(value) => setCode(value.replace(/\D/g, "").slice(0, 6))}
-              onResend={async () => {
-                const result = await requestHrdoPasswordRecoveryFn({ data: { email } });
-                if (!result.ok) setError(result.error);
-              }}
-              disabled={busy}
-            />
-            <label className="block space-y-1.5 text-sm font-medium">
-              New password
-              <Input
-                type="password"
-                name="new-password"
-                autoComplete="new-password"
-                required
-                placeholder="Enter your new password"
-                value={newPassword}
-                onChange={(event) => setNewPassword(event.target.value)}
-              />
-            </label>
-            <Button className="w-full" disabled={busy}>
-              {busy ? "Updating…" : "Update password"}
-            </Button>
-          </form>
-        )}
-      </section>
-    </main>
+      )}
+      {message && (
+        <p role="status" className="mb-3 text-sm text-success">
+          {message}
+        </p>
+      )}
+      {!sent ? (
+        <form onSubmit={sendCode}>
+          <Field
+            icon={Mail}
+            type="email"
+            name="recovery-email"
+            autoComplete="email"
+            required
+            placeholder="HRDO account email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+          />
+          <FakeCaptcha />
+          <SubmitButton icon={Send} disabled={busy}>
+            {busy ? "Sending..." : "Send Reset Link"}
+          </SubmitButton>
+        </form>
+      ) : (
+        <form onSubmit={reset}>
+          <p className="mb-3 text-sm text-muted-foreground">Recovery code sent to {email}.</p>
+          <InputOTPWithResendTimer
+            value={code}
+            onChange={(value) => setCode(value.replace(/\D/g, "").slice(0, 6))}
+            onResend={async () => {
+              const result = await requestHrdoPasswordRecoveryFn({ data: { email } });
+              if (!result.ok) setError(result.error);
+            }}
+            disabled={busy}
+          />
+          <Field
+            icon={Lock}
+            type="password"
+            name="new-password"
+            autoComplete="new-password"
+            required
+            placeholder="New password"
+            value={newPassword}
+            onChange={(event) => setNewPassword(event.target.value)}
+          />
+          <SubmitButton icon={Lock} disabled={busy}>
+            {busy ? "Updating..." : "Update Password"}
+          </SubmitButton>
+        </form>
+      )}
+      <p className="mt-3 text-sm text-muted-foreground">
+        Remember your password?{" "}
+        <Link to="/hrdo/login" className="font-semibold text-primary hover:underline">
+          Sign in.
+        </Link>
+      </p>
+    </AuthLayout>
   );
 }

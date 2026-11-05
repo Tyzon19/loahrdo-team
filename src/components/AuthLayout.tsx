@@ -9,17 +9,19 @@ export function AuthLayout({
   title,
   children,
   back = false,
+  backTo = "/login",
 }: {
   title: string;
   children: ReactNode;
   back?: boolean;
+  backTo?: "/login" | "/hrdo/login";
 }) {
   return (
     <div className="auth-layout flex min-h-screen bg-background">
       <aside className="flex w-full flex-col justify-center overflow-y-auto px-9 py-10 md:w-[480px] md:shrink-0">
         {back && (
           <Link
-            to="/login"
+            to={backTo}
             className="mb-4 inline-flex w-fit items-center gap-1.5 text-sm font-semibold text-primary hover:underline"
           >
             <ArrowLeft className="h-4 w-4" aria-hidden />

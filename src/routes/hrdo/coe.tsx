@@ -358,6 +358,10 @@ function CoeRequestPage() {
         toast.error("Enter the employee hiring date.");
         return;
       }
+      if (subjectDob > dateRequested) {
+        toast.error("Date hired cannot be in the future.");
+        return;
+      }
       if (!employmentEndDate) {
         toast.error("Enter the former employee's last day of employment.");
         return;
@@ -964,8 +968,10 @@ function CoeRequestPage() {
                               id="subject-dob"
                               className="mt-1"
                               type="date"
+                              max={dateRequested}
                               value={subjectDob}
                               onChange={(event) => setSubjectDob(event.target.value)}
+                              required
                             />
                           </div>
                           <div>
@@ -980,10 +986,12 @@ function CoeRequestPage() {
                               max={dateRequested}
                               value={employmentEndDate}
                               onChange={(event) => setEmploymentEndDate(event.target.value)}
+                              disabled={!subjectDob || subjectDob > dateRequested}
                               required
                             />
                             <p className="mt-1 text-xs text-muted-foreground">
-                              Required for verification of a former employee.
+                              Set Date Hired first. Choose a date from the hiring date through
+                              today.
                             </p>
                           </div>
                         </div>
