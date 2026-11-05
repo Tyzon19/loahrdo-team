@@ -43,6 +43,8 @@ function HrdoChangePassword() {
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     if (busy) return;
+    const dashboardTarget =
+      hrdoViewer?.role === "hrdo_staff" ? "/hrdo/dashboard" : "/hrdo/coe";
     setError(null);
     setFieldErrors({});
 
@@ -67,7 +69,7 @@ function HrdoChangePassword() {
 
     await router.invalidate();
     toast.success("Password updated.");
-    await navigate({ to: hrdoViewer.role === "hrdo_staff" ? "/hrdo/dashboard" : "/hrdo/coe" });
+    await navigate({ to: dashboardTarget });
   }
 
   return (

@@ -53,7 +53,7 @@ export const password = z
     const issues = passwordIssues(value);
     if (issues.length) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         message: `Password must contain ${issues.join(", ")}.`,
       });
     }

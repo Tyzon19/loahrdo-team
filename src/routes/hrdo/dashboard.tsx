@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { LoadingPanel } from "@/components/app/LoadingPanel";
 import { PageHeader, Section } from "@/components/app/PageHeader";
 import { CoeSummaryCards, type CoeSummaryCard } from "@/components/hrdo/CoeSummaryCards";
 import { CoeRequestTable } from "@/components/hrdo/CoeRequestTable";
