@@ -46,6 +46,8 @@ const DESCRIPTION_OPTIONS = [
   DESCRIPTION_OTHER,
 ] as const;
 const DESCRIPTION_TEXT_OPTIONS = new Set(["Letter of", "Affidavit of", "Form of"]);
+const STEP_LABELS = ["Request type", "Request details", "Review & submit"] as const;
+const PH_MOBILE_PATTERN = /^(09\d{9}|\+639\d{9})$/;
 
 function localDateValue(date: Date) {
   const year = date.getFullYear();
@@ -83,6 +85,7 @@ export const Route = createFileRoute("/hrdo/coe")({
 
 function CoeRequestPage() {
   const { hrdoViewer } = Route.useRouteContext();
+  const viewerEmail = hrdoViewer?.email ?? "";
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [requestorType, setRequestorType] = useState<"internal" | "third_party">("internal");
@@ -92,7 +95,7 @@ function CoeRequestPage() {
   const [customDescription, setCustomDescription] = useState("");
   const [note, setNote] = useState("");
   const [dateNeeded, setDateNeeded] = useState(() => addWorkingDays(new Date(), 3));
-  const [employeeEmail, setEmployeeEmail] = useState(hrdoViewer.email);
+  const [employeeEmail, setEmployeeEmail] = useState(viewerEmail);
   const [employeeNumber, setEmployeeNumber] = useState("");
   const [employeeName, setEmployeeName] = useState({
     firstName: "",
@@ -121,7 +124,9 @@ function CoeRequestPage() {
 
   const submit = useMutation({
     mutationFn: async () => {
-      const internalDepartment = department === "Other" ? customDepartment.trim() : department.trim();
+      const internalDepartment =
+        department === "Other" ? customDepartment.trim() : department.trim();
+      const normalizedVerifierContact = verifierContact.replace(/[\s()-]/g, "");
       const combinedNote = [
         note.trim(),
         requestorType === "internal"
@@ -133,7 +138,10 @@ function CoeRequestPage() {
               `Date needed: ${dateNeeded}`,
               `Description: ${
                 descriptionOptions
-                  .map((option) => `${option}${descriptionDetails[option] ? ` ${descriptionDetails[option]}` : ""}`)
+                  .map(
+                    (option) =>
+                      `${option}${descriptionDetails[option] ? ` ${descriptionDetails[option]}` : ""}`,
+                  )
                   .join(", ") || "Not provided"
               }${customDescription.trim() ? ` - ${customDescription.trim()}` : ""}`,
               `Employment status: ${employmentStatus || "Not provided"}`,
@@ -144,13 +152,17 @@ function CoeRequestPage() {
               `Subject title: ${subjectTitle}`,
               `Verifier company: ${verifierCompany || "Not provided"}`,
               `Authorized representative: ${verifierName || "Not provided"}`,
+              `Contact number: ${normalizedVerifierContact || "Not provided"}`,
               `Employee to verify: ${subjectName || "Not provided"}`,
               `Employee DOB: ${subjectDob || "Not provided"}`,
               `Date requested: ${dateRequested}`,
               `Date needed: ${dateNeeded}`,
               `Description: ${
                 descriptionOptions
-                  .map((option) => `${option}${descriptionDetails[option] ? ` ${descriptionDetails[option]}` : ""}`)
+                  .map(
+                    (option) =>
+                      `${option}${descriptionDetails[option] ? ` ${descriptionDetails[option]}` : ""}`,
+                  )
                   .join(", ") || "Not provided"
               }${customDescription.trim() ? ` - ${customDescription.trim()}` : ""}`,
             ].join(" | "),
@@ -171,11 +183,12 @@ function CoeRequestPage() {
             purpose:
               requestorType === "third_party"
                 ? "Third-party verification / employment verification"
-                  : purpose.trim(),
+                : purpose.trim(),
             note: combinedNote,
             employeeEmail:
               requestorType === "third_party" ? verifierEmail.trim() : employeeEmail.trim(),
             employeeNumber: employeeNumber.trim(),
+            contactNumber: requestorType === "third_party" ? normalizedVerifierContact : "",
             employeeName:
               requestorType === "third_party" ? subjectName.trim() : joinFullName(employeeName),
             department: submittedDepartment,
@@ -191,7 +204,7 @@ function CoeRequestPage() {
       setCustomDescription("");
       setNote("");
       setDateNeeded(addWorkingDays(new Date(), 3));
-      setEmployeeEmail(hrdoViewer.email);
+      setEmployeeEmail(viewerEmail);
       setEmployeeNumber("");
       setEmployeeName({
         firstName: "",
@@ -256,7 +269,10 @@ function CoeRequestPage() {
         toast.error("Enter last name.");
         return;
       }
-      if (!trimmedEmployeeEmail || !/^[^\s@]+@lyceumalabang\.edu\.ph$/i.test(trimmedEmployeeEmail)) {
+      if (
+        !trimmedEmployeeEmail ||
+        !/^[^\s@]+@lyceumalabang\.edu\.ph$/i.test(trimmedEmployeeEmail)
+      ) {
         toast.error("Use your official institutional email: name@lyceumalabang.edu.ph");
         return;
       }
@@ -305,8 +321,9 @@ function CoeRequestPage() {
         toast.error("Enter a valid official business email.");
         return;
       }
-      if (!verifierContact.trim()) {
-        toast.error("Enter a contact number.");
+      const normalizedVerifierContact = verifierContact.replace(/[\s()-]/g, "");
+      if (!PH_MOBILE_PATTERN.test(normalizedVerifierContact)) {
+        toast.error("Enter a valid Philippine mobile number (09XXXXXXXXX or +639XXXXXXXXX).");
         return;
       }
       if (!subjectName.trim()) {
@@ -368,62 +385,93 @@ function CoeRequestPage() {
         description="Submit a request for employment verification or certification."
       />
 
-      <div className="mx-auto max-w-5xl py-6">
+      <div className="mx-auto w-full max-w-4xl py-4 sm:py-8">
         <Card className="shadow-sm">
-          <CardHeader className="border-b bg-muted/30">
-            <div className="flex items-center justify-between gap-4">
-              <CardTitle className="text-xl">COE Request</CardTitle>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                {[0, 1, 2].map((step) => (
-                  <div
-                    key={step}
-                    className={[
-                      "flex h-7 w-7 items-center justify-center rounded-full border text-[10px] font-semibold",
-                      currentStep === step
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : currentStep > step
-                          ? "border-emerald-500 bg-emerald-500 text-white"
-                          : "bg-background text-muted-foreground",
-                    ].join(" ")}
-                  >
-                    {step + 1}
+          <CardHeader className="border-b bg-muted/30 px-4 py-5 sm:px-6">
+            <div className="flex flex-col gap-5">
+              <CardTitle className="text-lg sm:text-xl">COE Request</CardTitle>
+              <div className="grid grid-cols-3 gap-2 text-center text-[11px] sm:gap-4 sm:text-xs">
+                {STEP_LABELS.map((label, step) => (
+                  <div key={label} className="flex min-w-0 flex-col items-center gap-2">
+                    <div
+                      className={[
+                        "flex h-8 w-8 items-center justify-center rounded-full border text-xs font-semibold",
+                        currentStep === step
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : currentStep > step
+                            ? "border-emerald-500 bg-emerald-500 text-white"
+                            : "bg-background text-muted-foreground",
+                      ].join(" ")}
+                    >
+                      {step + 1}
+                    </div>
+                    <span
+                      className={
+                        currentStep === step
+                          ? "font-semibold text-foreground"
+                          : "text-muted-foreground"
+                      }
+                    >
+                      {label}
+                    </span>
                   </div>
                 ))}
               </div>
             </div>
           </CardHeader>
 
-          <CardContent className="pt-6">
-            <form className="space-y-6" onSubmit={onSubmit} noValidate>
+          <CardContent className="px-4 py-5 sm:px-6 sm:py-7">
+            <form className="space-y-5" onSubmit={onSubmit} noValidate>
               {currentStep === 0 && (
-                <div className="rounded-md border bg-muted/20 p-4">
-                  <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                    Step 1: Form Router
-                  </p>
+                <div className="rounded-lg border bg-muted/20 p-4 sm:p-6">
+                  <div className="mb-5">
+                    <p className="text-base font-semibold">What type of request are you making?</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Choose the option that best describes your request to continue.
+                    </p>
+                  </div>
                   <RadioGroup
                     value={requestorType}
                     onValueChange={(value) => setRequestorType(value as "internal" | "third_party")}
-                    className="space-y-3"
+                    className="grid gap-3 sm:grid-cols-2"
                   >
-                    <div className="flex items-center space-x-2 rounded-md border bg-background p-3">
-                      <RadioGroupItem value="internal" id="requestor-internal" />
-                      <Label htmlFor="requestor-internal" className="cursor-pointer font-medium">
-                        Internal Employee
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2 rounded-md border bg-background p-3">
-                      <RadioGroupItem value="third_party" id="requestor-third-party" />
-                      <Label htmlFor="requestor-third-party" className="cursor-pointer font-medium">
-                        Third-Party Verifier / External Agency
-                      </Label>
-                    </div>
+                    <label
+                      htmlFor="requestor-internal"
+                      className="flex cursor-pointer items-start gap-3 rounded-lg border bg-background p-4 transition-colors hover:border-primary/60 has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-primary/5"
+                    >
+                      <RadioGroupItem value="internal" id="requestor-internal" className="mt-0.5" />
+                      <span>
+                        <span className="block font-medium">Employee Request</span>
+                        <span className="mt-1 block text-sm text-muted-foreground">
+                          Request a COE for your own employment records.
+                        </span>
+                      </span>
+                    </label>
+                    <label
+                      htmlFor="requestor-third-party"
+                      className="flex cursor-pointer items-start gap-3 rounded-lg border bg-background p-4 transition-colors hover:border-primary/60 has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-primary/5"
+                    >
+                      <RadioGroupItem
+                        value="third_party"
+                        id="requestor-third-party"
+                        className="mt-0.5"
+                      />
+                      <span>
+                        <span className="block font-medium">
+                          Third-Party Verifier / External Agency
+                        </span>
+                        <span className="mt-1 block text-sm text-muted-foreground">
+                          Verify the employment of another person.
+                        </span>
+                      </span>
+                    </label>
                   </RadioGroup>
                 </div>
               )}
 
               {currentStep === 1 && (
                 <>
-                  <div className="rounded-md border bg-muted/20 p-4">
+                  <div className="rounded-lg border bg-muted/20 p-4 sm:p-6">
                     <p className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                       Request schedule
                     </p>
@@ -457,74 +505,75 @@ function CoeRequestPage() {
                   </div>
                   {requestorType === "internal" ? (
                     <div className="space-y-5">
-                      <div className="rounded-md border bg-muted/20 p-4">
-                        <p className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                      <div className="rounded-lg border bg-muted/20 p-4 sm:p-6">
+                        <p className="mb-5 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                           Section A: Internal Employee Request
                         </p>
 
-                        <div className="space-y-4">
-                          <div className="max-w-xs">
-                            <Label htmlFor="employee-title">Title</Label>
-                            <Select value={employeeTitle} onValueChange={setEmployeeTitle}>
-                              <SelectTrigger id="employee-title" className="mt-1">
-                                <SelectValue placeholder="Select title" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {["Mr", "Ms", "Mrs", "Dr", "Atty", "Engr", "Prof", "Mx"].map(
-                                  (title) => (
-                                    <SelectItem key={title} value={title}>
-                                      {title}
-                                    </SelectItem>
-                                  ),
-                                )}
-                              </SelectContent>
-                            </Select>
+                        <div className="space-y-5">
+                          <div className="grid gap-4 sm:grid-cols-[minmax(120px,0.45fr)_minmax(0,1.55fr)]">
+                            <div>
+                              <Label htmlFor="employee-title">Title</Label>
+                              <Select value={employeeTitle} onValueChange={setEmployeeTitle}>
+                                <SelectTrigger id="employee-title" className="mt-1">
+                                  <SelectValue placeholder="Select title" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {["Mr", "Ms", "Mrs", "Dr", "Atty", "Engr", "Prof", "Mx"].map(
+                                    (title) => (
+                                      <SelectItem key={title} value={title}>
+                                        {title}
+                                      </SelectItem>
+                                    ),
+                                  )}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="grid gap-4 sm:grid-cols-3">
+                              <div>
+                                <Label htmlFor="employee-first-name">First name</Label>
+                                <Input
+                                  id="employee-first-name"
+                                  className="mt-1"
+                                  value={employeeName.firstName}
+                                  onChange={(event) =>
+                                    setEmployeeName((current) => ({
+                                      ...current,
+                                      firstName: event.target.value,
+                                    }))
+                                  }
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor="employee-middle-name">Middle name</Label>
+                                <Input
+                                  id="employee-middle-name"
+                                  className="mt-1"
+                                  value={employeeName.middleName}
+                                  onChange={(event) =>
+                                    setEmployeeName((current) => ({
+                                      ...current,
+                                      middleName: event.target.value,
+                                    }))
+                                  }
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor="employee-last-name">Last name</Label>
+                                <Input
+                                  id="employee-last-name"
+                                  className="mt-1"
+                                  value={employeeName.lastName}
+                                  onChange={(event) =>
+                                    setEmployeeName((current) => ({
+                                      ...current,
+                                      lastName: event.target.value,
+                                    }))
+                                  }
+                                />
+                              </div>
+                            </div>
                           </div>
-                          <div className="grid gap-4 sm:grid-cols-3">
-                            <div>
-                              <Label htmlFor="employee-first-name">First name</Label>
-                              <Input
-                                id="employee-first-name"
-                                className="mt-1"
-                                value={employeeName.firstName}
-                                onChange={(event) =>
-                                  setEmployeeName((current) => ({
-                                    ...current,
-                                    firstName: event.target.value,
-                                  }))
-                                }
-                              />
-                            </div>
-                            <div>
-                              <Label htmlFor="employee-middle-name">Middle name</Label>
-                              <Input
-                                id="employee-middle-name"
-                                className="mt-1"
-                                value={employeeName.middleName}
-                                onChange={(event) =>
-                                  setEmployeeName((current) => ({
-                                    ...current,
-                                    middleName: event.target.value,
-                                  }))
-                                }
-                              />
-                            </div>
-                            <div>
-                              <Label htmlFor="employee-last-name">Last name</Label>
-                              <Input
-                                id="employee-last-name"
-                                className="mt-1"
-                                value={employeeName.lastName}
-                                onChange={(event) =>
-                                  setEmployeeName((current) => ({
-                                    ...current,
-                                    lastName: event.target.value,
-                                  }))
-                                }
-                              />
-                            </div>
-                          </div>
-
                           <div className="grid gap-4 md:grid-cols-2">
                             <div>
                               <Label htmlFor="employee-email">Official email address</Label>
@@ -554,7 +603,6 @@ function CoeRequestPage() {
                               />
                             </div>
                           </div>
-
                           <div className="grid gap-4 md:grid-cols-2">
                             <div>
                               <Label htmlFor="department">Department / College / Office</Label>
@@ -606,7 +654,7 @@ function CoeRequestPage() {
                                     "Technology Department (TESDA",
                                     "Warehouse",
                                     "Office of the President",
-                                    "Senior Highschool Faculty"
+                                    "Senior Highschool Faculty",
                                   ].map((item) => (
                                     <SelectItem key={item} value={item}>
                                       {item}
@@ -616,7 +664,9 @@ function CoeRequestPage() {
                               </Select>
                               {department === "Other" && (
                                 <div className="mt-3">
-                                  <Label htmlFor="department-other">Other department / college / office</Label>
+                                  <Label htmlFor="department-other">
+                                    Other department / college / office
+                                  </Label>
                                   <Input
                                     id="department-other"
                                     className="mt-1"
@@ -630,33 +680,41 @@ function CoeRequestPage() {
 
                             <div>
                               <Label>Employment status</Label>
-                              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                              <RadioGroup
+                                value={employmentStatus}
+                                onValueChange={setEmploymentStatus}
+                                className="mt-2 grid gap-2 sm:grid-cols-2"
+                              >
                                 {[
                                   "Full-time / Regular",
                                   "Part-time",
                                   "Probationary",
                                   "Contractual / Contract of Service",
-                                ].map((status) => (
+                                ].map((status, index) => (
                                   <label
                                     key={status}
-                                    className="flex items-center gap-2 rounded-md border bg-background px-3 py-2"
+                                    htmlFor={`employment-status-${index}`}
+                                    className="flex cursor-pointer items-start gap-2.5 rounded-md border bg-background px-3 py-2.5 text-sm transition-colors hover:border-primary/60 has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-primary/5"
                                   >
-                                    <input
-                                      type="radio"
-                                      name="employment-status"
-                                      checked={employmentStatus === status}
-                                      onChange={() => setEmploymentStatus(status)}
+                                    <RadioGroupItem
+                                      value={status}
+                                      id={`employment-status-${index}`}
+                                      className="mt-0.5"
                                     />
-                                    <span className="text-sm">{status}</span>
+                                    <span className="leading-snug">{status}</span>
                                   </label>
                                 ))}
-                              </div>
+                              </RadioGroup>
                             </div>
                           </div>
 
                           <div>
                             <Label>Type of copy &amp; delivery</Label>
-                            <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                            <RadioGroup
+                              value={copyType}
+                              onValueChange={(value) => setCopyType(value as CoeCopyType)}
+                              className="mt-2 grid gap-2 sm:grid-cols-3"
+                            >
                               {[
                                 { value: "original", label: "Hardcopy (Original)" },
                                 { value: "soft", label: "Softcopy (Digital PDF)" },
@@ -664,20 +722,19 @@ function CoeRequestPage() {
                               ].map((option) => (
                                 <label
                                   key={option.value}
-                                  className="flex items-center gap-2 rounded-md border bg-background px-3 py-2"
+                                  htmlFor={`copy-type-${option.value}`}
+                                  className="flex cursor-pointer items-start gap-2.5 rounded-md border bg-background px-3 py-2.5 text-sm transition-colors hover:border-primary/60 has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-primary/5"
                                 >
-                                  <input
-                                    type="radio"
-                                    name="copy-type"
-                                    checked={copyType === option.value}
-                                    onChange={() => setCopyType(option.value as CoeCopyType)}
+                                  <RadioGroupItem
+                                    value={option.value}
+                                    id={`copy-type-${option.value}`}
+                                    className="mt-0.5"
                                   />
-                                  <span className="text-sm">{option.label}</span>
+                                  <span className="leading-snug">{option.label}</span>
                                 </label>
                               ))}
-                            </div>
+                            </RadioGroup>
                           </div>
-
                           <div>
                             <Label htmlFor="purpose">Purpose of use</Label>
                             <Textarea
@@ -690,7 +747,6 @@ function CoeRequestPage() {
                               required
                             />
                           </div>
-
                           <div>
                             <Label>Description</Label>
                             <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -745,7 +801,6 @@ function CoeRequestPage() {
                               />
                             )}
                           </div>
-
                           <div>
                             <Label htmlFor="note">Additional note / special instructions</Label>
                             <Textarea
@@ -762,15 +817,17 @@ function CoeRequestPage() {
                     </div>
                   ) : (
                     <div className="space-y-5">
-                      <div className="rounded-md border bg-muted/20 p-4">
-                        <p className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                      <div className="rounded-lg border bg-muted/20 p-4 sm:p-6">
+                        <p className="mb-5 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                           Section B: Third-Party Employment Verification
                         </p>
 
-                        <div className="space-y-4">
+                        <div className="space-y-5">
                           <div className="grid gap-4 md:grid-cols-2">
                             <div>
-                              <Label htmlFor="verifier-company">Verifying company / agency name</Label>
+                              <Label htmlFor="verifier-company">
+                                Verifying company / agency name
+                              </Label>
                               <Input
                                 id="verifier-company"
                                 className="mt-1"
@@ -806,6 +863,12 @@ function CoeRequestPage() {
                               <Input
                                 id="verifier-contact"
                                 className="mt-1"
+                                type="tel"
+                                inputMode="tel"
+                                autoComplete="tel"
+                                placeholder="09XXXXXXXXX or +639XXXXXXXXX"
+                                maxLength={16}
+                                pattern="(09[0-9]{9}|\+639[0-9]{9})"
                                 value={verifierContact}
                                 onChange={(event) => setVerifierContact(event.target.value)}
                               />
@@ -904,7 +967,6 @@ function CoeRequestPage() {
                               />
                             )}
                           </div>
-
                         </div>
                       </div>
                     </div>
@@ -1027,15 +1089,15 @@ function CoeRequestPage() {
                     </dl>
                   </div>
 
-                  <div className="rounded-md border bg-muted/20 p-4">
+                  <div className="rounded-lg border bg-muted/20 p-4 sm:p-6">
                     <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                       Final confirmation
                     </p>
                     <div className="space-y-3 rounded-md bg-background p-3 text-sm text-muted-foreground">
                       <p>
-                        <strong>Processing SLA Notice:</strong> Standard processing time for all requests is
-                        3 to 5 working days. You will receive an automated notification once your request
-                        has been updated by HRDO.
+                        <strong>Processing SLA Notice:</strong> Standard processing time for all
+                        requests is 3 to 5 working days. You will receive an automated notification
+                        once your request has been updated by HRDO.
                       </p>
                       <label className="flex items-start gap-2 rounded-md border p-3">
                         <Checkbox
@@ -1043,8 +1105,8 @@ function CoeRequestPage() {
                           onCheckedChange={(checked) => setPrivacyChecked(checked === true)}
                         />
                         <span className="text-sm text-foreground">
-                          I certify that all information provided is true and correct, and I consent to the
-                          processing of this data for verification/certification purposes.
+                          I certify that all information provided is true and correct, and I consent
+                          to the processing of this data for verification/certification purposes.
                         </span>
                       </label>
                     </div>
@@ -1053,8 +1115,12 @@ function CoeRequestPage() {
                   <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
                     <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden />
                     <span>
-                      <strong>Important:</strong> All COE requests have a <strong>standard processing time</strong>
-                      of <strong><span style={{ color: "#d9534f" }}>three (3) working days</span></strong>{" "}
+                      <strong>Important:</strong> All COE requests have a{" "}
+                      <strong>standard processing time</strong>
+                      of{" "}
+                      <strong>
+                        <span style={{ color: "#d9534f" }}>three (3) working days</span>
+                      </strong>{" "}
                       (excluding weekends and holidays).
                     </span>
                   </div>
@@ -1075,7 +1141,11 @@ function CoeRequestPage() {
               <div className="flex items-center justify-between gap-3 border-t pt-4">
                 <div>
                   {currentStep > 0 && (
-                    <Button type="button" variant="outline" onClick={() => setCurrentStep((step) => Math.max(0, step - 1))}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setCurrentStep((step) => Math.max(0, step - 1))}
+                    >
                       Back
                     </Button>
                   )}
@@ -1101,11 +1171,14 @@ function CoeRequestPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm COE Request Submission</AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
-              <p>Are you sure you want to submit this Certificate of Employment request?</p>
-              <p className="rounded-md bg-amber-50 p-2 text-sm text-amber-900">
-                <strong>Reminder:</strong> This request is <strong>not automatically granted</strong>.
-                HRDO will review and process it within <strong>3 working days</strong> from submission.
-              </p>
+              <span className="block">
+                Are you sure you want to submit this Certificate of Employment request?
+              </span>
+              <span className="block rounded-md bg-amber-50 p-2 text-sm text-amber-900">
+                <strong>Reminder:</strong> This request is{" "}
+                <strong>not automatically granted</strong>. HRDO will review and process it within{" "}
+                <strong>3 working days</strong> from submission.
+              </span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

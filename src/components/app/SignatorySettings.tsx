@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import type { User } from "@/lib/types";
+import type { StageKey, User } from "@/lib/types";
 import { ROLE_TITLES } from "@/lib/workflow";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +19,6 @@ import {
   saveSignatoryAssistantsFn,
 } from "@/server-functions";
 import { unwrap } from "@/lib/api";
-import type { StageKey } from "@/lib/types";
 
 const FIELDS: { key: StageKey; label: string }[] = [
   { key: "review", label: "Head of Transport Services" },
@@ -47,6 +46,13 @@ function resultError(value: unknown, fallback: string): string {
     : fallback;
 }
 
+function useSignatorySettings() {
+  return useQuery({
+    queryKey: ["signatory-assistants"],
+    queryFn: () => unwrap(getSignatoryAssistantsFn()),
+  });
+}
+
 const EMPTY_FORM: AssistantForm = {
   review: { name: "", userId: "" },
   recommend: { name: "", userId: "" },
@@ -58,22 +64,9 @@ const EMPTY_MAIN_SIGNATORIES: MainSignatoryForm = {
   approve: "",
 };
 
-export function SignatoryAssistantSettings() {
+export function SignatoryAccountsSettings() {
   const queryClient = useQueryClient();
-  const phoneDirectory = useQuery({
-    queryKey: ["phone-directory"],
-    queryFn: () => unwrap(getPhoneDirectoryFn()),
-  });
-  const [phoneNumbers, setPhoneNumbers] = useState<Record<string, string>>({});
-  const [savingPhoneUserId, setSavingPhoneUserId] = useState<string | null>(null);
-  const query = useQuery({
-    queryKey: ["signatory-assistants"],
-    queryFn: () => unwrap(getSignatoryAssistantsFn()),
-  });
-  const [form, setForm] = useState<AssistantForm>(EMPTY_FORM);
-  const [busy, setBusy] = useState(false);
-  const [mainForm, setMainForm] = useState<MainSignatoryForm>(EMPTY_MAIN_SIGNATORIES);
-  const [mainBusy, setMainBusy] = useState(false);
+  const query = useSignatorySettings();
   const [mainAccountForm, setMainAccountForm] = useState<NewMainSignatoryAccount>({
     stage: "approve",
     name: "",
@@ -108,88 +101,6 @@ export function SignatoryAssistantSettings() {
     emailMessage?: string;
     temporaryPassword?: string;
   } | null>(null);
-
-  useEffect(() => {
-    if (!phoneDirectory.data) return;
-    setPhoneNumbers(
-      Object.fromEntries(
-        phoneDirectory.data.map((contact) => [contact.userId, contact.phoneNumber ?? ""]),
-      ),
-    );
-  }, [phoneDirectory.data]);
-
-  useEffect(() => {
-    if (!query.data) return;
-    setForm({
-      review: {
-        name: query.data.names.review ?? "",
-        userId: query.data.userIds.review ?? "",
-      },
-      recommend: {
-        name: query.data.names.recommend ?? "",
-        userId: query.data.userIds.recommend ?? "",
-      },
-      approve: {
-        name: query.data.names.approve ?? "",
-        userId: query.data.userIds.approve ?? "",
-      },
-    });
-    setMainForm({
-      review: query.data.configuredMainSignatoryUserIds.review ?? "",
-      recommend: query.data.configuredMainSignatoryUserIds.recommend ?? "",
-      approve: query.data.configuredMainSignatoryUserIds.approve ?? "",
-    });
-  }, [query.data]);
-
-  async function savePhoneNumber(userId: string) {
-    if (savingPhoneUserId) return;
-    setSavingPhoneUserId(userId);
-    try {
-      const result = await saveSignatoryPhoneNumberFn({
-        data: {
-          userId,
-          phoneNumber: phoneNumbers[userId]?.trim() || null,
-        },
-      });
-      if (!result.ok) {
-        toast.error(result.error);
-        return;
-      }
-      toast.success("LOA phone directory updated.");
-      await queryClient.invalidateQueries({ queryKey: ["phone-directory"] });
-    } catch {
-      toast.error("We couldn't save that contact number. Please try again.");
-    } finally {
-      setSavingPhoneUserId(null);
-    }
-  }
-
-  async function saveMainSignatories(event: React.FormEvent) {
-    event.preventDefault();
-    if (mainBusy) return;
-    setMainBusy(true);
-    try {
-      const result: unknown = await saveMainSignatoriesFn({
-        data: {
-          review: mainForm.review || null,
-          recommend: mainForm.recommend || null,
-          approve: mainForm.approve || null,
-        },
-      });
-      if (!isRecord(result) || result["ok"] !== true) {
-        toast.error(resultError(result, "We couldn't save the main signatories."));
-        return;
-      }
-      toast.success("Main signatories saved.");
-      await queryClient.invalidateQueries({ queryKey: ["signatory-assistants"] });
-      await queryClient.invalidateQueries({ queryKey: ["request"] });
-      await queryClient.invalidateQueries({ queryKey: ["requests"] });
-    } catch {
-      toast.error("We couldn't save the main signatories. Please try again.");
-    } finally {
-      setMainBusy(false);
-    }
-  }
 
   async function createMainAccount(event: React.FormEvent) {
     event.preventDefault();
@@ -228,7 +139,6 @@ export function SignatoryAssistantSettings() {
         ...(emailMessage ? { emailMessage } : {}),
         ...(typeof temporaryPassword === "string" ? { temporaryPassword } : {}),
       });
-      setMainForm((current) => ({ ...current, [mainAccountForm.stage]: id }));
       setMainAccountForm((current) => ({ ...current, name: "", email: "", department: "" }));
       if (emailSent) {
         toast.success("Main signatory account created and assigned. Login details emailed.");
@@ -245,31 +155,6 @@ export function SignatoryAssistantSettings() {
     }
   }
 
-  async function save(event: React.FormEvent) {
-    event.preventDefault();
-    if (busy) return;
-    setBusy(true);
-    try {
-      const result: unknown = await saveSignatoryAssistantsFn({
-        data: {
-          review: { ...form.review, userId: form.review.userId || null },
-          recommend: { ...form.recommend, userId: form.recommend.userId || null },
-          approve: { ...form.approve, userId: form.approve.userId || null },
-        },
-      });
-      if (!isRecord(result) || result["ok"] !== true) {
-        toast.error(resultError(result, "We couldn't save the alternate signatories."));
-        return;
-      }
-      toast.success("Alternate signatories saved.");
-      await queryClient.invalidateQueries({ queryKey: ["signatory-assistants"] });
-      await queryClient.invalidateQueries({ queryKey: ["request"] });
-    } catch {
-      toast.error("We couldn't save the alternate signatories. Please try again.");
-    } finally {
-      setBusy(false);
-    }
-  }
   async function createAccount(event: React.FormEvent) {
     event.preventDefault();
     if (accountBusy) return;
@@ -319,6 +204,7 @@ export function SignatoryAssistantSettings() {
       setAccountBusy(false);
     }
   }
+
   async function resetPassword(event: React.FormEvent) {
     event.preventDefault();
     if (resetBusy || !resetUserId) return;
@@ -362,73 +248,10 @@ export function SignatoryAssistantSettings() {
       setResetBusy(false);
     }
   }
+
   return (
     <div className="space-y-4">
-      <Section title="Manage LOA Phone Directory">
-        <p className="mb-4 text-sm text-muted-foreground">
-          Add verified contact numbers for administrators and assigned signatories. Numbers are
-          visible to signed-in users in the LOA Phone Directory.
-        </p>
-        {phoneDirectory.isPending ? (
-          <LoadingPanel label="Loading signatory phone numbers" rows={3} />
-        ) : phoneDirectory.isError ? (
-          <div className="p-4 text-sm" role="alert">
-            <p className="font-medium">We couldn&apos;t load phone directory contacts.</p>
-            <Button
-              className="mt-3"
-              variant="outline"
-              onClick={() => void phoneDirectory.refetch()}
-            >
-              Try again
-            </Button>
-          </div>
-        ) : phoneDirectory.data.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No signatory accounts have been assigned.</p>
-        ) : (
-          <div className="space-y-3">
-            {phoneDirectory.data.map((contact) => (
-              <form
-                key={contact.userId}
-                className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,18rem)_auto] sm:items-end"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void savePhoneNumber(contact.userId);
-                }}
-              >
-                <div>
-                  <p className="font-medium">{contact.name}</p>
-                  <p className="text-xs text-muted-foreground">{ROLE_TITLES[contact.role]}</p>
-                </div>
-                <div>
-                  <Label htmlFor={`phone-${contact.userId}`}>Telephone / mobile</Label>
-                  <Input
-                    id={`phone-${contact.userId}`}
-                    className="mt-1"
-                    type="tel"
-                    maxLength={32}
-                    value={phoneNumbers[contact.userId] ?? ""}
-                    onChange={(event) =>
-                      setPhoneNumbers((current) => ({
-                        ...current,
-                        [contact.userId]: event.target.value,
-                      }))
-                    }
-                    placeholder="Not provided"
-                  />
-                </div>
-                <Button type="submit" variant="outline" disabled={savingPhoneUserId !== null}>
-                  {savingPhoneUserId === contact.userId ? (
-                    <ButtonLoading label="Saving…" />
-                  ) : (
-                    "Save number"
-                  )}
-                </Button>
-              </form>
-            ))}
-          </div>
-        )}
-      </Section>
-      <Section title="Create Main Signatory Account">
+      <Section title="Create main signatory account">
         <p className="mb-4 max-w-3xl text-sm text-muted-foreground">
           Create an institutional account for a new Head of Transport Services, Director for
           Administration, or President. Creating an account assigns it as the main signatory for the
@@ -543,59 +366,8 @@ export function SignatoryAssistantSettings() {
           </div>
         )}
       </Section>
-      <Section title="Assign Main Signatories">
-        <p className="mb-4 max-w-3xl text-sm text-muted-foreground">
-          Assign all three approval stages in order: Head of Transport Services → Director for
-          Administration → President.
-        </p>
-        {query.isPending ? (
-          <LoadingPanel label="Loading main signatories" rows={3} />
-        ) : query.isError ? (
-          <div className="p-4 text-sm" role="alert">
-            <p className="font-medium">We couldn&apos;t load main signatories.</p>
-            <Button className="mt-3" variant="outline" onClick={() => void query.refetch()}>
-              Try again
-            </Button>
-          </div>
-        ) : (
-          <form className="max-w-xl space-y-4" onSubmit={saveMainSignatories}>
-            {FIELDS.map(({ key, label }) => {
-              const selected = query.data.mainSignatoryUsers.find(
-                (user: User) => user.id === mainForm[key],
-              );
-              return (
-                <div key={key}>
-                  <Label htmlFor={`main-signatory-${key}`}>{label} main signatory</Label>
-                  <select
-                    id={`main-signatory-${key}`}
-                    className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    value={mainForm[key]}
-                    onChange={(event) =>
-                      setMainForm((current) => ({ ...current, [key]: event.target.value }))
-                    }
-                  >
-                    <option value="">Select a main signatory account</option>
-                    {query.data.mainSignatoryUsers.map((user: User) => (
-                      <option key={user.id} value={user.id}>
-                        {user.name} — {user.email} ({ROLE_TITLES[user.role]})
-                      </option>
-                    ))}
-                  </select>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Current main signatory:{" "}
-                    {selected?.name ?? query.data.mainSignatoryNames[key] ?? "No account found"}
-                  </p>
-                </div>
-              );
-            })}
-            <Button type="submit" disabled={mainBusy}>
-              {mainBusy ? <ButtonLoading label="Saving…" /> : "Save main signatories"}
-            </Button>
-          </form>
-        )}
-      </Section>
 
-      <Section title="Create Alternate Signatory Account">
+      <Section title="Create alternate signatory account">
         <p className="mb-4 text-sm text-muted-foreground">
           Create an individual institutional account for an alternate signatory. The system emails a
           one-time temporary password to the account holder, who must change it at first sign-in.
@@ -690,7 +462,8 @@ export function SignatoryAssistantSettings() {
           </div>
         )}
       </Section>
-      <Section title="Reset User Password">
+
+      <Section title="Reset user password">
         <p className="mb-4 text-sm text-muted-foreground">
           Issue a new one-time temporary password for a non-administrator account. This signs the
           user out of active sessions and emails the new temporary password. The user must change it
@@ -771,7 +544,149 @@ export function SignatoryAssistantSettings() {
           </div>
         )}
       </Section>
-      <Section title="Assign Alternate Signatories">
+    </div>
+  );
+}
+
+export function SignatoryAssignmentSettings() {
+  const queryClient = useQueryClient();
+  const query = useSignatorySettings();
+  const [form, setForm] = useState<AssistantForm>(EMPTY_FORM);
+  const [busy, setBusy] = useState(false);
+  const [mainForm, setMainForm] = useState<MainSignatoryForm>(EMPTY_MAIN_SIGNATORIES);
+  const [mainBusy, setMainBusy] = useState(false);
+
+  useEffect(() => {
+    if (!query.data) return;
+    setForm({
+      review: {
+        name: query.data.names.review ?? "",
+        userId: query.data.userIds.review ?? "",
+      },
+      recommend: {
+        name: query.data.names.recommend ?? "",
+        userId: query.data.userIds.recommend ?? "",
+      },
+      approve: {
+        name: query.data.names.approve ?? "",
+        userId: query.data.userIds.approve ?? "",
+      },
+    });
+    setMainForm({
+      review: query.data.configuredMainSignatoryUserIds.review ?? "",
+      recommend: query.data.configuredMainSignatoryUserIds.recommend ?? "",
+      approve: query.data.configuredMainSignatoryUserIds.approve ?? "",
+    });
+  }, [query.data]);
+
+  async function saveMainSignatories(event: React.FormEvent) {
+    event.preventDefault();
+    if (mainBusy) return;
+    setMainBusy(true);
+    try {
+      const result: unknown = await saveMainSignatoriesFn({
+        data: {
+          review: mainForm.review || null,
+          recommend: mainForm.recommend || null,
+          approve: mainForm.approve || null,
+        },
+      });
+      if (!isRecord(result) || result["ok"] !== true) {
+        toast.error(resultError(result, "We couldn't save the main signatories."));
+        return;
+      }
+      toast.success("Main signatories saved.");
+      await queryClient.invalidateQueries({ queryKey: ["signatory-assistants"] });
+      await queryClient.invalidateQueries({ queryKey: ["request"] });
+      await queryClient.invalidateQueries({ queryKey: ["requests"] });
+    } catch {
+      toast.error("We couldn't save the main signatories. Please try again.");
+    } finally {
+      setMainBusy(false);
+    }
+  }
+
+  async function save(event: React.FormEvent) {
+    event.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    try {
+      const result: unknown = await saveSignatoryAssistantsFn({
+        data: {
+          review: { ...form.review, userId: form.review.userId || null },
+          recommend: { ...form.recommend, userId: form.recommend.userId || null },
+          approve: { ...form.approve, userId: form.approve.userId || null },
+        },
+      });
+      if (!isRecord(result) || result["ok"] !== true) {
+        toast.error(resultError(result, "We couldn't save the alternate signatories."));
+        return;
+      }
+      toast.success("Alternate signatories saved.");
+      await queryClient.invalidateQueries({ queryKey: ["signatory-assistants"] });
+      await queryClient.invalidateQueries({ queryKey: ["request"] });
+    } catch {
+      toast.error("We couldn't save the alternate signatories. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <Section title="Assign main signatories">
+        <p className="mb-4 max-w-3xl text-sm text-muted-foreground">
+          Assign all three approval stages in order: Head of Transport Services → Director for
+          Administration → President.
+        </p>
+        {query.isPending ? (
+          <LoadingPanel label="Loading main signatories" rows={3} />
+        ) : query.isError ? (
+          <div className="p-4 text-sm" role="alert">
+            <p className="font-medium">We couldn&apos;t load main signatories.</p>
+            <Button className="mt-3" variant="outline" onClick={() => void query.refetch()}>
+              Try again
+            </Button>
+          </div>
+        ) : (
+          <form className="max-w-xl space-y-4" onSubmit={saveMainSignatories}>
+            {FIELDS.map(({ key, label }) => {
+              const selected = query.data.mainSignatoryUsers.find(
+                (user: User) => user.id === mainForm[key],
+              );
+              return (
+                <div key={key}>
+                  <Label htmlFor={`main-signatory-${key}`}>{label} main signatory</Label>
+                  <select
+                    id={`main-signatory-${key}`}
+                    className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={mainForm[key]}
+                    onChange={(event) =>
+                      setMainForm((current) => ({ ...current, [key]: event.target.value }))
+                    }
+                  >
+                    <option value="">Select a main signatory account</option>
+                    {query.data.mainSignatoryUsers.map((user: User) => (
+                      <option key={user.id} value={user.id}>
+                        {user.name} — {user.email} ({ROLE_TITLES[user.role]})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Current main signatory:{" "}
+                    {selected?.name ?? query.data.mainSignatoryNames[key] ?? "No account found"}
+                  </p>
+                </div>
+              );
+            })}
+            <Button type="submit" disabled={mainBusy}>
+              {mainBusy ? <ButtonLoading label="Saving…" /> : "Save main signatories"}
+            </Button>
+          </form>
+        )}
+      </Section>
+
+      <Section title="Assign alternate signatories">
         <p className="mb-4 text-sm text-muted-foreground">
           Choose an alternate account for each approval stage. When needed, the assigned person
           signs in with their own account; their name, signature, and signing time are recorded.
@@ -822,5 +737,110 @@ export function SignatoryAssistantSettings() {
         )}
       </Section>
     </div>
+  );
+}
+
+export function PhoneDirectorySettings() {
+  const queryClient = useQueryClient();
+  const phoneDirectory = useQuery({
+    queryKey: ["phone-directory"],
+    queryFn: () => unwrap(getPhoneDirectoryFn()),
+  });
+  const [phoneNumbers, setPhoneNumbers] = useState<Record<string, string>>({});
+  const [savingPhoneUserId, setSavingPhoneUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!phoneDirectory.data) return;
+    setPhoneNumbers(
+      Object.fromEntries(
+        phoneDirectory.data.map((contact) => [contact.userId, contact.phoneNumber ?? ""]),
+      ),
+    );
+  }, [phoneDirectory.data]);
+
+  async function savePhoneNumber(userId: string) {
+    if (savingPhoneUserId) return;
+    setSavingPhoneUserId(userId);
+    try {
+      const result = await saveSignatoryPhoneNumberFn({
+        data: {
+          userId,
+          phoneNumber: phoneNumbers[userId]?.trim() || null,
+        },
+      });
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success("LOA phone directory updated.");
+      await queryClient.invalidateQueries({ queryKey: ["phone-directory"] });
+    } catch {
+      toast.error("We couldn't save that contact number. Please try again.");
+    } finally {
+      setSavingPhoneUserId(null);
+    }
+  }
+
+  return (
+    <Section title="Manage LOA phone directory">
+      <p className="mb-4 text-sm text-muted-foreground">
+        Add verified contact numbers for administrators and assigned signatories. Numbers are
+        visible to signed-in users in the LOA Phone Directory.
+      </p>
+      {phoneDirectory.isPending ? (
+        <LoadingPanel label="Loading signatory phone numbers" rows={3} />
+      ) : phoneDirectory.isError ? (
+        <div className="p-4 text-sm" role="alert">
+          <p className="font-medium">We couldn&apos;t load phone directory contacts.</p>
+          <Button className="mt-3" variant="outline" onClick={() => void phoneDirectory.refetch()}>
+            Try again
+          </Button>
+        </div>
+      ) : phoneDirectory.data.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No signatory accounts have been assigned.</p>
+      ) : (
+        <div className="space-y-3">
+          {phoneDirectory.data.map((contact) => (
+            <form
+              key={contact.userId}
+              className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,18rem)_auto] sm:items-end"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void savePhoneNumber(contact.userId);
+              }}
+            >
+              <div>
+                <p className="font-medium">{contact.name}</p>
+                <p className="text-xs text-muted-foreground">{ROLE_TITLES[contact.role]}</p>
+              </div>
+              <div>
+                <Label htmlFor={`phone-${contact.userId}`}>Telephone / mobile</Label>
+                <Input
+                  id={`phone-${contact.userId}`}
+                  className="mt-1"
+                  type="tel"
+                  maxLength={32}
+                  value={phoneNumbers[contact.userId] ?? ""}
+                  onChange={(event) =>
+                    setPhoneNumbers((current) => ({
+                      ...current,
+                      [contact.userId]: event.target.value,
+                    }))
+                  }
+                  placeholder="Not provided"
+                />
+              </div>
+              <Button type="submit" variant="outline" disabled={savingPhoneUserId !== null}>
+                {savingPhoneUserId === contact.userId ? (
+                  <ButtonLoading label="Saving…" />
+                ) : (
+                  "Save number"
+                )}
+              </Button>
+            </form>
+          ))}
+        </div>
+      )}
+    </Section>
   );
 }

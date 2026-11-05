@@ -23,6 +23,8 @@ import {
   passwordIssues,
   profileSchema,
   registrationOtpSchema,
+  passwordRecoveryRequestSchema,
+  passwordRecoverySchema,
   registerSchema,
 } from "@/lib/validation";
 import { encryptedCookieRequired, serverEnv, serverEnvOptional } from "./env";
@@ -47,6 +49,7 @@ const LOCK_MINUTES = 15;
 const REGISTRATION_OTP_MINUTES = 10;
 const REGISTRATION_OTP_RESEND_SECONDS = 60;
 const REGISTRATION_OTP_MAX_ATTEMPTS = 5;
+const PASSWORD_RECOVERY_MINUTES = 10;
 
 interface UserRow extends RowDataPacket {
   id: string;
@@ -157,7 +160,9 @@ export async function googleSignInAccount(email: string): Promise<GoogleSignInAc
     : null;
 }
 
-export async function ensureGoogleRequisitionerAccount(email: string): Promise<GoogleSignInAccount> {
+export async function ensureGoogleRequisitionerAccount(
+  email: string,
+): Promise<GoogleSignInAccount> {
   const normalised = normaliseEmail(email);
   const existing = await googleSignInAccount(normalised);
   if (existing) return existing;
@@ -166,7 +171,10 @@ export async function ensureGoogleRequisitionerAccount(email: string): Promise<G
     throw new AppError("Use your official Lyceum of Alabang email address.");
   }
 
-  const localName = normalised.split("@")[0].replace(/[._-]+/g, " ").trim();
+  const localName = normalised
+    .split("@")[0]
+    .replace(/[._-]+/g, " ")
+    .trim();
   const name = localName || "Institutional User";
   const id = randomUUID();
   await run(
@@ -235,13 +243,76 @@ export async function login(input: unknown): Promise<{ mustChangePassword: boole
      FROM users WHERE email = ? LIMIT 1`,
     [email],
   );
-  const user = rows[0];
   const invalid = new AppError("Incorrect email or password.");
 
+  let user = rows[0];
   if (!user) {
-    await verifyPassword(data.password, DUMMY_HASH);
-    throw invalid;
+    const employeeRows = await all<
+      Array<
+        RowDataPacket & {
+          id: string;
+          name: string;
+          email: string;
+          password_hash: string;
+          department: string;
+          must_change_password: number;
+          is_locked: number;
+          lock_minutes: number | null;
+        }
+      >
+    >(
+      `SELECT id, name, email, password_hash, department, must_change_password,
+              (locked_until IS NOT NULL AND locked_until > NOW()) AS is_locked,
+              TIMESTAMPDIFF(MINUTE, NOW(), locked_until) AS lock_minutes
+       FROM hrdo_users WHERE email = ? AND role = 'employee' LIMIT 1`,
+      [email],
+    );
+    const employee = employeeRows[0];
+    if (!employee) {
+      await verifyPassword(data.password, DUMMY_HASH);
+      throw invalid;
+    }
+
+    if (employee.is_locked) {
+      const minutes = Math.max(1, Number(employee.lock_minutes ?? LOCK_MINUTES));
+      throw new AppError(
+        `Too many failed sign-in attempts. Try again in ${minutes} minute${minutes === 1 ? "" : "s"}.`,
+      );
+    }
+
+    if (!(await verifyPassword(data.password, employee.password_hash))) {
+      await run(
+        `UPDATE hrdo_users SET failed_attempts = failed_attempts + 1,
+          locked_until = IF(failed_attempts + 1 >= ?, DATE_ADD(NOW(), INTERVAL ? MINUTE), locked_until)
+         WHERE id = ?`,
+        [MAX_FAILED_ATTEMPTS, LOCK_MINUTES, employee.id],
+      );
+      throw invalid;
+    }
+
+    await run(
+      `INSERT INTO users (id, name, email, password_hash, role, department, must_change_password)
+       VALUES (?, ?, ?, ?, 'requisitioner', ?, ?)`,
+      [
+        employee.id,
+        employee.name,
+        employee.email,
+        employee.password_hash,
+        employee.department,
+        employee.must_change_password,
+      ],
+    );
+    const linkedRows = await all<UserRow[]>(
+      `SELECT id, name, email, password_hash, role, department, must_change_password,
+              0 AS is_locked, NULL AS lock_minutes
+       FROM users WHERE id = ? LIMIT 1`,
+      [employee.id],
+    );
+    user = linkedRows[0];
   }
+
+  if (!user) throw new AppError("We couldn't sign you in. Please try again.");
+
   if (user.is_locked) {
     const minutes = Math.max(1, Number(user.lock_minutes ?? LOCK_MINUTES));
     throw new AppError(
@@ -251,6 +322,30 @@ export async function login(input: unknown): Promise<{ mustChangePassword: boole
 
   const valid = await verifyPassword(data.password, user.password_hash);
   if (!valid) {
+    if (user.role === "requisitioner") {
+      const employeeRows = await all<Array<RowDataPacket & { password_hash: string }>>(
+        "SELECT password_hash FROM hrdo_users WHERE email = ? AND role = 'employee' LIMIT 1",
+        [email],
+      );
+      const employee = employeeRows[0];
+      if (employee && (await verifyPassword(data.password, employee.password_hash))) {
+        await withTransaction(async (conn) => {
+          await run(
+            "UPDATE users SET password_hash = ?, failed_attempts = 0, locked_until = NULL WHERE id = ?",
+            [employee.password_hash, user.id],
+            conn,
+          );
+          await run(
+            "UPDATE hrdo_users SET failed_attempts = 0, locked_until = NULL WHERE email = ? AND role = 'employee'",
+            [email],
+            conn,
+          );
+        });
+        await startSession(user.id);
+        return { mustChangePassword: Boolean(user.must_change_password) };
+      }
+    }
+
     await run(
       `UPDATE users SET failed_attempts = failed_attempts + 1,
         locked_until = IF(failed_attempts + 1 >= ?, DATE_ADD(NOW(), INTERVAL ? MINUTE), locked_until)
@@ -263,6 +358,91 @@ export async function login(input: unknown): Promise<{ mustChangePassword: boole
   await run("UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?", [user.id]);
   await startSession(user.id);
   return { mustChangePassword: Boolean(user.must_change_password) };
+}
+
+export async function requestPasswordRecovery(input: unknown): Promise<{ sent: true }> {
+  const { email } = parseInput(passwordRecoveryRequestSchema, input);
+  const rows = await all<UserRow[]>(
+    "SELECT id, name, email, password_hash, role, department, must_change_password FROM users WHERE email = ? LIMIT 1",
+    [normaliseEmail(email)],
+  );
+  const user = rows[0];
+  if (!user) return { sent: true };
+
+  const code = String(randomInt(100000, 1000000));
+  const codeHash = sha256(code);
+  await run(
+    `INSERT INTO registration_otps
+      (email, name, department, password_hash, code_hash, send_nonce, attempts, last_sent_at, expires_at)
+     VALUES (?, ?, ?, ?, ?, ?, 0, NOW(), DATE_ADD(NOW(), INTERVAL ? MINUTE))
+     ON DUPLICATE KEY UPDATE name = VALUES(name), department = VALUES(department),
+       password_hash = VALUES(password_hash), code_hash = VALUES(code_hash),
+       send_nonce = VALUES(send_nonce), attempts = 0, last_sent_at = NOW(),
+       expires_at = DATE_ADD(NOW(), INTERVAL ? MINUTE)`,
+    [
+      user.email,
+      user.name,
+      user.department,
+      user.password_hash,
+      codeHash,
+      randomUUID(),
+      PASSWORD_RECOVERY_MINUTES,
+      PASSWORD_RECOVERY_MINUTES,
+    ],
+  );
+  await sendRegistrationOtpEmail(user.email, user.name, code, PASSWORD_RECOVERY_MINUTES);
+  return { sent: true };
+}
+
+export async function resetPasswordWithRecoveryCode(input: unknown): Promise<{ reset: true }> {
+  const data = parseInput(passwordRecoverySchema, input);
+  const email = normaliseEmail(data.email);
+  const userRows = await all<UserRow[]>("SELECT id, role FROM users WHERE email = ? LIMIT 1", [
+    email,
+  ]);
+  const user = userRows[0];
+  if (!user) throw new AppError("The recovery code is invalid or expired.");
+  const otpRows = await all<Array<{ code_hash: string; expires_at: string; attempts: number }>>(
+    "SELECT code_hash, expires_at, attempts FROM registration_otps WHERE email = ? LIMIT 1",
+    [email],
+  );
+  const otp = otpRows[0];
+  if (
+    !otp ||
+    otp.expires_at <= new Date().toISOString().slice(0, 19).replace("T", " ") ||
+    otp.attempts >= REGISTRATION_OTP_MAX_ATTEMPTS
+  ) {
+    throw new AppError("The recovery code is invalid or expired.");
+  }
+  if (otp.code_hash !== sha256(data.code)) {
+    await run("UPDATE registration_otps SET attempts = attempts + 1 WHERE email = ?", [email]);
+    throw new AppError("The recovery code is invalid or expired.");
+  }
+  const passwordHash = await hashPassword(data.newPassword);
+  await withTransaction(async (conn) => {
+    await run(
+      "UPDATE users SET password_hash = ?, failed_attempts = 0, locked_until = NULL, must_change_password = 0 WHERE id = ?",
+      [passwordHash, user.id],
+      conn,
+    );
+    if (user.role === "requisitioner") {
+      await run(
+        "UPDATE hrdo_users SET password_hash = ?, failed_attempts = 0, locked_until = NULL, must_change_password = 0 WHERE email = ? AND role = 'employee'",
+        [passwordHash, email],
+        conn,
+      );
+      await run("DELETE FROM sessions WHERE user_id = ?", [user.id], conn);
+      await run(
+        "DELETE FROM hrdo_sessions WHERE user_id IN (SELECT id FROM hrdo_users WHERE email = ? AND role = 'employee')",
+        [email],
+        conn,
+      );
+    } else {
+      await run("DELETE FROM sessions WHERE user_id = ?", [user.id], conn);
+    }
+    await run("DELETE FROM registration_otps WHERE email = ?", [email], conn);
+  });
+  return { reset: true };
 }
 
 interface RegistrationOtpRow extends RowDataPacket {
@@ -431,6 +611,18 @@ export async function verifyRegistrationOtp(
         });
       }
 
+      const hrdoAccounts = await all<
+        Array<RowDataPacket & { id: string; role: "employee" | "hrdo_staff" }>
+      >("SELECT id, role FROM hrdo_users WHERE email = ? LIMIT 1 FOR UPDATE", [email], conn);
+      const hrdoAccount = hrdoAccounts[0];
+      if (hrdoAccount?.role === "hrdo_staff") {
+        await run("DELETE FROM registration_otps WHERE email = ?", [email], conn);
+        return new AppError(
+          "This email already has an HRDO staff account. Contact an administrator to link modules.",
+          { email: "This email is already assigned to an HRDO staff account." },
+        );
+      }
+
       userId = randomUUID();
       await run(
         `INSERT INTO users (id, name, email, password_hash, role, department, must_change_password)
@@ -438,6 +630,24 @@ export async function verifyRegistrationOtp(
         [userId, pending.name, email, pending.password_hash, pending.department],
         conn,
       );
+      if (hrdoAccount) {
+        await run(
+          `UPDATE hrdo_users
+           SET name = ?, department = ?, password_hash = ?, must_change_password = 0,
+               failed_attempts = 0, locked_until = NULL
+           WHERE id = ?`,
+          [pending.name, pending.department, pending.password_hash, hrdoAccount.id],
+          conn,
+        );
+      } else {
+        await run(
+          `INSERT INTO hrdo_users
+            (id, name, email, password_hash, role, department, must_change_password)
+           VALUES (?, ?, ?, ?, 'employee', ?, 0)`,
+          [userId, pending.name, email, pending.password_hash, pending.department],
+          conn,
+        );
+      }
       await run("DELETE FROM registration_otps WHERE email = ?", [email], conn);
       return null;
     });
@@ -484,10 +694,26 @@ export async function changePassword(input: unknown): Promise<{ ok: true }> {
   }
 
   const token = getCookie(sessionCookieName());
-  await run(
-    "UPDATE users SET password_hash = ?, must_change_password = 0, failed_attempts = 0, locked_until = NULL WHERE id = ?",
-    [await hashPassword(data.newPassword), current.id],
-  );
+  const passwordHash = await hashPassword(data.newPassword);
+  await withTransaction(async (conn) => {
+    await run(
+      "UPDATE users SET password_hash = ?, must_change_password = 0, failed_attempts = 0, locked_until = NULL WHERE id = ?",
+      [passwordHash, current.id],
+      conn,
+    );
+    if (current.role === "requisitioner") {
+      await run(
+        "UPDATE hrdo_users SET password_hash = ?, must_change_password = 0, failed_attempts = 0, locked_until = NULL WHERE email = ? AND role = 'employee'",
+        [passwordHash, current.email],
+        conn,
+      );
+      await run(
+        "DELETE FROM hrdo_sessions WHERE user_id IN (SELECT id FROM hrdo_users WHERE email = ? AND role = 'employee')",
+        [current.email],
+        conn,
+      );
+    }
+  });
   if (token) {
     await run("DELETE FROM sessions WHERE user_id = ? AND token_hash <> ?", [
       current.id,
@@ -500,10 +726,19 @@ export async function changePassword(input: unknown): Promise<{ ok: true }> {
 export async function updateProfile(input: unknown): Promise<Viewer> {
   const current = await requireViewer();
   const data = parseInput(profileSchema, input);
-  await run("UPDATE users SET name = ?, department = ? WHERE id = ?", [
-    data.name,
-    data.department,
-    current.id,
-  ]);
+  await withTransaction(async (conn) => {
+    await run(
+      "UPDATE users SET name = ?, department = ? WHERE id = ?",
+      [data.name, data.department, current.id],
+      conn,
+    );
+    if (current.role === "requisitioner") {
+      await run(
+        "UPDATE hrdo_users SET name = ?, department = ? WHERE email = ? AND role = 'employee'",
+        [data.name, data.department, current.email],
+        conn,
+      );
+    }
+  });
   return { ...current, name: data.name, department: data.department };
 }

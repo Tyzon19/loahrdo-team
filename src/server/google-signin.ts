@@ -24,7 +24,9 @@ export function googleSignInCredentials() {
 /**
  * The redirect URI sent to Google and used for the token exchange. It must be
  * registered on the OAuth client. GOOGLE_SIGNIN_REDIRECT_URI wins; otherwise the
- * public site origin is used, except on localhost where the request origin is used.
+ * public site origin is used for non-local requests. Local requests use their
+ * own origin so OAuth state cookies survive when the dev server port differs
+ * from SITE_URL.
  */
 export function googleSignInRedirectUri(requestUrl: URL): string {
   const configured = serverEnvOptional("GOOGLE_SIGNIN_REDIRECT_URI");
@@ -36,9 +38,7 @@ export function googleSignInRedirectUri(requestUrl: URL): string {
     try {
       const siteUrl = new URL(site);
       const siteIsLocal = ["localhost", "127.0.0.1"].includes(siteUrl.hostname);
-      // When the dev server is opened from another device, localhost would
-      // resolve to that device instead of the machine running the app.
-      if (local || !siteIsLocal) {
+      if (!local && !siteIsLocal) {
         return `${siteUrl.origin}${GOOGLE_SIGN_IN_CALLBACK_PATH}`;
       }
     } catch {

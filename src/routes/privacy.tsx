@@ -123,7 +123,7 @@ function PrivacyPage() {
             <div className="mt-2 space-y-2 text-muted-foreground">
               <p className="flex gap-2">
                 <UserCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />A
-                requisitioner can only see requests filed by their own account.
+                requestor can only see requests filed by their own account.
               </p>
               <p className="flex gap-2">
                 <Lock className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />

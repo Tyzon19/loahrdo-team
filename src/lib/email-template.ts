@@ -212,7 +212,7 @@ export function renderEmailTemplate(
             </tr>
             <tr>
               <td style="padding:12px 32px 26px;">
-                <p style="margin:0;color:#353b45;font-size:14px;line-height:1.6;">Kind regards,<br><strong>Lyceum of Alabang<br>Vehicle Reservation &amp; Trip Ticket Team</strong></p>
+                <p style="margin:0;color:#353b45;font-size:14px;line-height:1.6;">Kind regards,<br><strong>Lyceum of Alabang<br>LOA HRDO DESK TEAM</strong></p>
                 <p style="margin:20px 0 0;color:#ff3333;font-size:13px;font-weight:700;line-height:1.6;">This is an automated notification. Please do not reply to this email.</p>
               </td>
             </tr>
@@ -281,7 +281,7 @@ export function renderRegistrationOtpEmail(
             <p style="margin:0;padding:12px 14px;background-color:#f7f8fa;border-left:3px solid #1f3b68;color:#454f5e;font-size:12px;line-height:1.6;">${escapeHtml(ignoredNotice)}</p>
           </td></tr>
           <tr><td style="padding:0 32px 26px;">
-            <p style="margin:0;color:#353b45;font-size:14px;line-height:1.6;">Kind regards,<br><strong>Lyceum of Alabang<br>Vehicle Reservation &amp; Trip Ticket Team</strong></p>
+            <p style="margin:0;color:#353b45;font-size:14px;line-height:1.6;">Kind regards,<br><strong>Lyceum of Alabang<br>LOA HRDO DESK TEAM</strong></p>
             <p style="margin:18px 0 0;color:#687386;font-size:11px;line-height:1.6;">This is an automated message. Please do not reply to this email.</p>
           </td></tr>
         </table>
@@ -371,7 +371,7 @@ export function renderTemporaryPasswordEmail(
             <p style="margin:0;padding:12px 14px;background-color:#f7f8fa;border-left:3px solid #1f3b68;color:#454f5e;font-size:12px;line-height:1.6;">If you were not expecting this account, contact the system administrator.</p>
           </td></tr>
           <tr><td style="padding:0 32px 26px;">
-            <p style="margin:0;color:#353b45;font-size:14px;line-height:1.6;">Kind regards,<br><strong>Lyceum of Alabang<br>Vehicle Reservation &amp; Trip Ticket Team</strong></p>
+            <p style="margin:0;color:#353b45;font-size:14px;line-height:1.6;">Kind regards,<br><strong>Lyceum of Alabang<br>LOA HRDO DESK TEAM</strong></p>
             <p style="margin:18px 0 0;color:#687386;font-size:11px;line-height:1.6;">This is an automated message. Please do not reply to this email.</p>
           </td></tr>
         </table>

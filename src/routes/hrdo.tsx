@@ -3,7 +3,11 @@ import { HrdoShell } from "@/components/hrdo/HrdoShell";
 
 export const Route = createFileRoute("/hrdo")({
   beforeLoad: ({ context, location }) => {
-    if (location.pathname === "/hrdo/login" || location.pathname === "/hrdo/change-password") {
+    if (
+      location.pathname === "/hrdo/login" ||
+      location.pathname === "/hrdo/forgot-password" ||
+      location.pathname === "/hrdo/change-password"
+    ) {
       return;
     }
 

@@ -65,6 +65,14 @@ export const registrationOtpSchema = z.object({
   code: z.string().regex(/^\d{6}$/, "Enter the six-digit verification code."),
 });
 
+export const passwordRecoveryRequestSchema = z.object({ email });
+
+export const passwordRecoverySchema = z.object({
+  email,
+  code: z.string().regex(/^\d{6}$/, "Enter the six-digit recovery code."),
+  newPassword: password,
+});
+
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, "Enter your current password.").max(200),
   newPassword: password,

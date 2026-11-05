@@ -94,7 +94,7 @@ export function RequestForm({
         <dl className="mb-4 grid grid-cols-1 gap-3 rounded-sm bg-muted p-3 text-sm sm:grid-cols-2">
           <div><dt className="text-xs text-muted-foreground">Request Number</dt><dd className="font-medium">{header.number}</dd></div>
           <div><dt className="text-xs text-muted-foreground">Date</dt><dd>{fmtDate(header.date)}</dd></div>
-          <div className="sm:col-span-2"><dt className="text-xs text-muted-foreground">Requisitioner</dt><dd className="font-medium">{header.requisitioner} (signed-in account)</dd></div>
+          <div className="sm:col-span-2"><dt className="text-xs text-muted-foreground">Requestor</dt><dd className="font-medium">{header.requisitioner} (signed-in account)</dd></div>
         </dl>
         <div className="mb-5 rounded-lg border bg-background p-4 sm:hidden">
           <div className="flex items-center justify-between gap-3">

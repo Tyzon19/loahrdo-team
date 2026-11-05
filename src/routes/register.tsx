@@ -1,23 +1,22 @@
 import { createFileRoute, Link, redirect as routerRedirect } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
+import { Building2, Lock, Mail, User, UserPlus } from "lucide-react";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { LoadingScreen } from "@/components/app/LoadingPanel";
 import {
-  AlertCircle,
-  ArrowLeft,
-  Check,
-  IdCard,
-  KeyRound,
-  MailCheck,
-  ShieldCheck,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { ButtonLoading } from "@/components/app/LoadingPanel";
+  AuthLayout,
+  FakeCaptcha,
+  Field,
+  GoogleButton,
+  OrDivider,
+  SubmitButton,
+} from "@/components/AuthLayout";
 import { institutionalEmailAllowed, registerSchema } from "@/lib/validation";
-import { joinFullName, splitFullName } from "@/lib/name";
+import { joinFullName } from "@/lib/name";
 import { requestRegistrationOtpFn, verifyRegistrationOtpFn } from "@/server-functions";
 import { SITE, canonical } from "@/lib/site";
+
 type RegisterSearch = {
   email?: string | undefined;
 };
@@ -34,14 +33,14 @@ export const Route = createFileRoute("/register")({
   },
   head: () => ({
     meta: [
-      { title: `Create a requisitioner account — ${SITE.name}` },
+      { title: `Create a requisitioner account | ${SITE.name}` },
       {
         name: "description",
         content:
           "Create a Lyceum of Alabang PFMO requisitioner account using your official institutional email address.",
       },
       { name: "robots", content: "noindex, nofollow" },
-      { property: "og:title", content: `Create a requisitioner account — ${SITE.name}` },
+      { property: "og:title", content: `Create a requisitioner account | ${SITE.name}` },
       {
         property: "og:description",
         content: "Register to file and track school vehicle reservation requests.",
@@ -54,7 +53,17 @@ export const Route = createFileRoute("/register")({
 });
 
 type Errors = {
-  [K in "firstName" | "middleName" | "lastName" | "email" | "department" | "password" | "confirm" | "code"]?: string | undefined;
+  [
+    K in
+      | "firstName"
+      | "middleName"
+      | "lastName"
+      | "email"
+      | "department"
+      | "password"
+      | "confirm"
+      | "code"
+  ]?: string | undefined;
 };
 
 function RegisterPage() {
@@ -141,7 +150,7 @@ function RegisterPage() {
           return;
         }
         toast.success("Email verified. Your account is ready.");
-        window.location.assign("/dashboard");
+        window.location.assign("/#main-content");
       } catch {
         setError("We couldn't verify the code. Check your connection and try again.");
       } finally {
@@ -190,248 +199,208 @@ function RegisterPage() {
     await requestCode();
   }
 
-  const fieldError = (key: keyof Errors) =>
-    errors[key] ? (
-      <p className="mt-1 text-sm text-destructive" role="alert">
-        {errors[key]}
+  function resetVerification() {
+    setVerificationStarted(false);
+    setCode("");
+    setErrors({});
+    setError(null);
+  }
+
+  function fieldError(key: keyof Errors) {
+    const message = errors[key];
+    return message ? (
+      <p className="mb-3 text-sm text-destructive" role="alert">
+        {message}
       </p>
     ) : null;
+  }
 
   return (
-    <div className="module-login-shell module-register-shell">
-      <section className="module-login-brand" aria-labelledby="register-brand-heading">
-        <div className="module-login-cityscape" aria-hidden="true" />
-        <div className="module-login-brand-copy">
-          <h1 id="register-brand-heading">
-            Create your account
-            <br />
-            to get started.
-          </h1>
-          <p>Register with your institutional account to submit and track vehicle requests.</p>
-        </div>
-      </section>
+    <>
+      {busy && (
+        <LoadingScreen
+          label={
+            verificationStarted ? "Verifying institutional email" : "Sending verification code"
+          }
+          mode="overlay"
+          immediate
+        />
+      )}
 
-      <section className="module-login-account module-register-account" aria-labelledby="register-heading">
-        <div className="module-login-account-content">
-          <div className="module-login-form-logo-wrap">
-            <img
-              src="/loa-loading.png"
-              alt="Lyceum of Alabang home logo"
-              className="module-login-form-logo"
-            />
-          </div>
-          <header className="module-login-form-heading">
-            <h2 id="register-heading">Create New Account</h2>
-            <p>Use your official institutional account to register.</p>
-          </header>
+      <AuthLayout title={verificationStarted ? "Verify Your Email" : "Create Account"}>
+        <form onSubmit={onSubmit} noValidate>
+          {error && (
+            <p className="mb-3 text-sm text-destructive" role="alert">
+              {error}
+            </p>
+          )}
 
-          <form className="module-login-form register-form" onSubmit={onSubmit} noValidate>
-              {error && (
-                <div
-                  role="alert"
-                  className="flex gap-2 rounded-sm border border-destructive/40 bg-danger-soft p-3 text-sm"
+          {verificationStarted ? (
+            <>
+              <p className="mb-4 text-sm text-muted-foreground">
+                We sent a six-digit code to{" "}
+                <span className="font-medium text-foreground">{form.email.trim()}</span>. Enter it
+                below to finish creating your account.
+              </p>
+              <div className="mb-3">
+                <label className="mb-2 block text-sm" htmlFor="registration-code">
+                  Verification code
+                </label>
+                <InputOTP
+                  id="registration-code"
+                  maxLength={6}
+                  autoComplete="one-time-code"
+                  required
+                  containerClassName="justify-center"
+                  value={code}
+                  onChange={(value) => setCode(value)}
+                  aria-invalid={Boolean(errors.code)}
+                  aria-describedby="registration-code-help"
                 >
-                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden />
-                  <span>{error}</span>
-                </div>
-              )}
-
-              {verificationStarted ? (
-                <div className="space-y-4">
-                  <div className="rounded-sm border border-primary/30 bg-info-soft p-4">
-                    <div className="flex items-start gap-3">
-                      <MailCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden />
-                      <div>
-                        <p className="font-semibold">Check your institutional inbox</p>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          Enter the six-digit code sent to <strong>{form.email.trim()}</strong>. It
-                          expires in 10 minutes.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="module-login-field">
-                    <Label htmlFor="registration-code">Verification code</Label>
-                    <Input
-                      id="registration-code"
-                      inputMode="numeric"
-                      autoComplete="one-time-code"
-                      pattern="[0-9]{6}"
-                      maxLength={6}
-                      required
-                      className="h-14 text-center text-2xl font-semibold tracking-[0.55em]"
-                      value={code}
-                      onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
-                      aria-invalid={Boolean(errors.code)}
-                      aria-describedby="registration-code-help"
-                    />
-                    <p
-                      id="registration-code-help"
-                      className="mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-muted-foreground"
-                    >
-                      <KeyRound className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-                      For your security, never share this code. It expires in 10 minutes.
-                    </p>
-                    {fieldError("code")}
-                  </div>
-
-                  <div className="register-action-row register-action-row--stacked">
-                    <Button type="submit" className="register-submit-button" disabled={busy}>
-                      {busy ? <ButtonLoading label="Verifying…" /> : "REGISTER"}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="register-cancel-button"
-                      onClick={() => {
-                        setVerificationStarted(false);
-                        setCode("");
-                        setErrors({});
-                        setError(null);
-                      }}
-                      disabled={busy}
-                    >
-                      <ArrowLeft className="h-4 w-4" aria-hidden />
-                      CANCEL
-                    </Button>
-                  </div>
-
-                  <div className="register-extra-actions">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() => void requestCode()}
-                      disabled={busy || resendSeconds > 0}
-                    >
-                      {resendSeconds > 0
-                        ? `Resend code in ${resendSeconds}s`
-                        : "Didn't get a code? Resend"}
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div className="register-grid">
-                    <div className="module-login-field">
-                      <Label htmlFor="first-name">First Name</Label>
-                      <Input
-                        id="first-name"
-                        autoComplete="given-name"
-                        required
-                        maxLength={60}
-                        value={form.firstName}
-                        onChange={(event) => set("firstName", event.target.value)}
-                        aria-invalid={Boolean(errors.firstName)}
+                  <InputOTPGroup className="gap-1 sm:gap-2">
+                    {Array.from({ length: 6 }, (_, index) => (
+                      <InputOTPSlot
+                        key={index}
+                        index={index}
+                        className="h-11 w-9 rounded-md border text-base font-medium sm:h-12 sm:w-11"
                       />
-                      {fieldError("firstName")}
-                    </div>
+                    ))}
+                  </InputOTPGroup>
+                </InputOTP>
+                <p
+                  id="registration-code-help"
+                  className="mt-2 text-xs leading-relaxed text-muted-foreground"
+                >
+                  The code expires in 10 minutes. Do not share it with anyone.
+                </p>
+                {fieldError("code")}
+              </div>
 
-                    <div className="module-login-field">
-                      <Label htmlFor="middle-name">Middle Name (Optional)</Label>
-                      <Input
-                        id="middle-name"
-                        autoComplete="additional-name"
-                        maxLength={60}
-                        value={form.middleName}
-                        onChange={(event) => set("middleName", event.target.value)}
-                        aria-invalid={Boolean(errors.middleName)}
-                      />
-                      {fieldError("middleName")}
-                    </div>
+              <div className="mt-3">
+                <SubmitButton icon={UserPlus} disabled={busy}>
+                  {busy ? "Verifying" : "Verify Email"}
+                </SubmitButton>
+              </div>
 
-                    <div className="module-login-field">
-                      <Label htmlFor="last-name">Last Name</Label>
-                      <Input
-                        id="last-name"
-                        autoComplete="family-name"
-                        required
-                        maxLength={60}
-                        value={form.lastName}
-                        onChange={(event) => set("lastName", event.target.value)}
-                        aria-invalid={Boolean(errors.lastName)}
-                      />
-                      {fieldError("lastName")}
-                    </div>
+              <div className="mt-3 flex items-center justify-between gap-4">
+                <button
+                  type="button"
+                  className="text-sm font-medium text-primary hover:underline disabled:opacity-60"
+                  onClick={() => void requestCode()}
+                  disabled={busy || resendSeconds > 0}
+                >
+                  {resendSeconds > 0 ? `Resend in ${resendSeconds}s` : "Resend code"}
+                </button>
+                <button
+                  type="button"
+                  className="text-sm font-medium text-primary hover:underline disabled:opacity-60"
+                  onClick={resetVerification}
+                  disabled={busy}
+                >
+                  Change email
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <Field
+                icon={User}
+                placeholder="First name"
+                autoComplete="given-name"
+                required
+                value={form.firstName}
+                onChange={(event) => set("firstName", event.target.value)}
+              />
+              {fieldError("firstName")}
+              <Field
+                icon={User}
+                placeholder="Middle name (optional)"
+                autoComplete="additional-name"
+                value={form.middleName}
+                onChange={(event) => set("middleName", event.target.value)}
+              />
+              <Field
+                icon={User}
+                placeholder="Last name"
+                autoComplete="family-name"
+                required
+                value={form.lastName}
+                onChange={(event) => set("lastName", event.target.value)}
+              />
+              {fieldError("lastName")}
+              <Field
+                icon={Mail}
+                type="email"
+                placeholder="Email address"
+                autoComplete="email"
+                required
+                value={form.email}
+                onChange={(event) => set("email", event.target.value)}
+              />
+              {fieldError("email")}
+              <Field
+                icon={Building2}
+                placeholder="Department or office"
+                autoComplete="organization"
+                required
+                value={form.department}
+                onChange={(event) => set("department", event.target.value)}
+              />
+              {fieldError("department")}
+              <Field
+                icon={Lock}
+                type="password"
+                placeholder="Password"
+                autoComplete="new-password"
+                required
+                value={form.password}
+                onChange={(event) => set("password", event.target.value)}
+              />
+              {fieldError("password")}
+              <Field
+                icon={Lock}
+                type="password"
+                placeholder="Confirm password"
+                autoComplete="new-password"
+                required
+                value={form.confirm}
+                onChange={(event) => set("confirm", event.target.value)}
+              />
+              {fieldError("confirm")}
 
-                    <div className="module-login-field">
-                      <Label htmlFor="email">Institutional Email</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        autoComplete="email"
-                        required
-                        maxLength={190}
-                        placeholder="name@lyceumalabang.edu.ph"
-                        value={form.email}
-                        onChange={(event) => set("email", event.target.value)}
-                        aria-invalid={Boolean(errors.email)}
-                      />
-                      {fieldError("email")}
-                    </div>
+              <FakeCaptcha />
 
-                    <div className="module-login-field module-login-field--full">
-                      <Label htmlFor="department">Department or Office</Label>
-                      <Input
-                        id="department"
-                        autoComplete="organization"
-                        required
-                        maxLength={190}
-                        value={form.department}
-                        onChange={(event) => set("department", event.target.value)}
-                        aria-invalid={Boolean(errors.department)}
-                      />
-                      {fieldError("department")}
-                    </div>
+              <div className="mt-3">
+                <SubmitButton icon={UserPlus} disabled={busy}>
+                  {busy ? "Sending code" : "Sign Up"}
+                </SubmitButton>
+              </div>
 
-                    <div className="module-login-field">
-                      <Label htmlFor="password">Password</Label>
-                      <Input
-                        id="password"
-                        type="password"
-                        autoComplete="new-password"
-                        required
-                        maxLength={128}
-                        value={form.password}
-                        onChange={(event) => set("password", event.target.value)}
-                        aria-invalid={Boolean(errors.password)}
-                        aria-describedby="password-help"
-                      />
-                      <p id="password-help" className="mt-1 text-[11px] text-muted-foreground">
-                        At least 12 characters, with upper and lower case, a number and a symbol.
-                      </p>
-                      {fieldError("password")}
-                    </div>
+              <OrDivider />
+              <GoogleButton
+                href="/api/auth/google?redirect=%2F%23main-content"
+                label="Sign up with your institutional Google account"
+              />
 
-                    <div className="module-login-field">
-                      <Label htmlFor="confirm">Confirm Password</Label>
-                      <Input
-                        id="confirm"
-                        type="password"
-                        autoComplete="new-password"
-                        required
-                        maxLength={128}
-                        value={form.confirm}
-                        onChange={(event) => set("confirm", event.target.value)}
-                        aria-invalid={Boolean(errors.confirm)}
-                      />
-                      {fieldError("confirm")}
-                    </div>
-                  </div>
-
-                  <div className="register-action-row">
-                    <Button type="submit" className="register-submit-button" disabled={busy}>
-                      {busy ? <ButtonLoading label="Sending verification code…" /> : "REGISTER"}
-                    </Button>
-                    <Link to="/login" className="register-cancel-button" aria-label="Cancel registration">
-                      CANCEL
-                    </Link>
-                  </div>
-                </>
-              )}
-            </form>
-        </div>
-      </section>
-    </div>
+              <p className="mt-3 text-xs text-muted-foreground">
+                Only verified @lyceumalabang.edu.ph accounts are accepted.
+              </p>
+              <p className="mt-3 text-sm text-muted-foreground">
+                By creating an account, you agree to our{" "}
+                <Link to="/terms-of-service" className="font-semibold text-primary hover:underline">
+                  Terms of Service.
+                </Link>
+              </p>
+              <p className="mt-3 text-sm text-muted-foreground">
+                Already have an account?{" "}
+                <Link to="/login" className="font-semibold text-primary hover:underline">
+                  Sign in.
+                </Link>
+              </p>
+            </>
+          )}
+        </form>
+      </AuthLayout>
+    </>
   );
 }

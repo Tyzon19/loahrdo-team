@@ -18,7 +18,6 @@ export function PublicShell({
     { label: "COE Request", href: "/hrdo/coe" },
     { label: "Permission Slip", href: "/hrdo/requests" },
     { label: "Late & Absences", href: "/hrdo/history" },
-    { label: "Employee Records", href: "/hrdo/profile" },
     { label: "HRDO Dashboard", href: "/hrdo/dashboard" },
   ];
 
@@ -44,7 +43,6 @@ export function PublicShell({
                   <span>Services</span>
                   <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
                 </button>
-
                 <div className="absolute right-0 top-full z-20 mt-3 hidden min-w-[240px] rounded-md border border-[#dfeaf3] bg-white p-2 shadow-lg group-hover:block group-focus-within:block">
                   {serviceLinks.map((item) => (
                     <Link
@@ -65,7 +63,6 @@ export function PublicShell({
                 About
               </Link>
             </nav>
-
             <div className="flex items-center gap-3">
               {!signedIn ? (
                 <Link
@@ -83,11 +80,9 @@ export function PublicShell({
           </div>
         </div>
       </header>
-
       <main id="main-content" className="flex-1">
         {children}
       </main>
-
       {showFooter && (
         <footer className="border-t bg-card">
           <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-4 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">

@@ -22,10 +22,8 @@ import { SITE } from "@/lib/site";
 const PAGE = 25;
 
 export const Route = createFileRoute("/hrdo/history")({
-  beforeLoad: ({ context }) => {
-    if (context.hrdoViewer && context.hrdoViewer.role !== "hrdo_staff") {
-      throw redirect({ to: "/hrdo/dashboard" });
-    }
+  beforeLoad: () => {
+    throw redirect({ to: "/hrdo/dashboard" });
   },
   head: () => ({
     meta: [

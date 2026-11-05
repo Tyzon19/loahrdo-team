@@ -52,7 +52,7 @@ export function RequestsTable({
                 <dd className="break-words">{fmtDate(request.submittedAt)}</dd>
               </div>
             </dl>
-        
+
             <Link
               to="/requests/$id"
               params={{ id: request.id }}
@@ -64,18 +64,22 @@ export function RequestsTable({
         ))}
       </ul>
       <div className="hidden lg:block">
-        <div className="overflow-hidden rounded-md border">
-          <table className="w-full table-fixed border-separate border-spacing-0 text-sm">
+        <div className="overflow-x-auto rounded-md border">
+          <table className="min-w-[1060px] w-full table-fixed border-separate border-spacing-0 text-sm">
             <thead className="border-b bg-muted text-left text-[11px] uppercase tracking-wide text-foreground/75">
               <tr>
-                <th className="px-3 py-2 font-medium text-foreground/80">Request No.</th>
-                <th className="px-3 py-2 font-medium text-foreground/80">Submitted</th>
-                {showRequester && <th className="px-3 py-2 font-medium text-foreground/80">Requisitioner</th>}
-                <th className="px-3 py-2 font-medium text-foreground/80">Destination</th>
-                <th className="px-3 py-2 font-medium text-foreground/80">Travel Dates</th>
-                <th className="px-3 py-2 font-medium text-foreground/80">Status</th>
-                <th className="px-3 py-2 font-medium text-foreground/80">Pending With</th>
-                <th className="px-3 py-2">
+                <th className="w-[140px] px-3 py-2 font-medium text-foreground/80">Request No.</th>
+                <th className="w-[115px] px-3 py-2 font-medium text-foreground/80">Submitted</th>
+                {showRequester && (
+                  <th className="w-[155px] px-3 py-2 font-medium text-foreground/80">
+                    Requestor
+                  </th>
+                )}
+                <th className="w-[180px] px-3 py-2 font-medium text-foreground/80">Destination</th>
+                <th className="w-[180px] px-3 py-2 font-medium text-foreground/80">Travel Dates</th>
+                <th className="w-[195px] px-3 py-2 font-medium text-foreground/80">Status</th>
+                <th className="w-[175px] px-3 py-2 font-medium text-foreground/80">Pending With</th>
+                <th className="w-[120px] px-3 py-2">
                   <span className="sr-only">Action</span>
                 </th>
               </tr>
@@ -83,7 +87,7 @@ export function RequestsTable({
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id} className="border-b last:border-0 align-top hover:bg-muted/60">
-                  <td className="px-3 py-2 font-medium break-words">
+                  <td className="px-3 py-2 font-medium whitespace-nowrap">
                     <Link
                       to="/requests/$id"
                       params={{ id: r.id }}
@@ -92,22 +96,28 @@ export function RequestsTable({
                       {r.number}
                     </Link>
                   </td>
-                  <td className="px-3 py-2 font-medium break-words">{fmtDate(r.submittedAt)}</td>
+                  <td className="px-3 py-2 font-medium whitespace-nowrap">
+                    {fmtDate(r.submittedAt)}
+                  </td>
                   {showRequester && (
                     <td className="px-3 py-2 font-medium break-words">{r.requisitionerName}</td>
                   )}
                   <td
-                    className="px-3 py-2 font-medium break-words"
+                    className="px-3 py-2 font-medium break-words [overflow-wrap:anywhere]"
                     title={r.destinations.join("; ")}
                   >
                     {r.destinations.join("; ")}
                   </td>
-                  <td className="px-3 py-2 font-medium break-words">{fmtRange(r.dateStart, r.dateEnd)}</td>
+                  <td className="px-3 py-2 font-medium whitespace-nowrap">
+                    {fmtRange(r.dateStart, r.dateEnd)}
+                  </td>
                   <td className="px-3 py-2 font-medium">
                     <StatusBadge status={r.status} />
                   </td>
-                  <td className="px-3 py-2 break-words text-foreground/80">{pendingWith(r.status)}</td>
-                  <td className="px-3 py-2 text-right font-medium">
+                  <td className="px-3 py-2 break-words [overflow-wrap:anywhere] text-foreground/80">
+                    {pendingWith(r.status)}
+                  </td>
+                  <td className="px-3 py-2 text-right font-medium whitespace-nowrap">
                     <Link
                       to="/requests/$id"
                       params={{ id: r.id }}

@@ -570,6 +570,79 @@ export async function sendCoeStatusEmail(input: {
   }
 }
 
+export async function sendCoeProcessorNotification(input: {
+  recipientName: string;
+  recipientEmail: string;
+  requestId: string;
+  requesterName: string;
+  requesterEmail: string;
+  department: string;
+  purpose: string;
+}): Promise<EmailDeliveryResult> {
+  try {
+    if (!validEmail(input.recipientEmail)) {
+      throw new AppError("The COE processor email address is invalid.");
+    }
+
+    const siteUrl = siteUrlForEmail();
+    const requestUrl = new URL(
+      `/hrdo/coe/${encodeURIComponent(input.requestId)}`,
+      siteUrl.origin,
+    ).toString();
+    const subject = `New COE request from ${input.requesterName}`;
+    const text = [
+      `Dear ${input.recipientName || "HRDO Processor"},`,
+      "",
+      "A new Certificate of Employment request is waiting for HRDO processing.",
+      "",
+      `Requester: ${input.requesterName}`,
+      `Requester email: ${input.requesterEmail}`,
+      `Department: ${input.department}`,
+      `Purpose: ${input.purpose}`,
+      `Request ID: ${input.requestId}`,
+      "",
+      `Review the request: ${requestUrl}`,
+      "",
+      "Thank you,",
+      "LOA HRDO DESK TEAM",
+    ].join("\n");
+    const html = `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
+        <p>Dear ${input.recipientName || "HRDO Processor"},</p>
+        <p>A new Certificate of Employment request is waiting for HRDO processing.</p>
+        <p>
+          <strong>Requester:</strong> ${input.requesterName}<br />
+          <strong>Requester email:</strong> ${input.requesterEmail}<br />
+          <strong>Department:</strong> ${input.department}<br />
+          <strong>Purpose:</strong> ${input.purpose}<br />
+          <strong>Request ID:</strong> ${input.requestId}
+        </p>
+        <p><a href="${requestUrl}">Review the COE request</a></p>
+        <p>Thank you,<br />LOA HRDO DESK TEAM</p>
+      </div>
+    `;
+
+    const token = await accessToken();
+    const logo = await readFile(join(process.cwd(), "public", "loa-loading.png"));
+    const mime = createMimeMessage(input.recipientEmail, subject, text, html, logo);
+    await sendMimeMessage(token, mime);
+    return { sent: true, delivered: 1, failed: 0 };
+  } catch (error) {
+    console.error(
+      `[email] COE processor notification failed: ${error instanceof AppError ? error.message : error instanceof Error ? error.name : "unknown"}`,
+    );
+    return {
+      sent: false,
+      delivered: 0,
+      failed: 1,
+      message:
+        error instanceof AppError
+          ? error.message
+          : "The COE processor notification could not be prepared.",
+    };
+  }
+}
+
 export async function sendTemporaryPasswordEmail(input: {
   recipientName: string;
   recipientEmail: string;

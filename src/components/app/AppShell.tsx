@@ -1,5 +1,5 @@
-import { type ReactNode } from "react";
-import { Link, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
+import { useState, type ReactNode } from "react";
+import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Bell,
@@ -25,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { LoadingScreen } from "@/components/app/LoadingPanel";
 import { cn } from "@/lib/utils";
 import { listNotificationsFn, logoutFn } from "@/server-functions";
 import { unwrap } from "@/lib/api";
@@ -236,7 +237,7 @@ function MobileNav({ user, unread }: { user: Viewer; unread: number }) {
 }
 
 export function AppShell({ user, children }: { user: Viewer; children: ReactNode }) {
-  const navigate = useNavigate();
+  const [signingOut, setSigningOut] = useState(false);
   const router = useRouter();
   const queryClient = useQueryClient();
   const notifications = useQuery({
@@ -247,13 +248,16 @@ export function AppShell({ user, children }: { user: Viewer; children: ReactNode
   const unread = notifications.data?.filter((n) => !n.read).length ?? 0;
 
   async function signOut() {
+    if (signingOut) return;
+    setSigningOut(true);
     await logoutFn();
     queryClient.clear();
     await router.invalidate();
-    navigate({ to: "/login" });
+    window.location.assign("/#main-content");
   }
   return (
     <div className="flex min-h-screen">
+      {signingOut && <LoadingScreen label="Signing out of LOA" mode="overlay" immediate />}
       <aside className="no-print sticky top-0 hidden h-screen w-56 shrink-0 md:block">
         <SideNav user={user} unread={unread} />
       </aside>

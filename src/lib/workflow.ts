@@ -44,7 +44,7 @@ export const STAGES: {
 ];
 
 export const ROLE_TITLES: Record<Role, string> = {
-  requisitioner: "Requisitioner",
+  requisitioner: "Requestor",
   transport_head: "Head of Transport Services",
   director: "Director for Administration",
   president: "President",
@@ -175,7 +175,7 @@ const EMAIL_COPY: Record<EmailKind, { subject: string; heading: string; cta: str
   },
   trip_ticket_reminder: {
     subject: "Action Needed: Trip Ticket Not Sent",
-    heading: "The official trip ticket has not been sent to the requisitioner yet.",
+    heading: "The official trip ticket has not been sent to the requestor yet.",
     cta: "Prepare Trip Ticket",
   },
 };
@@ -209,7 +209,7 @@ export function makeEmails(
 
 export function createRequest(ctx: Ctx, input: RequestInput, actor: User, number: string) {
   if (actor.role !== "requisitioner")
-    throw new WorkflowError("Only requisitioners can submit vehicle requests.");
+    throw new WorkflowError("Only requestors can submit vehicle requests.");
   const r: VehicleRequest = {
     ...input,
     destinations: input.destinations.map((d) => d.trim()).filter(Boolean),
@@ -374,7 +374,7 @@ export function approveStage(
         next,
         "trip_ticket_reminder",
         [actor],
-        `You gave final approval for ${r.number}, but the official trip ticket is still waiting to be sent. Please prepare it and send it to the requisitioner.`,
+        `You gave final approval for ${r.number}, but the official trip ticket is still waiting to be sent. Please prepare it and send it to the requestor.`,
         "approve",
       ),
     ];
@@ -438,7 +438,7 @@ export function resubmit(ctx: Ctx, r: VehicleRequest, actor: User, input: Reques
   if (r.status !== "returned")
     throw new WorkflowError("Only returned requests can be resubmitted.");
   if (actor.id !== r.requisitionerId)
-    throw new WorkflowError("Only the original requisitioner can resubmit this request.");
+    throw new WorkflowError("Only the original requestor can resubmit this request.");
   const next: VehicleRequest = {
     ...r,
     ...input,

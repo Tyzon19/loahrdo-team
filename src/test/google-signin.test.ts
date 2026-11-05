@@ -1,9 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   googleAccountProblem,
   googleSignInErrorMessage,
   safeSignInNext,
 } from "@/lib/google-signin";
+import { googleSignInRedirectUri } from "@/server/google-signin";
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("Google sign-in eligibility", () => {
   it("accepts an institutional requisitioner account regardless of case", () => {
@@ -37,6 +42,26 @@ describe("Google sign-in redirect target", () => {
     expect(safeSignInNext("/bad%0Apath")).toBe("/dashboard");
     expect(safeSignInNext("")).toBe("/dashboard");
     expect(safeSignInNext(undefined)).toBe("/dashboard");
+  });
+});
+
+describe("Google sign-in callback URI", () => {
+  it("uses the current local origin when SITE_URL points to another local port", () => {
+    vi.stubEnv("SITE_URL", "http://localhost:8080");
+    vi.stubEnv("GOOGLE_SIGNIN_REDIRECT_URI", "");
+
+    expect(googleSignInRedirectUri(new URL("http://localhost:3000/api/auth/google"))).toBe(
+      "http://localhost:3000/api/auth/google/callback",
+    );
+  });
+
+  it("uses the configured public origin for non-local requests", () => {
+    vi.stubEnv("SITE_URL", "https://portal.example.test");
+    vi.stubEnv("GOOGLE_SIGNIN_REDIRECT_URI", "");
+
+    expect(googleSignInRedirectUri(new URL("https://portal.example.test/api/auth/google"))).toBe(
+      "https://portal.example.test/api/auth/google/callback",
+    );
   });
 });
 

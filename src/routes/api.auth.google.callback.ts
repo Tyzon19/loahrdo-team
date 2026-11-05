@@ -81,7 +81,8 @@ export const Route = createFileRoute("/api/auth/google/callback")({
           secure = url.protocol === "https:";
         }
 
-        const mode = (cookieValue(request, GOOGLE_MODE_COOKIE) ?? "requisitioner") as "requisitioner" | "hrdo";
+        const mode = (cookieValue(request, GOOGLE_MODE_COOKIE) ?? "requisitioner") as
+          "requisitioner" | "hrdo";
         const cleared = [
           clearedSignInCookie(GOOGLE_STATE_COOKIE, secure),
           clearedSignInCookie(GOOGLE_VERIFIER_COOKIE, secure),
@@ -89,101 +90,107 @@ export const Route = createFileRoute("/api/auth/google/callback")({
           clearedSignInCookie(GOOGLE_MODE_COOKIE, secure),
         ];
 
-        const state = url.searchParams.get("state") ?? "";
-        const savedState = cookieValue(request, GOOGLE_STATE_COOKIE) ?? "";
-        const verifier = cookieValue(request, GOOGLE_VERIFIER_COOKIE) ?? "";
-        if (!state || !savedState || !verifier || !sameState(savedState, state)) {
-          return failure("google_failed", cleared, mode);
-        }
-        if (url.searchParams.get("error")) return failure("google_denied", cleared, mode);
+        try {
+          const state = url.searchParams.get("state") ?? "";
+          const savedState = cookieValue(request, GOOGLE_STATE_COOKIE) ?? "";
+          const verifier = cookieValue(request, GOOGLE_VERIFIER_COOKIE) ?? "";
+          if (!state || !savedState || !verifier || !sameState(savedState, state)) {
+            return failure("google_failed", cleared, mode);
+          }
+          if (url.searchParams.get("error")) return failure("google_denied", cleared, mode);
 
-        const code = url.searchParams.get("code");
-        if (!code) return failure("google_failed", cleared, mode);
+          const code = url.searchParams.get("code");
+          if (!code) return failure("google_failed", cleared, mode);
 
-        const { clientId, clientSecret } = googleSignInCredentials();
-        if (!clientId || !clientSecret) return failure("google_unavailable", cleared, mode);
+          const { clientId, clientSecret } = googleSignInCredentials();
+          if (!clientId || !clientSecret) return failure("google_unavailable", cleared, mode);
 
-        const tokens = await googleJson<GoogleTokenResponse>(
-          "https://oauth2.googleapis.com/token",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: new URLSearchParams({
-              code,
-              client_id: clientId,
-              client_secret: clientSecret,
-              redirect_uri: redirectUri,
-              code_verifier: verifier,
-              grant_type: "authorization_code",
-            }),
-          },
-        );
-        if (!tokens?.access_token) return failure("google_failed", cleared, mode);
+          const tokens = await googleJson<GoogleTokenResponse>(
+            "https://oauth2.googleapis.com/token",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/x-www-form-urlencoded" },
+              body: new URLSearchParams({
+                code,
+                client_id: clientId,
+                client_secret: clientSecret,
+                redirect_uri: redirectUri,
+                code_verifier: verifier,
+                grant_type: "authorization_code",
+              }),
+            },
+          );
+          if (!tokens?.access_token) return failure("google_failed", cleared, mode);
 
-        const identity = await googleJson<GoogleUserInfo>(
-          "https://openidconnect.googleapis.com/v1/userinfo",
-          { headers: { Authorization: `Bearer ${tokens.access_token}` } },
-        );
-        if (!identity?.email || !(identity.email_verified ?? identity.verified_email)) {
-          return failure("google_failed", cleared, mode);
-        }
-
-        const email = normaliseEmail(identity.email);
-
-        if (mode === "hrdo") {
-          const [
-            { ensureHrdoGoogleAccount, hrdoCreateSession },
-            { encryptedCookieRequired },
-          ] = await Promise.all([import("@/server/hrdo/auth"), import("@/server/env")]);
-
-          const account = await ensureHrdoGoogleAccount(email);
-          if (account.role !== "employee" && account.role !== "hrdo_staff") {
-            return failure("google_role", cleared, mode);
+          const identity = await googleJson<GoogleUserInfo>(
+            "https://openidconnect.googleapis.com/v1/userinfo",
+            { headers: { Authorization: `Bearer ${tokens.access_token}` } },
+          );
+          if (!identity?.email || !(identity.email_verified ?? identity.verified_email)) {
+            return failure("google_failed", cleared, mode);
           }
 
-          const { token, maxAge } = await hrdoCreateSession(account.id);
-          const sessionCookie = `loa_hrdo_session=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAge}${
+          const email = normaliseEmail(identity.email);
+
+          if (mode === "hrdo") {
+            const [{ ensureHrdoGoogleAccount, hrdoCreateSession }, { encryptedCookieRequired }] =
+              await Promise.all([import("@/server/hrdo/auth"), import("@/server/env")]);
+
+            const account = await ensureHrdoGoogleAccount(email);
+            if (account.role !== "employee" && account.role !== "hrdo_staff") {
+              return failure("google_role", cleared, mode);
+            }
+
+            const { token, maxAge } = await hrdoCreateSession(account.id);
+            const sessionCookie = `loa_hrdo_session=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAge}${
+              encryptedCookieRequired() || secure ? "; Secure" : ""
+            }`;
+
+            let nextTarget = "/hrdo/dashboard";
+            try {
+              nextTarget =
+                decodeURIComponent(cookieValue(request, GOOGLE_NEXT_COOKIE) ?? "") || nextTarget;
+            } catch {
+              // ignore malformed next target and keep the HRDO dashboard as the fallback.
+            }
+
+            return redirect(
+              account.mustChangePassword ? "/hrdo/change-password" : safeSignInNext(nextTarget),
+              [...cleared, sessionCookie],
+            );
+          }
+
+          const [
+            { createSession, ensureGoogleRequisitionerAccount, SESSION_COOKIE_NAME },
+            { encryptedCookieRequired },
+          ] = await Promise.all([import("@/server/auth"), import("@/server/env")]);
+
+          const requisitionerAccount = await ensureGoogleRequisitionerAccount(email);
+          const problem = googleAccountProblem(email, requisitionerAccount.role);
+          if (problem) return failure(problem, cleared, mode);
+
+          const { token, maxAge } = await createSession(requisitionerAccount.id);
+          let nextTarget = "";
+          try {
+            nextTarget = decodeURIComponent(cookieValue(request, GOOGLE_NEXT_COOKIE) ?? "");
+          } catch {
+            nextTarget = "";
+          }
+          const next = safeSignInNext(nextTarget);
+          const sessionCookie2 = `${SESSION_COOKIE_NAME}=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAge}${
             encryptedCookieRequired() || secure ? "; Secure" : ""
           }`;
 
-          let nextTarget = "/hrdo/dashboard";
-          try {
-            nextTarget = decodeURIComponent(cookieValue(request, GOOGLE_NEXT_COOKIE) ?? "") || nextTarget;
-          } catch {
-            // ignore malformed next target and keep the HRDO dashboard as the fallback.
-          }
-
-          return redirect(account.mustChangePassword ? "/hrdo/change-password" : safeSignInNext(nextTarget), [
+          return redirect(requisitionerAccount.mustChangePassword ? "/change-password" : next, [
             ...cleared,
-            sessionCookie,
+            sessionCookie2,
           ]);
+        } catch (error) {
+          console.error(
+            `[google-signin] Callback failed: ${error instanceof Error ? error.message : "unknown error"}`,
+          );
+          return failure("google_failed", cleared, mode);
         }
-
-        const [
-          { createSession, ensureGoogleRequisitionerAccount, SESSION_COOKIE_NAME },
-          { encryptedCookieRequired },
-        ] = await Promise.all([import("@/server/auth"), import("@/server/env")]);
-
-        const requisitionerAccount = await ensureGoogleRequisitionerAccount(email);
-        const problem = googleAccountProblem(email, requisitionerAccount.role);
-        if (problem) return failure(problem, cleared, mode);
-
-        const { token, maxAge } = await createSession(requisitionerAccount.id);
-        let nextTarget = "";
-        try {
-          nextTarget = decodeURIComponent(cookieValue(request, GOOGLE_NEXT_COOKIE) ?? "");
-        } catch {
-          nextTarget = "";
-        }
-        const next = safeSignInNext(nextTarget);
-        const sessionCookie2 = `${SESSION_COOKIE_NAME}=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAge}${
-          encryptedCookieRequired() || secure ? "; Secure" : ""
-        }`;
-
-        return redirect(requisitionerAccount.mustChangePassword ? "/change-password" : next, [
-          ...cleared,
-          sessionCookie2,
-        ]);
       },
     },
   },

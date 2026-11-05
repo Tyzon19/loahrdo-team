@@ -10,6 +10,7 @@ import {
   FileCheck2,
   Info,
   RefreshCw,
+  Send,
   Upload,
   XCircle,
 } from "lucide-react";
@@ -45,6 +46,7 @@ import {
   releaseCoeDocumentFn,
   requestCoeCorrectionFn,
   resubmitCoeRequestFn,
+  sendCoeTemplateFn,
   startCoeProcessingFn,
   uploadCoeDocumentFn,
   verifyCoeRequestFn,
@@ -122,13 +124,8 @@ function formatRequestNote(note: string) {
   const lines = note.split("\n");
   const metadataIndex = lines.findIndex((line) => /(?:^|\| )Requestor type:/.test(line));
   const customNote =
-    metadataIndex > 0
-      ? lines.slice(0, metadataIndex).join("\n")
-      : metadataIndex === -1
-        ? note
-        : "";
-  const metadata =
-    metadataIndex >= 0 ? lines.slice(metadataIndex).join("\n") : lines.join("\n");
+    metadataIndex > 0 ? lines.slice(0, metadataIndex).join("\n") : metadataIndex === -1 ? note : "";
+  const metadata = metadataIndex >= 0 ? lines.slice(metadataIndex).join("\n") : lines.join("\n");
   const fields = metadata
     ? metadata.split(/\s*\|\s*/).flatMap((part) => {
         const separator = part.indexOf(": ");
@@ -155,6 +152,37 @@ type ActionPayload =
   | { kind: "ready" }
   | { kind: "release"; receivedByName: string };
 
+interface CoeTemplatePayload {
+  id: string;
+  employeeName: string;
+  dateHired: string;
+  position: string;
+  department: string;
+  compensationWords: string;
+  compensationAmount: string;
+  purpose: string;
+  issueDate: string;
+  preparedByName: string;
+  includeCompensation: boolean;
+}
+
+interface CoeTemplatePreview {
+  payload: CoeTemplatePayload;
+  fileName: string;
+  mime: string;
+  base64: string;
+}
+
+function saveBase64File(fileName: string, mime: string, base64: string) {
+  const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
+  const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
+  const link = window.document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 function CoeDetailPage() {
   const { id } = Route.useParams();
   const { hrdoViewer } = Route.useRouteContext();
@@ -166,6 +194,10 @@ function CoeDetailPage() {
   const [receivedBy, setReceivedBy] = useState("");
   const [file, setFile] = useState<{ name: string; dataUrl: string } | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [preview, setPreview] = useState<CoeTemplatePreview | null>(null);
+  const [sentTo, setSentTo] = useState("");
   const [templateFields, setTemplateFields] = useState({
     employeeName: "",
     dateHired: "",
@@ -279,6 +311,7 @@ function CoeDetailPage() {
   const includesCompensation =
     /With compensation review/i.test(request.note) ||
     /COE type:\s*COE with Compensation/i.test(request.note);
+  const viewerName = hrdoViewer.name;
 
   function pickFile(event: React.ChangeEvent<HTMLInputElement>) {
     const selected = event.target.files?.[0];
@@ -298,34 +331,57 @@ function CoeDetailPage() {
     reader.readAsDataURL(selected);
   }
 
+  function templatePayload(): CoeTemplatePayload {
+    return {
+      id,
+      employeeName: templateFields.employeeName.trim() || request.employeeName,
+      dateHired: templateFields.dateHired,
+      position: templateFields.position,
+      department: request.department,
+      compensationWords: templateFields.compensationWords,
+      compensationAmount: templateFields.compensationAmount,
+      purpose: templateFields.purpose.trim() || request.purpose,
+      issueDate: templateFields.issueDate,
+      preparedByName: templateFields.preparedByName.trim() || viewerName,
+      includeCompensation: includesCompensation,
+    };
+  }
+
   async function generateTemplate() {
+    setGenerating(true);
     try {
-      const result = await unwrap(
-        generateCoeTemplateFn({
-          data: {
-            id,
-            employeeName: templateFields.employeeName.trim() || request.employeeName,
-            dateHired: templateFields.dateHired,
-            position: templateFields.position,
-            department: request.department,
-            compensationWords: templateFields.compensationWords,
-            compensationAmount: templateFields.compensationAmount,
-            purpose: templateFields.purpose.trim() || request.purpose,
-            issueDate: templateFields.issueDate,
-            preparedByName: templateFields.preparedByName.trim() || hrdoViewer.name,
-            includeCompensation: includesCompensation,
-          },
-        }),
-      );
-      const bytes = Uint8Array.from(atob(result.base64), (char) => char.charCodeAt(0));
-      const url = URL.createObjectURL(new Blob([bytes], { type: result.mime }));
-      const link = window.document.createElement("a");
-      link.href = url;
-      link.download = result.fileName;
-      link.click();
-      URL.revokeObjectURL(url);
+      const payload = templatePayload();
+      const result = await unwrap(generateCoeTemplateFn({ data: payload }));
+      saveBase64File(result.fileName, result.mime, result.base64);
+      setPreview({ payload, ...result });
+      setSentTo("");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "We couldn't generate the COE template.");
+      toast.error(
+        error instanceof Error ? error.message : "We couldn't generate the COE template.",
+      );
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  function downloadPreview() {
+    if (!preview) return;
+    saveBase64File(preview.fileName, preview.mime, preview.base64);
+  }
+
+  async function sendTemplate() {
+    if (!preview) return;
+    setSending(true);
+    try {
+      const result = await unwrap(sendCoeTemplateFn({ data: preview.payload }));
+      setPreview(null);
+      setSentTo(result.recipientEmail);
+      toast.success(`Word template sent to ${result.recipientEmail}.`);
+      await queryClient.invalidateQueries({ queryKey: ["coe"] });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "We couldn't send the COE template.");
+    } finally {
+      setSending(false);
     }
   }
 
@@ -333,20 +389,28 @@ function CoeDetailPage() {
     setDownloading(true);
     try {
       const document = await unwrap(getCoeDocumentFn({ data: { id } }));
-      const bytes = Uint8Array.from(atob(document.base64), (char) => char.charCodeAt(0));
-      const url = URL.createObjectURL(new Blob([bytes], { type: document.mime }));
-      const link = window.document.createElement("a");
-      link.href = url;
-      link.download = document.fileName;
-      link.click();
-      URL.revokeObjectURL(url);
+      saveBase64File(document.fileName, document.mime, document.base64);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "We couldn't download the signed COE.");
     } finally {
       setDownloading(false);
     }
-
   }
+
+  const templateInputs: [string, string, string][] = [
+    ["employeeName", "Employee name", request.employeeName],
+    ["dateHired", "Date hired", ""],
+    ["position", "Position / designation", ""],
+    ...(includesCompensation
+      ? ([
+          ["compensationWords", "Compensation in words", ""],
+          ["compensationAmount", "Compensation amount", ""],
+        ] as [string, string, string][])
+      : []),
+    ["purpose", "Purpose", request.purpose],
+    ["issueDate", "Issue date", templateFields.issueDate],
+    ["preparedByName", "Prepared by", viewerName],
+  ];
 
   return (
     <div className="space-y-4">
@@ -462,26 +526,13 @@ function CoeDetailPage() {
                 <DialogHeader>
                   <DialogTitle>COE template details</DialogTitle>
                   <DialogDescription>
-                    Review the details, start processing, and generate the filled Word template.
-                    The generated document will also be emailed to the requestor.
+                    Fill in the details and generate the Word template, then email it to the requestor.
+                    If the filled template is not correct, edit the Word file before sending it.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div className="grid gap-4 sm:grid-cols-2">
-                    {[
-                      ["employeeName", "Employee name", request.employeeName],
-                      ["dateHired", "Date hired", ""],
-                      ["position", "Position / designation", ""],
-                      ...(includesCompensation
-                        ? [
-                            ["compensationWords", "Compensation in words", ""],
-                            ["compensationAmount", "Compensation amount", ""],
-                          ]
-                        : []),
-                      ["purpose", "Purpose", request.purpose],
-                      ["issueDate", "Issue date", templateFields.issueDate],
-                      ["preparedByName", "Prepared by", hrdoViewer.name],
-                    ].map(([keyName, label, placeholder]) => (
+                    {templateInputs.map(([keyName, label, placeholder]) => (
                       <div key={keyName}>
                         <Label htmlFor={`template-${keyName}`}>{label}</Label>
                         <Input
@@ -490,12 +541,14 @@ function CoeDetailPage() {
                           type={keyName === "issueDate" ? "date" : "text"}
                           value={templateFields[keyName as keyof typeof templateFields]}
                           placeholder={placeholder}
-                          onChange={(event) =>
+                          onChange={(event) => {
                             setTemplateFields((current) => ({
                               ...current,
                               [keyName]: event.target.value,
-                            }))
-                          }
+                            }));
+                            setPreview(null);
+                            setSentTo("");
+                          }}
                         />
                       </div>
                     ))}
@@ -508,28 +561,68 @@ function CoeDetailPage() {
                         readOnly
                       />
                     </div>
-                  </div>
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    {request.status !== "processing" && (
+                  </div>                    <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      {request.status !== "processing" && (
+                        <Button
+                          type="button"
+                          className="sm:flex-1"
+                          disabled={action.isPending}
+                          onClick={() => action.mutate({ kind: "process" })}
+                        >
+                          {action.isPending ? "Starting processing…" : "Start processing"}
+                        </Button>
+                      )}
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="sm:flex-1"
+                        onClick={() => void generateTemplate()}
+                        disabled={request.status !== "processing" || generating}
+                      >
+                        <FileDown className="h-4 w-4" aria-hidden />
+                        {generating ? "Generating…" : "Generate Word template"}
+                      </Button>
                       <Button
                         type="button"
                         className="sm:flex-1"
-                        disabled={action.isPending}
-                        onClick={() => action.mutate({ kind: "process" })}
+                        onClick={() => void sendTemplate()}
+                        disabled={
+                          request.status !== "processing" || !preview || sending || generating
+                        }
                       >
-                        {action.isPending ? "Starting processing…" : "Start processing"}
+                        <Send className="h-4 w-4" aria-hidden />
+                        {sending ? "Sending…" : "Send Word file to requestor"}
                       </Button>
+                    </div>
+                    {sentTo ? (
+                      <p className="text-xs text-muted-foreground" role="status">
+                        Sent to {sentTo}. Generate a new copy before sending again.
+                      </p>
+                    ) : preview ? (
+                      <div className="space-y-1">                              <p className="text-xs text-muted-foreground">
+                          Review copy ready:{" "}
+                          <span className="font-medium text-foreground">{preview.fileName}</span>
+                          {" · "}
+                          <button
+                            type="button"
+                            className="text-primary underline underline-offset-2"
+                            onClick={downloadPreview}
+                          >
+                            Download again
+                          </button>
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Open the file and check it before sending. The requestor receives this
+                          exact copy as a Word document.
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Generating only downloads the file for review. Nothing is emailed until you
+                        press Send Word file to requestor.
+                      </p>
                     )}
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      className="sm:flex-1"
-                      onClick={() => void generateTemplate()}
-                      disabled={request.status !== "processing"}
-                    >
-                      <FileDown className="h-4 w-4" aria-hidden />
-                      Generate and email Word template
-                    </Button>
                   </div>
                   <Button asChild type="button" variant="outline" className="w-full">
                     <a href="/COE%20FORMAT.docx" download="COE FORMAT.docx">

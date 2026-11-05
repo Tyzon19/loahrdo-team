@@ -11,10 +11,12 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as HrdoRouteImport } from './routes/hrdo'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as RegisterRouteImport } from './routes/register'
+import { Route as TermsOfServiceRouteImport } from './routes/terms-of-service'
 import { Route as AuthenticatedChangePasswordRouteImport } from './routes/_authenticated/change-password'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedNotificationsRouteImport } from './routes/_authenticated/notifications'
@@ -25,6 +27,7 @@ import { Route as AuthenticatedVehiclesRouteImport } from './routes/_authenticat
 import { Route as HrdoChangePasswordRouteImport } from './routes/hrdo/change-password'
 import { Route as HrdoCoeRouteImport } from './routes/hrdo/coe'
 import { Route as HrdoDashboardRouteImport } from './routes/hrdo/dashboard'
+import { Route as HrdoForgotPasswordRouteImport } from './routes/hrdo/forgot-password'
 import { Route as HrdoHistoryRouteImport } from './routes/hrdo/history'
 import { Route as HrdoLoginRouteImport } from './routes/hrdo/login'
 import { Route as HrdoProfileRouteImport } from './routes/hrdo/profile'
@@ -52,6 +55,11 @@ const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const HrdoRoute = HrdoRouteImport.update({
   id: '/hrdo',
   path: '/hrdo',
@@ -70,6 +78,11 @@ const PrivacyRoute = PrivacyRouteImport.update({
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
   path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsOfServiceRoute = TermsOfServiceRouteImport.update({
+  id: '/terms-of-service',
+  path: '/terms-of-service',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedChangePasswordRoute =
@@ -124,6 +137,11 @@ const HrdoCoeRoute = HrdoCoeRouteImport.update({
 const HrdoDashboardRoute = HrdoDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => HrdoRoute,
+} as any)
+const HrdoForgotPasswordRoute = HrdoForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
   getParentRoute: () => HrdoRoute,
 } as any)
 const HrdoHistoryRoute = HrdoHistoryRouteImport.update({
@@ -216,10 +234,12 @@ const ApiAuthGoogleCallbackRoute = ApiAuthGoogleCallbackRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/hrdo': typeof HrdoRouteWithChildren
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
   '/register': typeof RegisterRoute
+  '/terms-of-service': typeof TermsOfServiceRoute
   '/change-password': typeof AuthenticatedChangePasswordRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/notifications': typeof AuthenticatedNotificationsRoute
@@ -230,6 +250,7 @@ export interface FileRoutesByFullPath {
   '/hrdo/change-password': typeof HrdoChangePasswordRoute
   '/hrdo/coe': typeof HrdoCoeRoute
   '/hrdo/dashboard': typeof HrdoDashboardRoute
+  '/hrdo/forgot-password': typeof HrdoForgotPasswordRoute
   '/hrdo/history': typeof HrdoHistoryRoute
   '/hrdo/login': typeof HrdoLoginRoute
   '/hrdo/profile': typeof HrdoProfileRoute
@@ -250,10 +271,12 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/hrdo': typeof HrdoRouteWithChildren
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
   '/register': typeof RegisterRoute
+  '/terms-of-service': typeof TermsOfServiceRoute
   '/change-password': typeof AuthenticatedChangePasswordRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/notifications': typeof AuthenticatedNotificationsRoute
@@ -264,6 +287,7 @@ export interface FileRoutesByTo {
   '/hrdo/change-password': typeof HrdoChangePasswordRoute
   '/hrdo/coe': typeof HrdoCoeRoute
   '/hrdo/dashboard': typeof HrdoDashboardRoute
+  '/hrdo/forgot-password': typeof HrdoForgotPasswordRoute
   '/hrdo/history': typeof HrdoHistoryRoute
   '/hrdo/login': typeof HrdoLoginRoute
   '/hrdo/profile': typeof HrdoProfileRoute
@@ -286,10 +310,12 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
+  '/forgot-password': typeof ForgotPasswordRoute
   '/hrdo': typeof HrdoRouteWithChildren
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
   '/register': typeof RegisterRoute
+  '/terms-of-service': typeof TermsOfServiceRoute
   '/_authenticated/change-password': typeof AuthenticatedChangePasswordRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/notifications': typeof AuthenticatedNotificationsRoute
@@ -300,6 +326,7 @@ export interface FileRoutesById {
   '/hrdo/change-password': typeof HrdoChangePasswordRoute
   '/hrdo/coe': typeof HrdoCoeRoute
   '/hrdo/dashboard': typeof HrdoDashboardRoute
+  '/hrdo/forgot-password': typeof HrdoForgotPasswordRoute
   '/hrdo/history': typeof HrdoHistoryRoute
   '/hrdo/login': typeof HrdoLoginRoute
   '/hrdo/profile': typeof HrdoProfileRoute
@@ -322,10 +349,12 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/forgot-password'
     | '/hrdo'
     | '/login'
     | '/privacy'
     | '/register'
+    | '/terms-of-service'
     | '/change-password'
     | '/dashboard'
     | '/notifications'
@@ -336,6 +365,7 @@ export interface FileRouteTypes {
     | '/hrdo/change-password'
     | '/hrdo/coe'
     | '/hrdo/dashboard'
+    | '/hrdo/forgot-password'
     | '/hrdo/history'
     | '/hrdo/login'
     | '/hrdo/profile'
@@ -356,10 +386,12 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/forgot-password'
     | '/hrdo'
     | '/login'
     | '/privacy'
     | '/register'
+    | '/terms-of-service'
     | '/change-password'
     | '/dashboard'
     | '/notifications'
@@ -370,6 +402,7 @@ export interface FileRouteTypes {
     | '/hrdo/change-password'
     | '/hrdo/coe'
     | '/hrdo/dashboard'
+    | '/hrdo/forgot-password'
     | '/hrdo/history'
     | '/hrdo/login'
     | '/hrdo/profile'
@@ -391,10 +424,12 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_authenticated'
+    | '/forgot-password'
     | '/hrdo'
     | '/login'
     | '/privacy'
     | '/register'
+    | '/terms-of-service'
     | '/_authenticated/change-password'
     | '/_authenticated/dashboard'
     | '/_authenticated/notifications'
@@ -405,6 +440,7 @@ export interface FileRouteTypes {
     | '/hrdo/change-password'
     | '/hrdo/coe'
     | '/hrdo/dashboard'
+    | '/hrdo/forgot-password'
     | '/hrdo/history'
     | '/hrdo/login'
     | '/hrdo/profile'
@@ -427,10 +463,12 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
+  ForgotPasswordRoute: typeof ForgotPasswordRoute
   HrdoRoute: typeof HrdoRouteWithChildren
   LoginRoute: typeof LoginRoute
   PrivacyRoute: typeof PrivacyRoute
   RegisterRoute: typeof RegisterRoute
+  TermsOfServiceRoute: typeof TermsOfServiceRoute
   ServiceSlugRoute: typeof ServiceSlugRoute
   VerifyTicketTokenRoute: typeof VerifyTicketTokenRoute
   ApiAuthGoogleRoute: typeof ApiAuthGoogleRouteWithChildren
@@ -453,6 +491,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/hrdo': {
@@ -481,6 +526,13 @@ declare module '@tanstack/react-router' {
       path: '/register'
       fullPath: '/register'
       preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms-of-service': {
+      id: '/terms-of-service'
+      path: '/terms-of-service'
+      fullPath: '/terms-of-service'
+      preLoaderRoute: typeof TermsOfServiceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/change-password': {
@@ -551,6 +603,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/hrdo/dashboard'
       preLoaderRoute: typeof HrdoDashboardRouteImport
+      parentRoute: typeof HrdoRoute
+    }
+    '/hrdo/forgot-password': {
+      id: '/hrdo/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/hrdo/forgot-password'
+      preLoaderRoute: typeof HrdoForgotPasswordRouteImport
       parentRoute: typeof HrdoRoute
     }
     '/hrdo/history': {
@@ -713,6 +772,7 @@ interface HrdoRouteChildren {
   HrdoChangePasswordRoute: typeof HrdoChangePasswordRoute
   HrdoCoeRoute: typeof HrdoCoeRoute
   HrdoDashboardRoute: typeof HrdoDashboardRoute
+  HrdoForgotPasswordRoute: typeof HrdoForgotPasswordRoute
   HrdoHistoryRoute: typeof HrdoHistoryRoute
   HrdoLoginRoute: typeof HrdoLoginRoute
   HrdoProfileRoute: typeof HrdoProfileRoute
@@ -724,6 +784,7 @@ const HrdoRouteChildren: HrdoRouteChildren = {
   HrdoChangePasswordRoute: HrdoChangePasswordRoute,
   HrdoCoeRoute: HrdoCoeRoute,
   HrdoDashboardRoute: HrdoDashboardRoute,
+  HrdoForgotPasswordRoute: HrdoForgotPasswordRoute,
   HrdoHistoryRoute: HrdoHistoryRoute,
   HrdoLoginRoute: HrdoLoginRoute,
   HrdoProfileRoute: HrdoProfileRoute,
@@ -748,10 +809,12 @@ const ApiAuthGoogleRouteWithChildren = ApiAuthGoogleRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
+  ForgotPasswordRoute: ForgotPasswordRoute,
   HrdoRoute: HrdoRouteWithChildren,
   LoginRoute: LoginRoute,
   PrivacyRoute: PrivacyRoute,
   RegisterRoute: RegisterRoute,
+  TermsOfServiceRoute: TermsOfServiceRoute,
   ServiceSlugRoute: ServiceSlugRoute,
   VerifyTicketTokenRoute: VerifyTicketTokenRoute,
   ApiAuthGoogleRoute: ApiAuthGoogleRouteWithChildren,

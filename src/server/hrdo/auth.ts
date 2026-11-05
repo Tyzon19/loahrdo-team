@@ -24,6 +24,8 @@ import {
   profileSchema,
   registrationOtpSchema,
   registerSchema,
+  passwordRecoveryRequestSchema,
+  passwordRecoverySchema,
 } from "@/lib/validation";
 import { encryptedCookieRequired, serverEnv, serverEnvOptional } from "../env";
 import { all, run, withTransaction } from "../db";
@@ -47,6 +49,7 @@ const LOCK_MINUTES = 15;
 const REGISTRATION_OTP_MINUTES = 10;
 const REGISTRATION_OTP_RESEND_SECONDS = 60;
 const REGISTRATION_OTP_MAX_ATTEMPTS = 5;
+const PASSWORD_RECOVERY_MINUTES = 10;
 
 interface HrdoUserRow extends RowDataPacket {
   id: string;
@@ -64,14 +67,18 @@ const loginAttempts = new Map<string, { count: number; resetAt: number }>();
 
 function isLocalEnvironmentIp(ip: string | null | undefined) {
   if (!ip || ip === "unknown") return true;
-  return ["127.0.0.1", "::1"].includes(ip) || ip.startsWith("10.") || ip.startsWith("192.168.") || ip.startsWith("172.");
+  return (
+    ["127.0.0.1", "::1"].includes(ip) ||
+    ip.startsWith("10.") ||
+    ip.startsWith("192.168.") ||
+    ip.startsWith("172.")
+  );
 }
 
 function checkIpRateLimit(ip: string) {
   if (isLocalEnvironmentIp(ip) || process.env.NODE_ENV !== "production") {
     return;
   }
-
 
   const now = Date.now();
   const entry = loginAttempts.get(ip);
@@ -135,9 +142,11 @@ export interface HrdoGoogleSignInAccount {
   mustChangePassword: boolean;
 }
 
-export async function hrdoGoogleSignInAccount(email: string): Promise<HrdoGoogleSignInAccount | null> {
+export async function hrdoGoogleSignInAccount(
+  email: string,
+): Promise<HrdoGoogleSignInAccount | null> {
   const rows = await all<HrdoUserRow[]>(
-    "SELECT id, role, must_change_password FROM hrdo_users WHERE email = ? LIMIT 1",
+    "SELECT id, name, email, password_hash, role, department, must_change_password FROM hrdo_users WHERE email = ? LIMIT 1",
     [normaliseEmail(email)],
   );
   const row = rows[0];
@@ -149,19 +158,42 @@ export async function hrdoGoogleSignInAccount(email: string): Promise<HrdoGoogle
 export async function ensureHrdoGoogleAccount(email: string): Promise<HrdoGoogleSignInAccount> {
   const normalised = normaliseEmail(email);
   const existing = await hrdoGoogleSignInAccount(normalised);
-  if (existing) return existing;
+  if (existing) {
+    const linkedUsers = await all<Array<RowDataPacket & { name: string; department: string }>>(
+      "SELECT name, department FROM users WHERE email = ? LIMIT 1",
+      [normalised],
+    );
+    const linkedUser = linkedUsers[0];
+    if (linkedUser?.name?.trim()) {
+      await run("UPDATE hrdo_users SET name = ?, department = ? WHERE id = ?", [
+        linkedUser.name.trim(),
+        linkedUser.department?.trim() || "General",
+        existing.id,
+      ]);
+    }
+    return existing;
+  }
 
   if (!institutionalEmailAllowed(normalised)) {
     throw new AppError("Use your official Lyceum of Alabang email address.");
   }
 
-  const localName = normalised.split("@")[0].replace(/[._-]+/g, " ").trim();
-  const name = localName || "Institutional User";
+  const linkedUsers = await all<Array<RowDataPacket & { name: string; department: string }>>(
+    "SELECT name, department FROM users WHERE email = ? LIMIT 1",
+    [normalised],
+  );
+  const linkedUser = linkedUsers[0];
+  const localName = normalised
+    .split("@")[0]
+    .replace(/[._-]+/g, " ")
+    .trim();
+  const name = linkedUser?.name?.trim() || localName || "Institutional User";
+  const department = linkedUser?.department?.trim() || "General";
   const id = randomUUID();
   await run(
     `INSERT INTO hrdo_users (id, name, email, password_hash, role, department, must_change_password)
-     VALUES (?, ?, ?, ?, 'employee', 'General', 0)`,
-    [id, name, normalised, DUMMY_HASH],
+     VALUES (?, ?, ?, ?, 'employee', ?, 0)`,
+    [id, name, normalised, DUMMY_HASH, department],
   );
 
   return { id, role: "employee", mustChangePassword: false };
@@ -242,13 +274,75 @@ export async function hrdoLogin(input: unknown): Promise<{ mustChangePassword: b
      FROM hrdo_users WHERE email = ? LIMIT 1`,
     [email],
   );
-  const user = rows[0];
   const invalid = new AppError("Incorrect email or password.");
 
+  let user = rows[0];
   if (!user) {
-    await verifyPassword(data.password, DUMMY_HASH);
-    throw invalid;
+    const requisitionerRows = await all<
+      Array<
+        RowDataPacket & {
+          id: string;
+          name: string;
+          email: string;
+          password_hash: string;
+          department: string;
+          must_change_password: number;
+          is_locked: number;
+          lock_minutes: number | null;
+        }
+      >
+    >(
+      `SELECT id, name, email, password_hash, department, must_change_password,
+              (locked_until IS NOT NULL AND locked_until > NOW()) AS is_locked,
+              TIMESTAMPDIFF(MINUTE, NOW(), locked_until) AS lock_minutes
+       FROM users WHERE email = ? AND role = 'requisitioner' LIMIT 1`,
+      [email],
+    );
+    const requisitioner = requisitionerRows[0];
+    if (!requisitioner) {
+      await verifyPassword(data.password, DUMMY_HASH);
+      throw invalid;
+    }
+
+    if (requisitioner.is_locked) {
+      const minutes = Math.max(1, Number(requisitioner.lock_minutes ?? LOCK_MINUTES));
+      throw new AppError(
+        `Too many failed sign-in attempts. Try again in ${minutes} minute${minutes === 1 ? "" : "s"}.`,
+      );
+    }
+
+    if (!(await verifyPassword(data.password, requisitioner.password_hash))) {
+      await run(
+        `UPDATE users SET failed_attempts = failed_attempts + 1,
+          locked_until = IF(failed_attempts + 1 >= ?, DATE_ADD(NOW(), INTERVAL ? MINUTE), locked_until)
+         WHERE id = ?`,
+        [MAX_FAILED_ATTEMPTS, LOCK_MINUTES, requisitioner.id],
+      );
+      throw invalid;
+    }
+
+    await run(
+      `INSERT INTO hrdo_users (id, name, email, password_hash, role, department, must_change_password)
+       VALUES (?, ?, ?, ?, 'employee', ?, ?)`,
+      [
+        requisitioner.id,
+        requisitioner.name,
+        requisitioner.email,
+        requisitioner.password_hash,
+        requisitioner.department,
+        requisitioner.must_change_password,
+      ],
+    );
+    const linkedRows = await all<HrdoUserRow[]>(
+      `SELECT id, name, email, password_hash, role, department, must_change_password,
+              0 AS is_locked, NULL AS lock_minutes
+       FROM hrdo_users WHERE id = ? LIMIT 1`,
+      [requisitioner.id],
+    );
+    user = linkedRows[0];
   }
+
+  if (!user) throw new AppError("We couldn't sign you in. Please try again.");
   if (user.is_locked) {
     const minutes = Math.max(1, Number(user.lock_minutes ?? LOCK_MINUTES));
     throw new AppError(
@@ -258,6 +352,30 @@ export async function hrdoLogin(input: unknown): Promise<{ mustChangePassword: b
 
   const valid = await verifyPassword(data.password, user.password_hash);
   if (!valid) {
+    if (user.role === "employee") {
+      const requisitionerRows = await all<Array<RowDataPacket & { password_hash: string }>>(
+        "SELECT password_hash FROM users WHERE email = ? AND role = 'requisitioner' LIMIT 1",
+        [email],
+      );
+      const requisitioner = requisitionerRows[0];
+      if (requisitioner && (await verifyPassword(data.password, requisitioner.password_hash))) {
+        await withTransaction(async (conn) => {
+          await run(
+            "UPDATE hrdo_users SET password_hash = ?, failed_attempts = 0, locked_until = NULL WHERE id = ?",
+            [requisitioner.password_hash, user.id],
+            conn,
+          );
+          await run(
+            "UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE email = ? AND role = 'requisitioner'",
+            [email],
+            conn,
+          );
+        });
+        await startSession(user.id);
+        return { mustChangePassword: Boolean(user.must_change_password) };
+      }
+    }
+
     await run(
       `UPDATE hrdo_users SET failed_attempts = failed_attempts + 1,
         locked_until = IF(failed_attempts + 1 >= ?, DATE_ADD(NOW(), INTERVAL ? MINUTE), locked_until)
@@ -272,6 +390,102 @@ export async function hrdoLogin(input: unknown): Promise<{ mustChangePassword: b
   ]);
   await startSession(user.id);
   return { mustChangePassword: Boolean(user.must_change_password) };
+}
+
+export async function requestHrdoPasswordRecovery(input: unknown): Promise<{ sent: true }> {
+  const { email } = parseInput(passwordRecoveryRequestSchema, input);
+  const rows = await all<HrdoUserRow[]>(
+    "SELECT id, name, email, password_hash, role, department, must_change_password FROM hrdo_users WHERE email = ? LIMIT 1",
+    [normaliseEmail(email)],
+  );
+  const user = rows[0];
+  if (!user) return { sent: true };
+  const pending = await all<Array<{ seconds_since_sent: number }>>(
+    `SELECT TIMESTAMPDIFF(SECOND, last_sent_at, NOW()) AS seconds_since_sent
+       FROM hrdo_registration_otps WHERE email = ? LIMIT 1`,
+    [user.email],
+  );
+  const secondsSinceSent = Number(pending[0]?.seconds_since_sent ?? 60);
+  if (secondsSinceSent < REGISTRATION_OTP_RESEND_SECONDS) {
+    throw new AppError(
+      `Please wait ${Math.max(1, REGISTRATION_OTP_RESEND_SECONDS - secondsSinceSent)} seconds before requesting another code.`,
+    );
+  }
+  const code = String(randomInt(100000, 1000000));
+  await run(
+    `INSERT INTO hrdo_registration_otps
+      (email, name, department, password_hash, code_hash, send_nonce, attempts, last_sent_at, expires_at)
+     VALUES (?, ?, ?, ?, ?, ?, 0, NOW(), DATE_ADD(NOW(), INTERVAL ? MINUTE))
+     ON DUPLICATE KEY UPDATE name = VALUES(name), department = VALUES(department),
+       password_hash = VALUES(password_hash), code_hash = VALUES(code_hash),
+       send_nonce = VALUES(send_nonce), attempts = 0, last_sent_at = NOW(),
+       expires_at = DATE_ADD(NOW(), INTERVAL ? MINUTE)`,
+    [
+      user.email,
+      user.name,
+      user.department,
+      user.password_hash,
+      createHash("sha256").update(code).digest("hex"),
+      randomUUID(),
+      PASSWORD_RECOVERY_MINUTES,
+      PASSWORD_RECOVERY_MINUTES,
+    ],
+  );
+  await sendRegistrationOtpEmail(user.email, user.name, code, PASSWORD_RECOVERY_MINUTES);
+  return { sent: true };
+}
+
+export async function resetHrdoPasswordWithRecoveryCode(input: unknown): Promise<{ reset: true }> {
+  const data = parseInput(passwordRecoverySchema, input);
+  const email = normaliseEmail(data.email);
+  const users = await all<HrdoUserRow[]>(
+    "SELECT id, role FROM hrdo_users WHERE email = ? LIMIT 1",
+    [email],
+  );
+  const user = users[0];
+  const otps = await all<Array<{ code_hash: string; expires_at: string; attempts: number }>>(
+    "SELECT code_hash, expires_at, attempts FROM hrdo_registration_otps WHERE email = ? LIMIT 1",
+    [email],
+  );
+  const otp = otps[0];
+  if (
+    !user ||
+    !otp ||
+    otp.expires_at <= new Date().toISOString().slice(0, 19).replace("T", " ") ||
+    otp.attempts >= REGISTRATION_OTP_MAX_ATTEMPTS
+  ) {
+    throw new AppError("The recovery code is invalid or expired.");
+  }
+  const codeHash = createHash("sha256").update(data.code).digest("hex");
+  if (otp.code_hash !== codeHash) {
+    await run("UPDATE hrdo_registration_otps SET attempts = attempts + 1 WHERE email = ?", [email]);
+    throw new AppError("The recovery code is invalid or expired.");
+  }
+  const passwordHash = await hashPassword(data.newPassword);
+  await withTransaction(async (conn) => {
+    await run(
+      "UPDATE hrdo_users SET password_hash = ?, failed_attempts = 0, locked_until = NULL, must_change_password = 0 WHERE id = ?",
+      [passwordHash, user.id],
+      conn,
+    );
+    if (user.role === "employee") {
+      await run(
+        "UPDATE users SET password_hash = ?, failed_attempts = 0, locked_until = NULL, must_change_password = 0 WHERE email = ? AND role = 'requisitioner'",
+        [passwordHash, email],
+        conn,
+      );
+      await run("DELETE FROM hrdo_sessions WHERE user_id = ?", [user.id], conn);
+      await run(
+        "DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE email = ? AND role = 'requisitioner')",
+        [email],
+        conn,
+      );
+    } else {
+      await run("DELETE FROM hrdo_sessions WHERE user_id = ?", [user.id], conn);
+    }
+    await run("DELETE FROM hrdo_registration_otps WHERE email = ?", [email], conn);
+  });
+  return { reset: true };
 }
 
 interface HrdoRegistrationOtpRow extends RowDataPacket {
@@ -315,10 +529,9 @@ export async function hrdoRequestRegistrationOtp(input: unknown): Promise<{ sent
   const passwordProblem = passwordIssues(data.password)[0];
   if (passwordProblem) throw new AppError(`Password needs ${passwordProblem}.`);
 
-  const existing = await all<RowDataPacket[]>(
-    "SELECT id FROM hrdo_users WHERE email = ? LIMIT 1",
-    [email],
-  );
+  const existing = await all<RowDataPacket[]>("SELECT id FROM hrdo_users WHERE email = ? LIMIT 1", [
+    email,
+  ]);
   if (existing.length) {
     throw new AppError("An HRDO account with this email already exists. Sign in instead.", {
       email: "An HRDO account with this email already exists.",
@@ -498,10 +711,26 @@ export async function hrdoChangePassword(input: unknown): Promise<{ ok: true }> 
   }
 
   const token = getCookie(sessionCookieName());
-  await run(
-    "UPDATE hrdo_users SET password_hash = ?, must_change_password = 0, failed_attempts = 0, locked_until = NULL WHERE id = ?",
-    [await hashPassword(data.newPassword), current.id],
-  );
+  const passwordHash = await hashPassword(data.newPassword);
+  await withTransaction(async (conn) => {
+    await run(
+      "UPDATE hrdo_users SET password_hash = ?, must_change_password = 0, failed_attempts = 0, locked_until = NULL WHERE id = ?",
+      [passwordHash, current.id],
+      conn,
+    );
+    if (current.role === "employee") {
+      await run(
+        "UPDATE users SET password_hash = ?, must_change_password = 0, failed_attempts = 0, locked_until = NULL WHERE email = ? AND role = 'requisitioner'",
+        [passwordHash, current.email],
+        conn,
+      );
+      await run(
+        "DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE email = ? AND role = 'requisitioner')",
+        [current.email],
+        conn,
+      );
+    }
+  });
   if (token) {
     await run("DELETE FROM hrdo_sessions WHERE user_id = ? AND token_hash <> ?", [
       current.id,
@@ -514,10 +743,19 @@ export async function hrdoChangePassword(input: unknown): Promise<{ ok: true }> 
 export async function hrdoUpdateProfile(input: unknown): Promise<HrdoViewer> {
   const current = await requireHrdoViewer();
   const data = parseInput(profileSchema, input);
-  await run("UPDATE hrdo_users SET name = ?, department = ? WHERE id = ?", [
-    data.name,
-    data.department,
-    current.id,
-  ]);
+  await withTransaction(async (conn) => {
+    await run(
+      "UPDATE hrdo_users SET name = ?, department = ? WHERE id = ?",
+      [data.name, data.department, current.id],
+      conn,
+    );
+    if (current.role === "employee") {
+      await run(
+        "UPDATE users SET name = ?, department = ? WHERE email = ? AND role = 'requisitioner'",
+        [data.name, data.department, current.email],
+        conn,
+      );
+    }
+  });
   return { ...current, name: data.name, department: data.department };
 }

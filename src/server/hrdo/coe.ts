@@ -16,13 +16,14 @@ import type {
   CoeHistoryRecord,
   CoeRequest,
   CoeStatus,
+  HrdoViewer,
 } from "@/lib/hrdo";
 import { COE_MAX_DOCUMENT_BYTES, coeNeedsDocument } from "@/lib/hrdo";
 import { AppError, parseInput } from "@/lib/errors";
-import { all, run, withTransaction, type Db } from "../db";
+import { all, likePattern, run, withTransaction, type Db } from "../db";
 import { sendCoeReleaseEmail, sendCoeStatusEmail } from "../gmail";
 import { requireHrdoViewer } from "./auth";
-import type { HrdoViewer } from "@/lib/hrdo";
+import { join } from "node:path";
 
 const submitSchema = z.object({
   employeeName: z
@@ -52,6 +53,15 @@ const submitSchema = z.object({
     .string()
     .trim()
     .max(40, "Employee ID must be 40 characters or fewer.")
+    .optional()
+    .default(""),
+  contactNumber: z
+    .string()
+    .trim()
+    .refine(
+      (value) => !value || /^(09\d{9}|\+639\d{9})$/.test(value),
+      "Enter a valid Philippine mobile number.",
+    )
     .optional()
     .default(""),
   copyType: z.enum(["soft", "original", "both"], {
@@ -120,6 +130,42 @@ const resubmitSchema = submitSchema.extend({
     .optional()
     .default(""),
 });
+
+const staffRequestQueueSchema = z.enum(["all", "new", "review", "processing", "due", "ready"]);
+const staffRequestSortSchema = z.enum([
+  "priority",
+  "date_newest",
+  "date_oldest",
+  "requestor_asc",
+  "requestor_desc",
+  "department_asc",
+  "department_desc",
+  "id_asc",
+  "id_desc",
+]);
+const dateOnlySchema = z
+  .string()
+  .refine((value) => {
+    if (!value) return true;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const date = new Date(`${value}T00:00:00.000Z`);
+    return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  }, "Enter a valid date.")
+  .default("");
+const staffRequestListSchema = z
+  .object({
+    query: z.string().trim().max(100).default(""),
+    department: z.string().trim().max(120).default(""),
+    dateFrom: dateOnlySchema,
+    dateTo: dateOnlySchema,
+    queue: staffRequestQueueSchema.default("all"),
+    sort: staffRequestSortSchema.default("priority"),
+    page: z.number().int().min(0).max(1_000_000).default(0),
+  })
+  .refine((data) => !data.dateFrom || !data.dateTo || data.dateFrom <= data.dateTo, {
+    path: ["dateTo"],
+    message: "The end date must be on or after the start date.",
+  });
 
 interface CoeRow extends RowDataPacket {
   id: string;
@@ -253,8 +299,8 @@ async function notifyEmployeeOfCoeStatus(
     status,
     title,
     message,
-    attachment,
-    subject,
+    ...(attachment ? { attachment } : {}),
+    ...(subject ? { subject } : {}),
   });
 
   if (!emailResult.sent) {
@@ -377,6 +423,21 @@ export async function submitCoeRequest(input: unknown): Promise<CoeRequest> {
     await addHistory(conn, id, viewer, "submitted", "Certificate of Employment request submitted.");
   });
 
+  const emailResult = await sendCoeStatusEmail({
+    recipientName: data.employeeName,
+    recipientEmail: data.employeeEmail,
+    requestId: id,
+    status: "pending",
+    title: "Your COE request has been submitted",
+    message:
+      "We have received your Certificate of Employment request. It is now pending HRDO review. You will receive an email when its status changes.",
+  });
+  if (!emailResult.sent) {
+    console.warn(
+      `[coe] Request confirmation for ${id} to ${data.employeeEmail} failed: ${emailResult.message}`,
+    );
+  }
+
   return loadRequest(id);
 }
 
@@ -393,7 +454,8 @@ export async function resubmitCoeRequest(input: unknown): Promise<CoeRequest> {
       throw new AppError("This request is no longer waiting for corrections.");
     }
 
-    const department = data.department?.trim() || row.department.trim() || viewer.department.trim() || "General";
+    const department =
+      data.department?.trim() || row.department.trim() || viewer.department.trim() || "General";
 
     // The original submission timestamp and deadline are deliberately preserved.
     await run(
@@ -446,6 +508,90 @@ export async function listAllCoeRequests(): Promise<CoeRequest[]> {
      LIMIT 300`,
   );
   return rows.map((row) => mapRow(row));
+}
+
+export async function searchStaffCoeRequests(input: unknown) {
+  const viewer = await requireHrdoViewer();
+  requireStaff(viewer);
+  const data = parseInput(staffRequestListSchema, input);
+  const where: string[] = [];
+  const params: unknown[] = [];
+
+  if (data.query) {
+    const pattern = likePattern(data.query);
+    where.push(`(
+      c.id LIKE ? OR c.employee_name LIKE ? OR c.employee_number LIKE ?
+      OR c.department LIKE ? OR DATE_FORMAT(c.requested_at, '%Y-%m-%d') LIKE ?
+    )`);
+    params.push(pattern, pattern, pattern, pattern, pattern);
+  }
+  if (data.department) {
+    where.push("c.department LIKE ?");
+    params.push(likePattern(data.department));
+  }
+  if (data.dateFrom) {
+    where.push("c.requested_at >= CONCAT(?, ' 00:00:00')");
+    params.push(data.dateFrom);
+  }
+  if (data.dateTo) {
+    where.push("c.requested_at < DATE_ADD(CONCAT(?, ' 00:00:00'), INTERVAL 1 DAY)");
+    params.push(data.dateTo);
+  }
+
+  switch (data.queue) {
+    case "new":
+      where.push("c.status = 'pending'");
+      break;
+    case "review":
+      where.push("c.status = 'under_review'");
+      break;
+    case "processing":
+      where.push("c.status = 'processing'");
+      break;
+    case "ready":
+      where.push("c.status = 'ready_for_pickup'");
+      break;
+    case "due":
+      where.push(
+        "c.status IN ('pending', 'under_review', 'correction_requested', 'processing') AND c.deadline_at <= DATE_ADD(NOW(), INTERVAL 24 HOUR)",
+      );
+      break;
+  }
+
+  const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+  const orderBy: Record<z.infer<typeof staffRequestSortSchema>, string> = {
+    priority: `${ORDER_PENDING_FIRST}, c.id ASC`,
+    date_newest: "c.requested_at DESC, c.id DESC",
+    date_oldest: "c.requested_at ASC, c.id ASC",
+    requestor_asc: "c.employee_name ASC, c.id ASC",
+    requestor_desc: "c.employee_name DESC, c.id DESC",
+    department_asc: "c.department ASC, c.id ASC",
+    department_desc: "c.department DESC, c.id DESC",
+    id_asc: "c.id ASC",
+    id_desc: "c.id DESC",
+  };
+  const offset = data.page * 10;
+
+  const [countRows, rows] = await Promise.all([
+    all<(RowDataPacket & { total: number })[]>(
+      `SELECT COUNT(*) AS total FROM hrdo_coe_requests c ${whereSql}`,
+      params,
+    ),
+    all<CoeRow[]>(
+      `SELECT ${SELECT_COLUMNS} FROM hrdo_coe_requests c
+       ${whereSql}
+       ORDER BY ${orderBy[data.sort]}
+       LIMIT 10 OFFSET ?`,
+      [...params, offset],
+    ),
+  ]);
+
+  return {
+    requests: rows.map((row) => mapRow(row)),
+    total: Number(countRows[0]?.total ?? 0),
+    page: data.page,
+    pageSize: 10,
+  };
 }
 
 export async function getCoeRequest(input: unknown): Promise<CoeRequest> {
@@ -642,7 +788,9 @@ export async function rejectCoeRequest(input: unknown): Promise<CoeRequest> {
       employee_email: row.employee_email,
     };
     if (row.status === "rejected") {
-      throw new AppError("This request has already been rejected. Duplicate rejection is not allowed.");
+      throw new AppError(
+        "This request has already been rejected. Duplicate rejection is not allowed.",
+      );
     }
     if (!["pending", "under_review", "correction_requested", "processing"].includes(row.status)) {
       throw new AppError("This request can no longer be rejected.");
@@ -670,12 +818,12 @@ export async function rejectCoeRequest(input: unknown): Promise<CoeRequest> {
 }
 
 function escapeXml(value: string) {
-    return value
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&apos;");
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
 }
 
 function ordinalSuffix(day: number) {
@@ -711,10 +859,7 @@ function replaceTextRuns(xml: string, replacements: Record<number, string>) {
   );
 }
 
-export async function generateCoeTemplate(input: unknown) {
-  const viewer = await requireHrdoViewer();
-  requireStaff(viewer);
-  const data = parseInput(templateSchema, input);
+async function buildCoeTemplate(data: z.infer<typeof templateSchema>) {
   const request = await loadRequest(data.id);
   if (!request) throw new AppError("COE request not found.");
   if (request.status !== "processing") {
@@ -751,7 +896,7 @@ export async function generateCoeTemplate(input: unknown) {
           26: data.compensationWords || "________________",
           27: "",
           28: "",
-          29: "Only",
+          29: "",
           33: data.compensationAmount || "____________",
         }
       : {
@@ -780,12 +925,33 @@ export async function generateCoeTemplate(input: unknown) {
   zip.file("word/document.xml", replacementXml);
   const output = await zip.generateAsync({ type: "nodebuffer" });
   const fileName = `COE-${request.employeeName.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "") || "request"}.docx`;
-  const attachment = {
-    filename: fileName,
+  return {
+    request,
+    fileName,
     mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     content: output,
   };
-  await notifyEmployeeOfCoeStatus(
+}
+
+/** Builds the review copy only. Nothing is emailed until `sendCoeTemplate` is called. */
+export async function generateCoeTemplate(input: unknown) {
+  const viewer = await requireHrdoViewer();
+  requireStaff(viewer);
+  const data = parseInput(templateSchema, input);
+  const { fileName, mime, content } = await buildCoeTemplate(data);
+  return { fileName, mime, base64: content.toString("base64") };
+}
+
+export async function sendCoeTemplate(input: unknown) {
+  const viewer = await requireHrdoViewer();
+  requireStaff(viewer);
+  const data = parseInput(templateSchema, input);
+  const { request, fileName, mime, content } = await buildCoeTemplate(data);
+  if (!request.employeeEmail) {
+    throw new AppError("This request has no employee email address to send the template to.");
+  }
+
+  const emailResult = await notifyEmployeeOfCoeStatus(
     "processing",
     {
       id: request.id,
@@ -794,14 +960,17 @@ export async function generateCoeTemplate(input: unknown) {
     },
     "Your filled COE template is ready for review.",
     "HRDO has prepared your Certificate of Employment template. Please review the attached Word document and contact HRDO if any information needs correction.",
-    attachment,
+    { filename: fileName, mime, content },
     "Your filled COE template is ready for review",
   );
-  return {
-    fileName,
-    mime: attachment.mime,
-    base64: output.toString("base64"),
-  };
+
+  if (!emailResult?.sent) {
+    throw new AppError(
+      `The template could not be emailed to ${request.employeeEmail}. ${emailResult?.message ?? "Contact the system administrator."}`,
+    );
+  }
+
+  return { recipientEmail: request.employeeEmail };
 }
 
 export async function uploadCoeDocument(input: unknown): Promise<CoeRequest> {
@@ -902,7 +1071,7 @@ export async function uploadCoeDocument(input: unknown): Promise<CoeRequest> {
     const emailResult = await sendCoeReleaseEmail(releaseEmailPayload);
     if (!emailResult.sent) {
       console.warn(
-        `[coe] Release email failed for ${releaseEmailPayload.requestId}: ${emailResult.message}`,
+        `[coe] Release email failed for ${(releaseEmailPayload as { requestId: string }).requestId}: ${emailResult.message}`,
       );
       throw new AppError(
         `The COE was released in the system, but the employee email could not be sent: ${emailResult.message}`,
@@ -988,16 +1157,10 @@ export async function releaseCoeDocument(input: unknown): Promise<CoeRequest> {
   requireStaff(viewer);
   const data = parseInput(releaseSchema, input);
 
-  let releaseEmailPayload: {
-    requestId: string;
-    recipientName: string;
-    recipientEmail: string;
-    copyType: CoeCopyType;
-    attachment?: { filename: string; mime: string; content: Buffer };
-  } | null = null;
-  let statusEmailRecipient: { id: string; employee_name: string; employee_email: string } | null = null;
+  let statusEmailRecipient: { id: string; employee_name: string; employee_email: string } | null =
+    null;
 
-  await withTransaction(async (conn) => {
+  const releaseEmailPayload = await withTransaction(async (conn) => {
     const row = await loadRow(data.id, conn, true);
     statusEmailRecipient = {
       id: row.id,
@@ -1029,19 +1192,28 @@ export async function releaseCoeDocument(input: unknown): Promise<CoeRequest> {
     );
 
     const document = await loadDocumentForEmail(data.id);
-    releaseEmailPayload = {
+    const payload: {
+      requestId: string;
+      recipientName: string;
+      recipientEmail: string;
+      employeeName: string;
+      copyType: CoeCopyType;
+      attachment?: { filename: string; mime: string; content: Buffer };
+    } = {
       requestId: data.id,
       recipientName: row.employee_name,
       recipientEmail: row.employee_email,
+      employeeName: row.employee_name,
       copyType: row.copy_type,
-      attachment: document
-        ? {
-            filename: document.fileName,
-            mime: document.mime,
-            content: document.content,
-          }
-        : undefined,
     };
+    if (document) {
+      payload.attachment = {
+        filename: document.fileName,
+        mime: document.mime,
+        content: document.content,
+      };
+    }
+    return payload;
   });
 
   if (releaseEmailPayload) {

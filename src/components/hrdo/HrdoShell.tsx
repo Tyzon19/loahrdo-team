@@ -1,11 +1,9 @@
-import type { ReactNode } from "react";
-import { Link, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
+import { useState, type ReactNode } from "react";
+import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ChevronDown,
-  ClipboardList,
   FileBadge,
-  History,
   LayoutDashboard,
   LogOut,
   UserRound,
@@ -21,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { hrdoLogoutFn } from "@/server-functions";
+import { LoadingScreen } from "@/components/app/LoadingPanel";
 import type { HrdoViewer } from "@/lib/hrdo";
 
 type NavItem = {
@@ -41,14 +40,6 @@ function navItems(user: HrdoViewer): NavItem[] {
         mobileLabel: "Overview",
         icon: LayoutDashboard,
       },
-      {
-        to: "/hrdo/requests",
-        label: "COE Requests",
-        mobileLabel: "Requests",
-        icon: ClipboardList,
-        alsoStartsWith: ["/hrdo/coe/"],
-      },
-      { to: "/hrdo/history", label: "Request History", mobileLabel: "History", icon: History },
       { to: "/hrdo/profile", label: "Profile", mobileLabel: "Profile", icon: UserRound },
     ];
   }
@@ -171,20 +162,23 @@ function MobileNav({ items, onNavigate }: { items: NavItem[]; onNavigate?: () =>
 }
 
 export function HrdoShell({ user, children }: { user: HrdoViewer; children: ReactNode }) {
-  const navigate = useNavigate();
+  const [signingOut, setSigningOut] = useState(false);
   const router = useRouter();
   const queryClient = useQueryClient();
   const items = navItems(user);
 
   async function signOut() {
+    if (signingOut) return;
+    setSigningOut(true);
     await hrdoLogoutFn();
     queryClient.clear();
     await router.invalidate();
-    navigate({ to: "/hrdo/login" });
+    window.location.assign("/#main-content");
   }
 
   return (
     <div className="flex min-h-screen">
+      {signingOut && <LoadingScreen label="Signing out of LOA HRDO Desk" mode="overlay" immediate />}
       <aside className="no-print sticky top-0 hidden h-screen w-56 shrink-0 md:block">
         <SideNav user={user} items={items} />
       </aside>

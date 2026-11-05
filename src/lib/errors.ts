@@ -1,4 +1,4 @@
-import type { ZodType } from "zod";
+import type { output, ZodTypeAny } from "zod";
 import type { ApiResult } from "@/lib/types";
 
 /** An error whose message is safe to show to the signed-in user. */
@@ -12,7 +12,10 @@ export class AppError extends Error {
   }
 }
 
-export function parseInput<T>(schema: ZodType<T>, input: unknown): T {
+export function parseInput<Schema extends ZodTypeAny>(
+  schema: Schema,
+  input: unknown,
+): output<Schema> {
   const result = schema.safeParse(input);
   if (result.success) return result.data;
 

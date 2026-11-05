@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 type LoadingScreenProps = {
   label?: string;
   mode?: "inline" | "overlay";
+  immediate?: boolean;
 };
 
 export function ButtonLoading({ label }: { label: string }) {
@@ -15,13 +16,21 @@ export function ButtonLoading({ label }: { label: string }) {
   );
 }
 
-export function LoadingScreen({ label = "Loading", mode = "inline" }: LoadingScreenProps) {
-  const [visible, setVisible] = useState(false);
+export function LoadingScreen({
+  label = "Loading",
+  mode = "inline",
+  immediate = false,
+}: LoadingScreenProps) {
+  const [visible, setVisible] = useState(immediate);
 
   useEffect(() => {
+    if (immediate) {
+      setVisible(true);
+      return;
+    }
     const timeout = window.setTimeout(() => setVisible(true), 400);
     return () => window.clearTimeout(timeout);
-  }, []);
+  }, [immediate]);
 
   if (!visible) return null;
 

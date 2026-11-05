@@ -29,6 +29,18 @@ export const hrdoLoginFn = createServerFn({ method: "POST" })
     runSafely(async () => (await import("./server/hrdo/auth")).hrdoLogin(data)),
   );
 
+export const requestHrdoPasswordRecoveryFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/hrdo/auth")).requestHrdoPasswordRecovery(data)),
+  );
+
+export const resetHrdoPasswordWithRecoveryCodeFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/hrdo/auth")).resetHrdoPasswordWithRecoveryCode(data)),
+  );
+
 export const requestRegistrationOtpFn = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) =>
@@ -39,6 +51,18 @@ export const verifyRegistrationOtpFn = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) =>
     runSafely(async () => (await import("./server/auth")).verifyRegistrationOtp(data)),
+  );
+
+export const requestPasswordRecoveryFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/auth")).requestPasswordRecovery(data)),
+  );
+
+export const resetPasswordWithRecoveryCodeFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/auth")).resetPasswordWithRecoveryCode(data)),
   );
 
 export const logoutFn = createServerFn({ method: "POST" }).handler(async () =>
@@ -86,6 +110,12 @@ export const listMyCoeRequestsFn = createServerFn({ method: "GET" }).handler(asy
 export const listAllCoeRequestsFn = createServerFn({ method: "GET" }).handler(async () =>
   runSafely(async () => (await import("./server/hrdo/coe")).listAllCoeRequests()),
 );
+
+export const searchStaffCoeRequestsFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/hrdo/coe")).searchStaffCoeRequests(data)),
+  );
 
 export const getCoeRequestFn = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
@@ -137,6 +167,12 @@ export const generateCoeTemplateFn = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) =>
     runSafely(async () => (await import("./server/hrdo/coe")).generateCoeTemplate(data)),
+  );
+
+export const sendCoeTemplateFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/hrdo/coe")).sendCoeTemplate(data)),
   );
 
 export const markCoeReadyFn = createServerFn({ method: "POST" })

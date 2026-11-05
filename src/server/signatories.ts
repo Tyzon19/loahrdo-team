@@ -370,12 +370,30 @@ export async function resetUserPassword(input: unknown) {
   if (!user) throw new AppError("Choose a valid non-administrator account.");
 
   const temporaryPassword = `${randomBytes(24).toString("base64url")}Aa1!`;
-  await run(
-    `UPDATE users
-     SET password_hash = ?, must_change_password = 1, failed_attempts = 0, locked_until = NULL
-     WHERE id = ?`,
-    [await hashPassword(temporaryPassword), userId],
-  );
+  const passwordHash = await hashPassword(temporaryPassword);
+  await withTransaction(async (conn) => {
+    await run(
+      `UPDATE users
+       SET password_hash = ?, must_change_password = 1, failed_attempts = 0, locked_until = NULL
+       WHERE id = ?`,
+      [passwordHash, userId],
+      conn,
+    );
+    if (user.role === "requisitioner") {
+      await run(
+        `UPDATE hrdo_users
+         SET password_hash = ?, must_change_password = 1, failed_attempts = 0, locked_until = NULL
+         WHERE email = ? AND role = 'employee'`,
+        [passwordHash, user.email],
+        conn,
+      );
+      await run(
+        "DELETE FROM hrdo_sessions WHERE user_id IN (SELECT id FROM hrdo_users WHERE email = ? AND role = 'employee')",
+        [user.email],
+        conn,
+      );
+    }
+  });
   await run("DELETE FROM sessions WHERE user_id = ?", [userId]);
 
   const emailDelivery = await sendTemporaryPasswordEmail({

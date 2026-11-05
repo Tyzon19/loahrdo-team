@@ -38,7 +38,7 @@ export function ApproveDialog({
         </DialogHeader>
         <dl className="grid min-w-0 grid-cols-2 gap-x-3 gap-y-1 rounded-sm border bg-muted p-3 text-sm sm:gap-x-4">
           <dt className="min-w-0 text-muted-foreground">Request</dt><dd className="min-w-0 break-words [overflow-wrap:anywhere] font-medium">{request.number}</dd>
-          <dt className="min-w-0 text-muted-foreground">Requisitioner</dt><dd className="min-w-0 break-words [overflow-wrap:anywhere]">{request.requisitionerName}</dd>
+          <dt className="min-w-0 text-muted-foreground">Requestor</dt><dd className="min-w-0 break-words [overflow-wrap:anywhere]">{request.requisitionerName}</dd>
           <dt className="min-w-0 text-muted-foreground">Destination</dt><dd className="min-w-0 break-words [overflow-wrap:anywhere]">{request.destinations.join("; ")}</dd>
           <dt className="min-w-0 text-muted-foreground">Date / Time</dt><dd className="min-w-0 break-words [overflow-wrap:anywhere]">{fmtRange(request.dateStart, request.dateEnd)}, {fmtTime(request.timeNeeded)}</dd>
         </dl>
@@ -101,12 +101,12 @@ export function RejectDialog({
     <Dialog open={open} onOpenChange={(o) => { if (!busy) { onOpenChange(o); if (!o) { setReason(""); setErr(null); } } }}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Reject &amp; Return to Requisitioner</DialogTitle>
-          <DialogDescription>The request will stop here and go back to the requisitioner for revision. It will not move to the next approver.</DialogDescription>
+          <DialogTitle>Reject &amp; Return to Requestor</DialogTitle>
+          <DialogDescription>The request will stop here and go back to the requestor for revision. It will not move to the next approver.</DialogDescription>
         </DialogHeader>
         <div>
           <Label htmlFor="reason">Reason for returning <span className="text-destructive">*</span></Label>
-          <Textarea id="reason" rows={4} value={reason} onChange={(e) => setReason(e.target.value)} className="mt-1" placeholder="Explain what the requisitioner should change." aria-invalid={!!err} />
+          <Textarea id="reason" rows={4} value={reason} onChange={(e) => setReason(e.target.value)} className="mt-1" placeholder="Explain what the requestor should change." aria-invalid={!!err} />
           {err && <p className="mt-1 text-sm text-destructive">{err}</p>}
           <p className="mt-1 text-xs text-muted-foreground">
             {proxySigner
