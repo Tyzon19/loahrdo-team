@@ -1,7 +1,7 @@
 /**
  * COE request storage and processing for the HRDO system.
  *
- * Requests live in `hrdo_coe_requests`, signed PDFs in `hrdo_coe_documents` and
+ * Requests live in `hrdo_coe_requests`, signed COE files in `hrdo_coe_documents` and
  * every meaningful step in `hrdo_coe_history`. Employees only ever see their own
  * requests; HRDO staff see every request and move it through the workflow.
  */
@@ -18,8 +18,14 @@ import type {
   CoeStatus,
   HrdoViewer,
 } from "@/lib/hrdo";
-import { COE_MAX_DOCUMENT_BYTES, coeNeedsDocument } from "@/lib/hrdo";
+import {
+  COE_DOCUMENT_MIMES,
+  COE_MAX_DOCUMENT_BYTES,
+  coeNeedsDocument,
+  coeRequestsCompensation,
+} from "@/lib/hrdo";
 import { AppError, parseInput } from "@/lib/errors";
+import { normalizePhilippineMobileNumber } from "@/lib/validation";
 import { all, likePattern, run, withTransaction, type Db } from "../db";
 import { sendCoeReleaseEmail, sendCoeStatusEmail } from "../gmail";
 import { requireHrdoViewer } from "./auth";
@@ -58,10 +64,10 @@ const submitSchema = z.object({
   contactNumber: z
     .string()
     .trim()
-    .refine(
-      (value) => !value || /^(09\d{9}|\+639\d{9})$/.test(value),
-      "Enter a valid Philippine mobile number.",
-    )
+    .max(32, "Contact numbers must be 32 characters or fewer.")
+    .transform(normalizePhilippineMobileNumber)
+    .refine((value) => value !== null, "Enter a valid Philippine mobile number.")
+    .transform((value) => value ?? "")
     .optional()
     .default(""),
   copyType: z.enum(["soft", "original", "both"], {
@@ -103,13 +109,24 @@ const releaseSchema = z.object({
 const uploadSchema = z.object({
   id: z.string().uuid("Invalid request reference."),
   fileName: z.string().trim().min(1, "The uploaded file needs a name.").max(255),
-  dataUrl: z.string().min(32, "Choose a signed PDF to upload.").max(9_000_000),
+  dataUrl: z.string().min(32, "Choose a signed COE document to upload.").max(9_000_000),
 });
+
+const dateOnlySchema = z
+  .string()
+  .refine((value) => {
+    if (!value) return true;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const date = new Date(`${value}T00:00:00.000Z`);
+    return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  }, "Enter a valid date.")
+  .default("");
 
 const templateSchema = z.object({
   id: z.string().uuid("Invalid request reference."),
   employeeName: z.string().trim().min(2).max(120),
-  dateHired: z.string().trim().max(40).default(""),
+  dateHired: dateOnlySchema,
+  employmentEndDate: dateOnlySchema,
   position: z.string().trim().max(120).default(""),
   department: z.string().trim().max(190).default(""),
   compensationWords: z.string().trim().max(120).default(""),
@@ -131,7 +148,15 @@ const resubmitSchema = submitSchema.extend({
     .default(""),
 });
 
-const staffRequestQueueSchema = z.enum(["all", "new", "review", "processing", "due", "ready"]);
+const staffRequestQueueSchema = z.enum([
+  "all",
+  "new",
+  "review",
+  "processing",
+  "awaiting_review",
+  "due",
+  "ready",
+]);
 const staffRequestSortSchema = z.enum([
   "priority",
   "date_newest",
@@ -143,15 +168,6 @@ const staffRequestSortSchema = z.enum([
   "id_asc",
   "id_desc",
 ]);
-const dateOnlySchema = z
-  .string()
-  .refine((value) => {
-    if (!value) return true;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-    const date = new Date(`${value}T00:00:00.000Z`);
-    return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
-  }, "Enter a valid date.")
-  .default("");
 const staffRequestListSchema = z
   .object({
     query: z.string().trim().max(100).default(""),
@@ -279,7 +295,7 @@ const SELECT_COLUMNS = `c.id, c.employee_id, c.employee_name, c.employee_email, 
                         (SELECT d.file_name FROM hrdo_coe_documents d WHERE d.request_id = c.id) AS document_file_name`;
 
 const ORDER_PENDING_FIRST = `FIELD(c.status, 'pending', 'under_review', 'correction_requested',
-                                 'processing', 'ready_for_pickup', 'released', 'rejected'),
+                                 'processing', 'awaiting_review', 'ready_for_pickup', 'released', 'rejected'),
                               c.deadline_at ASC, c.requested_at DESC`;
 
 async function notifyEmployeeOfCoeStatus(
@@ -393,6 +409,49 @@ function isPdf(bytes: Buffer) {
     bytes[3] === 0x46 &&
     bytes[4] === 0x2d
   );
+}
+
+async function isDocx(bytes: Buffer) {
+  try {
+    const archive = await JSZip.loadAsync(bytes);
+    const contentTypes = archive.file("[Content_Types].xml");
+    const document = archive.file("word/document.xml");
+    if (!contentTypes || !document) return false;
+    const contentTypesXml = await contentTypes.async("string");
+    return (
+      contentTypesXml.includes(
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
+      ) && (await document.async("string")).length > 0
+    );
+  } catch {
+    return false;
+  }
+}
+
+export async function validateCoeDocumentUpload(fileName: string, dataUrl: string) {
+  const extension = path.extname(fileName).toLowerCase();
+  const mime =
+    extension === ".pdf"
+      ? COE_DOCUMENT_MIMES.pdf
+      : extension === ".docx"
+        ? COE_DOCUMENT_MIMES.docx
+        : "";
+  if (!mime || !dataUrl.startsWith(`data:${mime};base64,`)) {
+    throw new AppError("Upload the signed COE as a PDF or Word (.docx) file.");
+  }
+
+  const bytes = Buffer.from(dataUrl.slice(dataUrl.indexOf(",") + 1), "base64");
+  const validDocument = extension === ".pdf" ? isPdf(bytes) : await isDocx(bytes);
+  if (!validDocument) {
+    throw new AppError(
+      `That file is not a valid ${extension === ".pdf" ? "PDF" : "Word document"}.`,
+    );
+  }
+  if (bytes.length > COE_MAX_DOCUMENT_BYTES) {
+    throw new AppError("The signed COE must be 5 MB or smaller.");
+  }
+
+  return { mime, bytes };
 }
 
 export async function submitCoeRequest(input: unknown): Promise<CoeRequest> {
@@ -548,12 +607,15 @@ export async function searchStaffCoeRequests(input: unknown) {
     case "processing":
       where.push("c.status = 'processing'");
       break;
+    case "awaiting_review":
+      where.push("c.status = 'awaiting_review'");
+      break;
     case "ready":
       where.push("c.status = 'ready_for_pickup'");
       break;
     case "due":
       where.push(
-        "c.status IN ('pending', 'under_review', 'correction_requested', 'processing') AND c.deadline_at <= DATE_ADD(NOW(), INTERVAL 24 HOUR)",
+        "c.status IN ('pending', 'under_review', 'correction_requested', 'processing', 'awaiting_review') AND c.deadline_at <= DATE_ADD(NOW(), INTERVAL 24 HOUR)",
       );
       break;
   }
@@ -694,7 +756,7 @@ export async function startCoeProcessing(input: unknown): Promise<CoeRequest> {
         `This request is already being processed by ${row.processed_by_name || "HRDO staff"}. Duplicate processing is not allowed.`,
       );
     }
-    if (row.status !== "under_review") {
+    if (row.status !== "under_review" && row.status !== "awaiting_review") {
       throw new AppError("Verify the request before starting the COE preparation.");
     }
     if (!row.verified_at) {
@@ -707,7 +769,15 @@ export async function startCoeProcessing(input: unknown): Promise<CoeRequest> {
       [viewer.id, viewer.name, data.id],
       conn,
     );
-    await addHistory(conn, data.id, viewer, "processing", "COE preparation started.");
+    await addHistory(
+      conn,
+      data.id,
+      viewer,
+      "processing",
+      row.status === "awaiting_review"
+        ? "COE preparation resumed after the requestor reviewed the filled template."
+        : "COE preparation started.",
+    );
   });
 
   if (emailRecipient) {
@@ -859,11 +929,64 @@ function replaceTextRuns(xml: string, replacements: Record<number, string>) {
   );
 }
 
+export function widenCoeTemplateTextArea(xml: string) {
+  const pageMargins = xml.match(/<w:pgMar\b([^>]*)\/>/);
+  if (!pageMargins) throw new AppError("The COE template page margins are missing.");
+  if (
+    !/\bw:left="[^"]*"/.test(pageMargins[1] ?? "") ||
+    !/\bw:right="[^"]*"/.test(pageMargins[1] ?? "")
+  ) {
+    throw new AppError("The COE template side margins are missing.");
+  }
+
+  const adjustedMargins = (pageMargins[1] ?? "")
+    .replace(/\bw:left="[^"]*"/, 'w:left="1080"')
+    .replace(/\bw:right="[^"]*"/, 'w:right="1080"');
+  return xml.replace(pageMargins[0], `<w:pgMar${adjustedMargins}/>`);
+}
+
+export function formatCoeEmploymentDate(value: string) {
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!dateOnly) return value;
+  const date = new Date(`${value}T12:00:00`);
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.getFullYear() !== Number(dateOnly[1]) ||
+    date.getMonth() + 1 !== Number(dateOnly[2]) ||
+    date.getDate() !== Number(dateOnly[3])
+  ) {
+    return value;
+  }
+  return new Intl.DateTimeFormat("en-PH", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
+}
+
+export function isCoeEmploymentEndDateOnOrAfterHireDate(
+  dateHired: string,
+  employmentEndDate: string,
+) {
+  return !dateHired || employmentEndDate >= dateHired;
+}
+
 async function buildCoeTemplate(data: z.infer<typeof templateSchema>) {
   const request = await loadRequest(data.id);
   if (!request) throw new AppError("COE request not found.");
   if (request.status !== "processing") {
     throw new AppError("Start processing the request before generating the COE template.");
+  }
+  const isThirdPartyVerifier = /(?:^|\| )Requestor type: Third-Party Verifier/i.test(request.note);
+  const includeCompensation = coeRequestsCompensation(request.note);
+  if (isThirdPartyVerifier && !data.employmentEndDate) {
+    throw new AppError("Enter the former employee's last day of employment.");
+  }
+  if (
+    isThirdPartyVerifier &&
+    !isCoeEmploymentEndDateOnOrAfterHireDate(data.dateHired, data.employmentEndDate)
+  ) {
+    throw new AppError("Employment end date must be on or after the hiring date.");
   }
 
   const templatePath = path.join(process.cwd(), "public", "COE FORMAT.docx");
@@ -884,44 +1007,46 @@ async function buildCoeTemplate(data: z.infer<typeof templateSchema>) {
   const subjectTitleMatch = request.note.match(/(?:^|\| )Subject title: ([^|\n]+)/i);
   const title = (titleMatch?.[1] || subjectTitleMatch?.[1] || "").trim();
   const titleWithPunctuation = title ? `${title}. ` : "";
-  const replacementXml = replaceTextRuns(xml, {
-    9: title,
-    10: title ? ". " : "",
-    11: employeeName,
-    18: `${data.dateHired || "________________"} up to present as `,
-    19: data.position || "________________",
-    23: `${data.department || "________________"} `,
-    ...(data.includeCompensation
-      ? {
-          26: data.compensationWords || "________________",
-          27: "",
-          28: "",
-          29: "",
-          33: data.compensationAmount || "____________",
-        }
-      : {
-          24: "",
-          25: "",
-          26: "",
-          27: "",
-          28: "",
-          29: "",
-          30: "",
-          31: "",
-          32: "",
-          33: "",
-          34: "",
-          35: "",
-        }),
-    38: `of ${titleWithPunctuation}`,
-    39: surname,
-    43: ` ${data.purpose}`,
-    47: issueDay,
-    48: ordinalSuffix(issueDate.getDate()),
-    51: `${issueMonth} `,
-    52: `${issueYear}.`,
-    55: ` ${data.preparedByName}`,
-  });
+  const replacementXml = widenCoeTemplateTextArea(
+    replaceTextRuns(xml, {
+      9: title,
+      10: title ? ". " : "",
+      11: employeeName,
+      18: `${formatCoeEmploymentDate(data.dateHired) || "________________"} up to ${formatCoeEmploymentDate(data.employmentEndDate) || "present"} as `,
+      19: data.position || "________________",
+      23: `${data.department || "________________"} `,
+      ...(includeCompensation
+        ? {
+            26: data.compensationWords || "________________",
+            27: "",
+            28: "",
+            29: "",
+            33: data.compensationAmount || "____________",
+          }
+        : {
+            24: "",
+            25: "",
+            26: "",
+            27: "",
+            28: "",
+            29: "",
+            30: "",
+            31: "",
+            32: "",
+            33: "",
+            34: "",
+            35: "",
+          }),
+      38: `of ${titleWithPunctuation}`,
+      39: surname,
+      43: ` ${data.purpose}`,
+      47: issueDay,
+      48: ordinalSuffix(issueDate.getDate()),
+      51: `${issueMonth} `,
+      52: `${issueYear}.`,
+      55: ` ${data.preparedByName}`,
+    }),
+  );
   zip.file("word/document.xml", replacementXml);
   const output = await zip.generateAsync({ type: "nodebuffer" });
   const fileName = `COE-${request.employeeName.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "") || "request"}.docx`;
@@ -952,7 +1077,7 @@ export async function sendCoeTemplate(input: unknown) {
   }
 
   const emailResult = await notifyEmployeeOfCoeStatus(
-    "processing",
+    "awaiting_review",
     {
       id: request.id,
       employee_name: request.employeeName,
@@ -970,6 +1095,31 @@ export async function sendCoeTemplate(input: unknown) {
     );
   }
 
+  await withTransaction(async (conn) => {
+    const row = await loadRow(request.id, conn, true);
+    if (row.status === "awaiting_review") return;
+    if (row.status !== "processing") {
+      throw new AppError(
+        "The Word template was emailed, but the request status changed before it could be updated. Refresh the request and contact an administrator if it still shows as processing.",
+      );
+    }
+
+    await run(
+      `UPDATE hrdo_coe_requests
+       SET status = 'awaiting_review', updated_at = NOW()
+       WHERE id = ? AND status = 'processing'`,
+      [request.id],
+      conn,
+    );
+    await addHistory(
+      conn,
+      request.id,
+      viewer,
+      "template_sent",
+      "Filled Word template sent to the requestor for review.",
+    );
+  });
+
   return { recipientEmail: request.employeeEmail };
 }
 
@@ -977,18 +1127,7 @@ export async function uploadCoeDocument(input: unknown): Promise<CoeRequest> {
   const viewer = await requireHrdoViewer();
   requireStaff(viewer);
   const data = parseInput(uploadSchema, input);
-
-  if (!data.dataUrl.startsWith("data:application/pdf;base64,")) {
-    throw new AppError("Upload the signed COE as a PDF file.");
-  }
-
-  const bytes = Buffer.from(data.dataUrl.slice(data.dataUrl.indexOf(",") + 1), "base64");
-  if (!isPdf(bytes)) {
-    throw new AppError("That file is not a valid PDF.");
-  }
-  if (bytes.length > COE_MAX_DOCUMENT_BYTES) {
-    throw new AppError("The signed COE must be 5 MB or smaller.");
-  }
+  const { mime, bytes } = await validateCoeDocumentUpload(data.fileName, data.dataUrl);
 
   let releaseEmailPayload: {
     requestId: string;
@@ -1004,18 +1143,18 @@ export async function uploadCoeDocument(input: unknown): Promise<CoeRequest> {
       throw new AppError("Start processing the request before uploading the signed COE.");
     }
     if (!coeNeedsDocument(row.copy_type)) {
-      throw new AppError("This request only needs a printed original, so no PDF is uploaded.");
+      throw new AppError("This request only needs a printed original, so no document is uploaded.");
     }
 
     await run(
       `INSERT INTO hrdo_coe_documents
          (request_id, file_name, mime, size_bytes, content, uploaded_by_id, uploaded_by_name)
-       VALUES (?, ?, 'application/pdf', ?, ?, ?, ?)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
          file_name = VALUES(file_name), size_bytes = VALUES(size_bytes), content = VALUES(content),
          uploaded_by_id = VALUES(uploaded_by_id), uploaded_by_name = VALUES(uploaded_by_name),
          uploaded_at = NOW()`,
-      [data.id, data.fileName, bytes.length, bytes, viewer.id, viewer.name],
+      [data.id, data.fileName, mime, bytes.length, bytes, viewer.id, viewer.name],
       conn,
     );
     await run(
@@ -1033,7 +1172,7 @@ export async function uploadCoeDocument(input: unknown): Promise<CoeRequest> {
       `Signed COE uploaded (${data.fileName}).`,
     );
 
-    // Soft copy only: the signed PDF is the release.
+    // Soft copy only: the signed COE document is the release.
     if (row.copy_type === "soft") {
       await run(
         `UPDATE hrdo_coe_requests
@@ -1054,7 +1193,7 @@ export async function uploadCoeDocument(input: unknown): Promise<CoeRequest> {
         recipientName: row.employee_name,
         recipientEmail: row.employee_email,
         copyType: row.copy_type,
-        attachment: { filename: data.fileName, mime: "application/pdf", content: bytes },
+        attachment: { filename: data.fileName, mime, content: bytes },
       };
     } else if (row.copy_type === "both") {
       releaseEmailPayload = {
@@ -1062,7 +1201,7 @@ export async function uploadCoeDocument(input: unknown): Promise<CoeRequest> {
         recipientName: row.employee_name,
         recipientEmail: row.employee_email,
         copyType: row.copy_type,
-        attachment: { filename: data.fileName, mime: "application/pdf", content: bytes },
+        attachment: { filename: data.fileName, mime, content: bytes },
       };
     }
   });
@@ -1109,11 +1248,13 @@ export async function markCoeReady(input: unknown): Promise<CoeRequest> {
     }
     if (row.copy_type === "soft") {
       throw new AppError(
-        "Soft-copy requests are released online after the signed PDF is uploaded.",
+        "Soft-copy requests are released online after the signed COE document is uploaded.",
       );
     }
     if (row.copy_type === "both" && !row.has_document) {
-      throw new AppError("Upload the signed PDF before marking this request ready for pickup.");
+      throw new AppError(
+        "Upload the signed COE document before marking this request ready for pickup.",
+      );
     }
     await run(
       `UPDATE hrdo_coe_requests

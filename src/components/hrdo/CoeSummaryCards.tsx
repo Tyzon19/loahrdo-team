@@ -31,14 +31,18 @@ export function CoeSummaryCards({
   activeKey?: string | undefined;
   onSelect?: ((key: string) => void) | undefined;
   loading?: boolean;
-  columns?: 4 | 5;
+  columns?: 4 | 5 | 6;
   label: string;
 }) {
   return (
     <div
       className={cn(
         "mb-4 grid gap-2 sm:gap-3",
-        columns === 5 ? "grid-cols-2 sm:grid-cols-3 xl:grid-cols-5" : "grid-cols-2 lg:grid-cols-4",
+        columns === 6
+          ? "grid-cols-2 sm:grid-cols-3 xl:grid-cols-6"
+          : columns === 5
+            ? "grid-cols-2 sm:grid-cols-3 xl:grid-cols-5"
+            : "grid-cols-2 lg:grid-cols-4",
       )}
       role="group"
       aria-label={label}

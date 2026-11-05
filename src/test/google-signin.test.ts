@@ -70,6 +70,11 @@ describe("Google sign-in messages", () => {
     expect(googleSignInErrorMessage("google_domain")).toContain("@lyceumalabang.edu.ph");
     expect(googleSignInErrorMessage("google_no_account")).toContain("created automatically");
     expect(googleSignInErrorMessage("google_role")).toContain("HRDO");
+    expect(googleSignInErrorMessage("google_session")).toContain("session expired");
+    expect(googleSignInErrorMessage("google_configuration")).toContain("callback URL");
+    expect(googleSignInErrorMessage("google_token")).toContain("Google could not complete");
+    expect(googleSignInErrorMessage("google_profile")).toContain("account profile");
+    expect(googleSignInErrorMessage("google_server")).toContain("app could not finish");
     expect(googleSignInErrorMessage("something_else")).toBe(
       googleSignInErrorMessage("google_failed"),
     );

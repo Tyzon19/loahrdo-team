@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
-import { Link, useRouter, useRouterState } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import {
   Bell,
   BarChart3,
@@ -238,7 +239,6 @@ function MobileNav({ user, unread }: { user: Viewer; unread: number }) {
 
 export function AppShell({ user, children }: { user: Viewer; children: ReactNode }) {
   const [signingOut, setSigningOut] = useState(false);
-  const router = useRouter();
   const queryClient = useQueryClient();
   const notifications = useQuery({
     queryKey: ["notifications"],
@@ -250,10 +250,16 @@ export function AppShell({ user, children }: { user: Viewer; children: ReactNode
   async function signOut() {
     if (signingOut) return;
     setSigningOut(true);
-    await logoutFn();
-    queryClient.clear();
-    await router.invalidate();
-    window.location.assign("/#main-content");
+    try {
+      await unwrap(logoutFn());
+      queryClient.clear();
+      window.location.replace("/#main-content");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "We couldn't sign you out. Please try again.",
+      );
+      setSigningOut(false);
+    }
   }
   return (
     <div className="flex min-h-screen">

@@ -20,8 +20,12 @@ export const HRDO = {
 export const COE_PROCESSING_DAYS = 3;
 /** A request counts as "due soon" inside this window before its deadline. */
 export const COE_DUE_SOON_HOURS = 24;
-/** Largest signed PDF HR can attach to a request. */
+/** Largest signed COE document HR can attach to a request. */
 export const COE_MAX_DOCUMENT_BYTES = 5 * 1024 * 1024;
+export const COE_DOCUMENT_MIMES = {
+  pdf: "application/pdf",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+} as const;
 
 export type HrdoRole = "employee" | "hrdo_staff";
 
@@ -37,6 +41,105 @@ export interface HrdoViewer {
 
 export type CoeCopyType = "soft" | "original" | "both";
 
+export function coeRequestsCompensation(note: string) {
+  const fields = note.split(/\s*\|\s*/).map((field) => field.trim());
+  const description = fields.find((field) => /^Description:/i.test(field));
+  if (description) {
+    const selectedDescriptions = description
+      .slice("Description:".length)
+      .split(",")
+      .map((value) => value.trim().replace(/\s+-\s+.*$/, ""));
+    return selectedDescriptions.some((value) => /^With compensation review$/i.test(value));
+  }
+
+  return fields.some((field) => /^COE type:\s*COE with Compensation$/i.test(field));
+}
+
+const NUMBER_WORDS = [
+  "Zero",
+  "One",
+  "Two",
+  "Three",
+  "Four",
+  "Five",
+  "Six",
+  "Seven",
+  "Eight",
+  "Nine",
+  "Ten",
+  "Eleven",
+  "Twelve",
+  "Thirteen",
+  "Fourteen",
+  "Fifteen",
+  "Sixteen",
+  "Seventeen",
+  "Eighteen",
+  "Nineteen",
+];
+const TENS_WORDS = [
+  "",
+  "",
+  "Twenty",
+  "Thirty",
+  "Forty",
+  "Fifty",
+  "Sixty",
+  "Seventy",
+  "Eighty",
+  "Ninety",
+];
+const NUMBER_SCALES = ["", "Thousand", "Million", "Billion"];
+
+function numberUnderThousandToWords(value: number): string {
+  const words: string[] = [];
+  let remainder = value;
+  if (remainder >= 100) {
+    words.push(`${NUMBER_WORDS[Math.floor(remainder / 100)]} Hundred`);
+    remainder %= 100;
+  }
+  if (remainder >= 20) {
+    words.push(TENS_WORDS[Math.floor(remainder / 10)]);
+    remainder %= 10;
+  }
+  if (remainder > 0) words.push(NUMBER_WORDS[remainder]);
+  return words.join(" ");
+}
+
+function integerToWords(value: number): string {
+  if (value === 0) return NUMBER_WORDS[0];
+  const groups: string[] = [];
+  let remainder = value;
+  let scale = 0;
+  while (remainder > 0) {
+    const group = remainder % 1000;
+    if (group > 0) {
+      groups.unshift(
+        [numberUnderThousandToWords(group), NUMBER_SCALES[scale]].filter(Boolean).join(" "),
+      );
+    }
+    remainder = Math.floor(remainder / 1000);
+    scale += 1;
+  }
+  return groups.join(" ");
+}
+
+/** Converts a Philippine-peso amount to words; incomplete or invalid input returns an empty string. */
+export function compensationAmountToWords(amount: string): string {
+  const value = amount.trim().replace(/^(?:₱|PHP)\s*/i, "");
+  if (!/^(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d{0,2})?$/.test(value)) return "";
+
+  const [wholeText = "", fractionText = ""] = value.replace(/,/g, "").split(".");
+  const whole = Number(wholeText);
+  if (!Number.isSafeInteger(whole) || whole >= 1_000_000_000_000) return "";
+
+  const wholeWords = `${integerToWords(whole)} Peso${whole === 1 ? "" : "s"}`;
+  const fraction = Number(fractionText.padEnd(2, "0"));
+  return fraction
+    ? `${wholeWords} and ${String(fraction).padStart(2, "0")}/100 Only`
+    : `${wholeWords} Only`;
+}
+
 export const COE_COPY_TYPES: CoeCopyType[] = ["soft", "original", "both"];
 
 export const COE_COPY_TYPE_LABELS: Record<CoeCopyType, string> = {
@@ -46,12 +149,12 @@ export const COE_COPY_TYPE_LABELS: Record<CoeCopyType, string> = {
 };
 
 export const COE_COPY_TYPE_HINTS: Record<CoeCopyType, string> = {
-  soft: "A signed PDF is released online once HRDO finalizes it.",
+  soft: "A signed COE document is released online once HRDO finalizes it.",
   original: "A printed, signed copy is released at the HRDO desk.",
-  both: "A signed PDF is released online and a printed copy is prepared for pickup.",
+  both: "A signed COE document is released online and a printed copy is prepared for pickup.",
 };
 
-/** Copy types that include an online signed PDF. */
+/** Copy types that include an online signed document. */
 export function coeNeedsDocument(copyType: CoeCopyType) {
   return copyType === "soft" || copyType === "both";
 }
@@ -61,6 +164,7 @@ export type CoeStatus =
   | "under_review"
   | "correction_requested"
   | "processing"
+  | "awaiting_review"
   | "ready_for_pickup"
   | "released"
   | "rejected";
@@ -70,6 +174,7 @@ export const COE_STATUSES: CoeStatus[] = [
   "under_review",
   "correction_requested",
   "processing",
+  "awaiting_review",
   "ready_for_pickup",
   "released",
   "rejected",
@@ -81,6 +186,7 @@ export const COE_OPEN_STATUSES: CoeStatus[] = [
   "under_review",
   "correction_requested",
   "processing",
+  "awaiting_review",
 ];
 
 export function isCoeOpen(status: CoeStatus) {
@@ -93,6 +199,7 @@ export const COE_STATUS_LABELS: Record<CoeStatus, string> = {
   under_review: "Under review",
   correction_requested: "Correction requested",
   processing: "Under processing",
+  awaiting_review: "Awaiting requestor review",
   ready_for_pickup: "Ready for pickup",
   released: "Released",
   rejected: "Rejected",
@@ -104,6 +211,7 @@ export const COE_REQUESTOR_STATUS_LABELS: Record<CoeStatus, string> = {
   under_review: "Under review",
   correction_requested: "Needs action",
   processing: "Processing",
+  awaiting_review: "Awaiting your review",
   ready_for_pickup: "Ready for pickup",
   released: "Released",
   rejected: "Not approved",
@@ -116,6 +224,8 @@ export const COE_STATUS_HINTS: Record<CoeStatus, string> = {
   correction_requested:
     "HRDO needs more information. Open the request, read the message and submit the corrected details.",
   processing: "Your Certificate of Employment is being prepared and signed.",
+  awaiting_review:
+    "HRDO emailed you a filled Word template. Please review it and contact HRDO if any information needs correction.",
   ready_for_pickup: "Your printed COE is ready. Claim it at the HRDO desk.",
   released: "Your Certificate of Employment has been released.",
   rejected: "HRDO could not process this request. Review the remarks and submit a new request.",
@@ -195,6 +305,7 @@ export type CoeHistoryType =
   | "correction_requested"
   | "resubmitted"
   | "processing"
+  | "template_sent"
   | "document_uploaded"
   | "ready_for_pickup"
   | "released"
@@ -206,6 +317,7 @@ export const COE_HISTORY_LABELS: Record<CoeHistoryType, string> = {
   correction_requested: "Correction requested",
   resubmitted: "Corrected details submitted",
   processing: "Processing started",
+  template_sent: "Template sent for review",
   document_uploaded: "Signed COE uploaded",
   ready_for_pickup: "Ready for pickup",
   released: "Document released",
@@ -284,6 +396,8 @@ export function coeStaffActions(request: {
       actions.push("request_correction", "reject");
       return actions;
     }
+    case "awaiting_review":
+      return ["process"];
     case "ready_for_pickup":
       return ["release"];
     case "correction_requested":
@@ -308,6 +422,7 @@ export interface HrCoeSummary {
   newCount: number;
   underReview: number;
   processing: number;
+  awaitingReview: number;
   dueSoon: number;
   overdue: number;
   readyForPickup: number;
@@ -323,6 +438,7 @@ export function hrCoeSummary(
     newCount: 0,
     underReview: 0,
     processing: 0,
+    awaitingReview: 0,
     dueSoon: 0,
     overdue: 0,
     readyForPickup: 0,
@@ -332,6 +448,7 @@ export function hrCoeSummary(
     if (request.status === "pending") summary.newCount += 1;
     if (request.status === "under_review") summary.underReview += 1;
     if (request.status === "processing") summary.processing += 1;
+    if (request.status === "awaiting_review") summary.awaitingReview += 1;
     if (request.status === "ready_for_pickup") summary.readyForPickup += 1;
     if (request.status === "released") summary.released += 1;
     const deadline = coeDeadlineInfo(request.deadlineAt, request.status, now);
@@ -341,7 +458,7 @@ export function hrCoeSummary(
   return summary;
 }
 
-export type CoeRequestorGroupKey = "review" | "processing" | "action" | "ready";
+export type CoeRequestorGroupKey = "review" | "processing" | "awaiting_review" | "action" | "ready";
 
 export interface CoeRequestorGroup {
   key: CoeRequestorGroupKey;
@@ -352,7 +469,7 @@ export interface CoeRequestorGroup {
 
 /**
  * Employee summary cards. Every status belongs to exactly one group, so the
- * four cards always add up to the employee's total number of requests.
+ * five cards always add up to the employee's total number of requests.
  */
 export const COE_REQUESTOR_GROUPS: CoeRequestorGroup[] = [
   {
@@ -366,6 +483,12 @@ export const COE_REQUESTOR_GROUPS: CoeRequestorGroup[] = [
     label: "Processing",
     hint: "COE being prepared by HRDO",
     statuses: ["processing"],
+  },
+  {
+    key: "awaiting_review",
+    label: "Awaiting Your Review",
+    hint: "HRDO emailed you the filled Word template",
+    statuses: ["awaiting_review"],
   },
   {
     key: "action",
@@ -387,6 +510,7 @@ export function coeRequestorCounts(
   const counts: Record<CoeRequestorGroupKey, number> = {
     review: 0,
     processing: 0,
+    awaiting_review: 0,
     action: 0,
     ready: 0,
   };

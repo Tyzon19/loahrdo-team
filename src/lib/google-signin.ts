@@ -11,6 +11,11 @@ export type GoogleSignInErrorCode =
   | "google_domain"
   | "google_no_account"
   | "google_role"
+  | "google_session"
+  | "google_configuration"
+  | "google_token"
+  | "google_profile"
+  | "google_server"
   | "google_failed";
 
 const MESSAGES: Record<GoogleSignInErrorCode, string> = {
@@ -22,6 +27,16 @@ const MESSAGES: Record<GoogleSignInErrorCode, string> = {
   google_no_account:
     "Your institutional Google account is valid. The requisitioner profile will be created automatically on first sign-in. Please try again.",
   google_role: "This is not a requisitioner account. Use the HRDO staff sign-in instead.",
+  google_session:
+    "The Google sign-in session expired or could not be verified. Start again from the sign-in page.",
+  google_configuration:
+    "Google sign-in configuration needs attention. Contact the system administrator and ask them to verify the OAuth client and callback URL.",
+  google_token:
+    "Google could not complete sign-in. Please start again; if it continues, contact the system administrator.",
+  google_profile:
+    "Google sign-in completed, but the account profile could not be verified. Try again or contact the system administrator.",
+  google_server:
+    "Google verified your account, but the app could not finish sign-in. Contact the system administrator.",
   google_failed: "We couldn't sign you in with Google. Please try again.",
 };
 

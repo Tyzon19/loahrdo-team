@@ -4,6 +4,7 @@ import {
   approveSchema,
   emailDomainAllowed,
   institutionalEmailAllowed,
+  normalizePhilippineMobileNumber,
   passwordIssues,
   createAssistantAccountSchema,
   createMainSignatoryAccountSchema,
@@ -65,6 +66,25 @@ describe("password policy", () => {
 describe("request input validation", () => {
   it("accepts a complete request", () => {
     expect(requestInputSchema.safeParse(validInput).success).toBe(true);
+  });
+
+  describe("Philippine mobile number normalization", () => {
+    it.each([
+      ["09123456789", "09123456789"],
+      ["0912 345 6789", "09123456789"],
+      ["(0912) 345-6789", "09123456789"],
+      ["+63 912 345 6789", "+639123456789"],
+      ["639123456789", "+639123456789"],
+      ["9123456789", "09123456789"],
+    ])("normalizes %s to %s", (input, expected) => {
+      expect(normalizePhilippineMobileNumber(input)).toBe(expected);
+    });
+
+    it("rejects invalid numbers and preserves an empty optional value", () => {
+      expect(normalizePhilippineMobileNumber("")).toBe("");
+      expect(normalizePhilippineMobileNumber("12345")).toBeNull();
+      expect(normalizePhilippineMobileNumber("0912abc6789")).toBeNull();
+    });
   });
 
   it("rejects an end date before the start date", () => {

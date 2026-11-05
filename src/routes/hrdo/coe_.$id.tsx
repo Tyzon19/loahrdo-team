@@ -56,12 +56,15 @@ import {
   COE_COPY_TYPES,
   COE_COPY_TYPE_HINTS,
   COE_COPY_TYPE_LABELS,
+  COE_DOCUMENT_MIMES,
   COE_MAX_DOCUMENT_BYTES,
   COE_REQUESTOR_STATUS_LABELS,
   COE_STATUS_HINTS,
   COE_STATUS_LABELS,
+  compensationAmountToWords,
   coeCanDownloadDocument,
   coeNeedsDocument,
+  coeRequestsCompensation,
   coeReference,
   coeStaffActions,
   type CoeAction,
@@ -86,15 +89,22 @@ export const Route = createFileRoute("/hrdo/coe_/$id")({
   component: CoeDetailPage,
 });
 
+
 const ACTION_LABELS: Record<CoeAction, string> = {
   verify: "Verify information",
   process: "Start processing",
   request_correction: "Request correction",
-  upload_document: "Upload signed PDF",
+  upload_document: "Upload signed document",
   mark_ready: "Mark ready for pickup",
   release: "Record release",
   reject: "Reject request",
 };
+
+function actionLabel(key: CoeAction, status: CoeStatus) {
+  return key === "process" && status === "awaiting_review"
+    ? "Resume processing"
+    : ACTION_LABELS[key];
+}
 
 const ACTION_SUCCESS: Record<ActionPayload["kind"], string> = {
   verify: "Employee information verified.",
@@ -137,6 +147,19 @@ function formatRequestNote(note: string) {
   return { customNote, fields };
 }
 
+function requestNoteValue(note: string, label: string) {
+  const field = note
+    .split(/\s*\|\s*/)
+    .map((part) => part.trim())
+    .find((part) => part.toLowerCase().startsWith(`${label.toLowerCase()}:`));
+  return field?.slice(label.length + 1).trim() ?? "";
+}
+
+function requestEmploymentDate(note: string, label: string) {
+  const value = requestNoteValue(note, label);
+  return value.toLowerCase() === "present" || value.toLowerCase() === "not provided" ? "" : value;
+}
+
 function normalizePurposeChoice(value: string) {
   return COE_PURPOSE_OPTIONS.includes(value as (typeof COE_PURPOSE_OPTIONS)[number])
     ? value
@@ -156,6 +179,7 @@ interface CoeTemplatePayload {
   id: string;
   employeeName: string;
   dateHired: string;
+  employmentEndDate: string;
   position: string;
   department: string;
   compensationWords: string;
@@ -201,8 +225,9 @@ function CoeDetailPage() {
   const [templateFields, setTemplateFields] = useState({
     employeeName: "",
     dateHired: "",
+    employmentEndDate: "",
     position: "",
-    compensationWords: "",
+    department: "",
     compensationAmount: "",
     purpose: "",
     issueDate: new Date().toISOString().slice(0, 10),
@@ -279,8 +304,8 @@ function CoeDetailPage() {
               <RefreshCw className="h-4 w-4" aria-hidden /> Try again
             </Button>
             <Button asChild variant="ghost">
-              <Link to={isStaff ? "/hrdo/requests" : "/hrdo/dashboard"}>
-                {isStaff ? "Back to COE Requests" : "Back to My COE Requests"}
+              <Link to={isStaff ? "/hrdo/requests" : "/hrdo/coe"}>
+                {isStaff ? "Back to COE Requests" : "New COE Request"}
               </Link>
             </Button>
           </div>
@@ -295,11 +320,8 @@ function CoeDetailPage() {
       <Section title="COE request not found">
         <EmptyState title="We couldn't find this COE request.">
           It may have been removed, or it does not belong to your account.{" "}
-          <Link
-            to={isStaff ? "/hrdo/requests" : "/hrdo/dashboard"}
-            className="text-primary underline"
-          >
-            View COE requests
+          <Link to={isStaff ? "/hrdo/requests" : "/hrdo/coe"} className="text-primary underline">
+            Go to COE request form
           </Link>
         </EmptyState>
       </Section>
@@ -308,17 +330,23 @@ function CoeDetailPage() {
 
   const actions = isStaff ? coeStaffActions(request) : [];
   const canDownload = coeCanDownloadDocument(request, isStaff ? "staff" : "requestor");
-  const includesCompensation =
-    /With compensation review/i.test(request.note) ||
-    /COE type:\s*COE with Compensation/i.test(request.note);
+  const isThirdPartyVerifier = /(?:^|\| )Requestor type: Third-Party Verifier/i.test(request.note);
+  const includesCompensation = coeRequestsCompensation(request.note);
   const viewerName = hrdoViewer.name;
 
   function pickFile(event: React.ChangeEvent<HTMLInputElement>) {
     const selected = event.target.files?.[0];
     event.target.value = "";
     if (!selected) return;
-    if (selected.type !== "application/pdf") {
-      toast.error("Choose the signed COE as a PDF file.");
+    const extension = selected.name.split(".").pop()?.toLowerCase();
+    const mime =
+      extension === "pdf"
+        ? COE_DOCUMENT_MIMES.pdf
+        : extension === "docx"
+          ? COE_DOCUMENT_MIMES.docx
+          : "";
+    if (!mime || (selected.type && selected.type !== mime)) {
+      toast.error("Choose the signed COE as a PDF or Word (.docx) file.");
       return;
     }
     if (selected.size > COE_MAX_DOCUMENT_BYTES) {
@@ -326,7 +354,10 @@ function CoeDetailPage() {
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => setFile({ name: selected.name, dataUrl: String(reader.result) });
+    reader.onload = () => {
+      const dataUrl = String(reader.result).replace(/^data:[^;,]*;base64,/, `data:${mime};base64,`);
+      setFile({ name: selected.name, dataUrl });
+    };
     reader.onerror = () => toast.error("We couldn't read that file. Try another copy.");
     reader.readAsDataURL(selected);
   }
@@ -335,10 +366,18 @@ function CoeDetailPage() {
     return {
       id,
       employeeName: templateFields.employeeName.trim() || request.employeeName,
-      dateHired: templateFields.dateHired,
+      dateHired:
+        templateFields.dateHired.trim() || requestEmploymentDate(request.note, "Date hired"),
+      employmentEndDate:
+        templateFields.employmentEndDate.trim() ||
+        requestEmploymentDate(request.note, "Employment end date"),
       position: templateFields.position,
-      department: request.department,
-      compensationWords: templateFields.compensationWords,
+      department:
+        templateFields.department.trim() ||
+        (isThirdPartyVerifier
+          ? ""
+          : requestNoteValue(request.note, "Department") || request.department),
+      compensationWords: compensationAmountToWords(templateFields.compensationAmount),
       compensationAmount: templateFields.compensationAmount,
       purpose: templateFields.purpose.trim() || request.purpose,
       issueDate: templateFields.issueDate,
@@ -376,6 +415,7 @@ function CoeDetailPage() {
       const result = await unwrap(sendCoeTemplateFn({ data: preview.payload }));
       setPreview(null);
       setSentTo(result.recipientEmail);
+      setActive(null);
       toast.success(`Word template sent to ${result.recipientEmail}.`);
       await queryClient.invalidateQueries({ queryKey: ["coe"] });
     } catch (error) {
@@ -399,13 +439,19 @@ function CoeDetailPage() {
 
   const templateInputs: [string, string, string][] = [
     ["employeeName", "Employee name", request.employeeName],
-    ["dateHired", "Date hired", ""],
+    ["dateHired", "Date hired", requestEmploymentDate(request.note, "Date hired")],
+    ...(isThirdPartyVerifier
+      ? [
+          [
+            "employmentEndDate",
+            "Last day of employment",
+            requestEmploymentDate(request.note, "Employment end date"),
+          ] as [string, string, string],
+        ]
+      : []),
     ["position", "Position / designation", ""],
     ...(includesCompensation
-      ? ([
-          ["compensationWords", "Compensation in words", ""],
-          ["compensationAmount", "Compensation amount", ""],
-        ] as [string, string, string][])
+      ? ([["compensationAmount", "Compensation amount", ""]] as [string, string, string][])
       : []),
     ["purpose", "Purpose", request.purpose],
     ["issueDate", "Issue date", templateFields.issueDate],
@@ -424,8 +470,8 @@ function CoeDetailPage() {
         }
         actions={
           <Button asChild variant="outline">
-            <Link to={isStaff ? "/hrdo/requests" : "/hrdo/dashboard"}>
-              {isStaff ? "Back to COE Requests" : "Back to My COE Requests"}
+            <Link to={isStaff ? "/hrdo/requests" : "/hrdo/coe"}>
+              {isStaff ? "Back to COE Requests" : "New COE Request"}
             </Link>
           </Button>
         }
@@ -526,8 +572,9 @@ function CoeDetailPage() {
                 <DialogHeader>
                   <DialogTitle>COE template details</DialogTitle>
                   <DialogDescription>
-                    Fill in the details and generate the Word template, then email it to the requestor.
-                    If the filled template is not correct, edit the Word file before sending it.
+                    Fill in the details and generate the Word template, then email it to the
+                    requestor. If the filled template is not correct, edit the Word file before
+                    sending it.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
@@ -538,9 +585,21 @@ function CoeDetailPage() {
                         <Input
                           id={`template-${keyName}`}
                           className="mt-1"
-                          type={keyName === "issueDate" ? "date" : "text"}
-                          value={templateFields[keyName as keyof typeof templateFields]}
+                          type={
+                            keyName === "issueDate" ||
+                            keyName === "dateHired" ||
+                            keyName === "employmentEndDate"
+                              ? "date"
+                              : "text"
+                          }
+                          value={
+                            templateFields[keyName as keyof typeof templateFields] ||
+                            (keyName === "dateHired" || keyName === "employmentEndDate"
+                              ? placeholder
+                              : "")
+                          }
                           placeholder={placeholder}
+                          required={isThirdPartyVerifier && keyName === "employmentEndDate"}
                           onChange={(event) => {
                             setTemplateFields((current) => ({
                               ...current,
@@ -557,11 +616,29 @@ function CoeDetailPage() {
                       <Input
                         id="template-department"
                         className="mt-1"
-                        value={request.department}
-                        readOnly
+                        value={
+                          templateFields.department ||
+                          (isThirdPartyVerifier
+                            ? ""
+                            : requestNoteValue(request.note, "Department") || request.department)
+                        }
+                        placeholder={
+                          isThirdPartyVerifier
+                            ? "Enter the former employee's department / office"
+                            : "Department / office"
+                        }
+                        onChange={(event) => {
+                          setTemplateFields((current) => ({
+                            ...current,
+                            department: event.target.value,
+                          }));
+                          setPreview(null);
+                          setSentTo("");
+                        }}
                       />
                     </div>
-                  </div>                    <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+                  </div>{" "}
+                  <div className="space-y-2 rounded-md border bg-muted/30 p-3">
                     <div className="flex flex-col gap-2 sm:flex-row">
                       {request.status !== "processing" && (
                         <Button
@@ -570,7 +647,13 @@ function CoeDetailPage() {
                           disabled={action.isPending}
                           onClick={() => action.mutate({ kind: "process" })}
                         >
-                          {action.isPending ? "Starting processing…" : "Start processing"}
+                          {action.isPending
+                            ? request.status === "awaiting_review"
+                              ? "Resuming processing…"
+                              : "Starting processing…"
+                            : request.status === "awaiting_review"
+                              ? "Resume processing"
+                              : "Start processing"}
                         </Button>
                       )}
                       <Button
@@ -600,7 +683,9 @@ function CoeDetailPage() {
                         Sent to {sentTo}. Generate a new copy before sending again.
                       </p>
                     ) : preview ? (
-                      <div className="space-y-1">                              <p className="text-xs text-muted-foreground">
+                      <div className="space-y-1">
+                        {" "}
+                        <p className="text-xs text-muted-foreground">
                           Review copy ready:{" "}
                           <span className="font-medium text-foreground">{preview.fileName}</span>
                           {" · "}
@@ -611,10 +696,6 @@ function CoeDetailPage() {
                           >
                             Download again
                           </button>
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Open the file and check it before sending. The requestor receives this
-                          exact copy as a Word document.
                         </p>
                       </div>
                     ) : (
@@ -743,7 +824,7 @@ function CoeDetailPage() {
                           setFile(null);
                         }}
                       >
-                        {ACTION_LABELS[key]}
+                        {actionLabel(key, request.status)}
                       </Button>
 
                       {active === key && (
@@ -788,11 +869,13 @@ function CoeDetailPage() {
                           )}
                           {key === "upload_document" && (
                             <>
-                              <Label htmlFor="coe-pdf">Signed COE (PDF, max 5 MB)</Label>
+                              <Label htmlFor="coe-document">
+                                Signed COE (PDF or Word .docx, max 5 MB)
+                              </Label>
                               <Input
-                                id="coe-pdf"
+                                id="coe-document"
                                 type="file"
-                                accept="application/pdf"
+                                accept={`.pdf,.docx,${COE_DOCUMENT_MIMES.pdf},${COE_DOCUMENT_MIMES.docx}`}
                                 onChange={pickFile}
                               />
                               {file && (
@@ -811,7 +894,9 @@ function CoeDetailPage() {
                                 {key === "verify"
                                   ? "Confirm the name, Employee ID, department and employment details against HR records before continuing."
                                   : key === "process"
-                                    ? "Start processing first, then download the approved template, fill it with the request details, export it as a PDF, have it signed, and upload the signed PDF."
+                                    ? request.status === "awaiting_review"
+                                      ? "Resume COE preparation after the requestor reviews the filled Word template, then continue with signing and release."
+                                      : "Start processing first, then prepare the COE, have it signed, and upload the signed document."
                                     : "The printed, signed COE is now waiting at the HRDO desk."}
                               </p>
                             </div>
@@ -848,7 +933,7 @@ function CoeDetailPage() {
                                 });
                               } else if (key === "upload_document") {
                                 if (!file) {
-                                  toast.error("Choose the signed PDF first.");
+                                  toast.error("Choose the signed COE document first.");
                                   return;
                                 }
                                 action.mutate({
@@ -862,7 +947,7 @@ function CoeDetailPage() {
                             {action.isPending ? (
                               <ButtonLoading label="Saving…" />
                             ) : (
-                              ACTION_LABELS[key]
+                              actionLabel(key, request.status)
                             )}
                           </Button>
                         </div>
@@ -888,7 +973,8 @@ function staffHint(status: CoeStatus) {
     pending: "New request. Verify the employee details, then start processing.",
     under_review: "Verify the employee details against official HR records.",
     correction_requested: "Waiting for the employee to submit the corrected details.",
-    processing: "Prepare the COE, upload the signed PDF for soft copies, then release it.",
+    processing: "Prepare the COE, upload the signed document for soft copies, then release it.",
+    awaiting_review: "Filled Word template sent. Resume processing after the requestor reviews it.",
     ready_for_pickup:
       "The printed COE is waiting at the HRDO desk. Record the release when claimed.",
     released: "This request is complete and recorded in the request history.",
@@ -983,7 +1069,7 @@ function DocumentPanel({
           <p className="flex items-start gap-2">
             <FileCheck2 className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden />
             <span className="min-w-0 break-words">
-              {request.documentFileName || "Signed COE.pdf"}
+              {request.documentFileName || "Signed COE document"}
             </span>
           </p>
           {canDownload ? (
@@ -1012,9 +1098,9 @@ function DocumentPanel({
         <p className="text-sm text-muted-foreground">
           {expectsDocument
             ? isStaff
-              ? "No signed PDF has been uploaded yet. Upload it while processing the request."
+              ? "No signed COE document has been uploaded yet. Upload it while processing the request."
               : "HRDO will upload the signed COE here once it is finalized."
-            : "This request is for an original printed copy, so no PDF is uploaded."}
+            : "This request is for an original printed copy, so no document is uploaded."}
         </p>
       )}
     </Section>

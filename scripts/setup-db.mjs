@@ -242,7 +242,7 @@ try {
     [dbName],
   );
   const coeStatusEnum =
-    "ENUM('pending','under_review','correction_requested','processing','ready_for_pickup','released','rejected')";
+    "ENUM('pending','under_review','correction_requested','processing','awaiting_review','ready_for_pickup','released','rejected')";
   if (coeColumns.size && !String(coeStatusColumn[0]?.columnType ?? "").includes("'released'")) {
     // Map the previous four-state workflow onto the expanded lifecycle before narrowing the enum.
     await conn.query(
@@ -256,6 +256,28 @@ try {
     );
     await conn.query(
       `ALTER TABLE hrdo_coe_requests MODIFY status ${coeStatusEnum} NOT NULL DEFAULT 'pending'`,
+    );
+  }
+  if (
+    coeColumns.size &&
+    !String(coeStatusColumn[0]?.columnType ?? "").includes("'awaiting_review'")
+  ) {
+    await conn.query(
+      `ALTER TABLE hrdo_coe_requests MODIFY status ${coeStatusEnum} NOT NULL DEFAULT 'pending'`,
+    );
+  }
+  const [coeHistoryTypeColumn] = await conn.query(
+    `SELECT COLUMN_TYPE AS columnType
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'hrdo_coe_history' AND COLUMN_NAME = 'type'`,
+    [dbName],
+  );
+  if (
+    coeHistoryTypeColumn.length &&
+    !String(coeHistoryTypeColumn[0]?.columnType ?? "").includes("'template_sent'")
+  ) {
+    await conn.query(
+      `ALTER TABLE hrdo_coe_history MODIFY type ENUM('submitted','verified','correction_requested','resubmitted','processing','template_sent','document_uploaded','ready_for_pickup','released','rejected') NOT NULL`,
     );
   }
   for (const [column, definition] of [

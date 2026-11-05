@@ -47,11 +47,25 @@ function sameState(expected: string, actual: string): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-async function googleJson<T>(url: string, init: RequestInit): Promise<T | null> {
+async function googleJson<T>(
+  url: string,
+  init: RequestInit,
+  onProviderError?: (providerCode: string) => void,
+): Promise<T | null> {
   try {
     const response = await fetch(url, { ...init, signal: AbortSignal.timeout(15_000) });
     if (!response.ok) {
-      console.error(`[google-signin] Google request failed (${response.status}).`);
+      let providerCode = "unknown";
+      try {
+        const body = (await response.json()) as { error?: unknown };
+        if (typeof body.error === "string" && /^[a-z_]+$/.test(body.error)) {
+          providerCode = body.error;
+        }
+      } catch {
+        // A non-JSON error response has no safe provider code to log.
+      }
+      console.error(`[google-signin] Google request failed (${response.status}, ${providerCode}).`);
+      onProviderError?.(providerCode);
       return null;
     }
     return (await response.json()) as T;
@@ -95,16 +109,21 @@ export const Route = createFileRoute("/api/auth/google/callback")({
           const savedState = cookieValue(request, GOOGLE_STATE_COOKIE) ?? "";
           const verifier = cookieValue(request, GOOGLE_VERIFIER_COOKIE) ?? "";
           if (!state || !savedState || !verifier || !sameState(savedState, state)) {
-            return failure("google_failed", cleared, mode);
+            console.warn("[google-signin] Callback rejected: missing or mismatched OAuth state.");
+            return failure("google_session", cleared, mode);
           }
           if (url.searchParams.get("error")) return failure("google_denied", cleared, mode);
 
           const code = url.searchParams.get("code");
-          if (!code) return failure("google_failed", cleared, mode);
+          if (!code) {
+            console.warn("[google-signin] Callback rejected: authorization code was missing.");
+            return failure("google_session", cleared, mode);
+          }
 
           const { clientId, clientSecret } = googleSignInCredentials();
           if (!clientId || !clientSecret) return failure("google_unavailable", cleared, mode);
 
+          let tokenErrorCode = "google_token";
           const tokens = await googleJson<GoogleTokenResponse>(
             "https://oauth2.googleapis.com/token",
             {
@@ -119,20 +138,34 @@ export const Route = createFileRoute("/api/auth/google/callback")({
                 grant_type: "authorization_code",
               }),
             },
+            (providerCode) => {
+              if (
+                ["invalid_client", "unauthorized_client", "redirect_uri_mismatch"].includes(
+                  providerCode,
+                )
+              ) {
+                tokenErrorCode = "google_configuration";
+              } else if (providerCode === "invalid_grant") {
+                tokenErrorCode = "google_session";
+              }
+            },
           );
-          if (!tokens?.access_token) return failure("google_failed", cleared, mode);
+          if (!tokens?.access_token) return failure(tokenErrorCode, cleared, mode);
 
           const identity = await googleJson<GoogleUserInfo>(
             "https://openidconnect.googleapis.com/v1/userinfo",
             { headers: { Authorization: `Bearer ${tokens.access_token}` } },
           );
           if (!identity?.email || !(identity.email_verified ?? identity.verified_email)) {
-            return failure("google_failed", cleared, mode);
+            return failure("google_profile", cleared, mode);
           }
 
           const email = normaliseEmail(identity.email);
 
           if (mode === "hrdo") {
+            const accountProblem = googleAccountProblem(email, null);
+            if (accountProblem) return failure(accountProblem, cleared, mode);
+
             const [{ ensureHrdoGoogleAccount, hrdoCreateSession }, { encryptedCookieRequired }] =
               await Promise.all([import("@/server/hrdo/auth"), import("@/server/env")]);
 
@@ -189,7 +222,7 @@ export const Route = createFileRoute("/api/auth/google/callback")({
           console.error(
             `[google-signin] Callback failed: ${error instanceof Error ? error.message : "unknown error"}`,
           );
-          return failure("google_failed", cleared, mode);
+          return failure("google_server", cleared, mode);
         }
       },
     },

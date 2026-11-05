@@ -1,9 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
+import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import InputOTPWithResendTimer from "@/components/shadcn-studio/input-otp/input-otp-04";
-import { requestHrdoPasswordRecoveryFn, resetHrdoPasswordWithRecoveryCodeFn } from "@/server-functions";
+import {
+  requestHrdoPasswordRecoveryFn,
+  resetHrdoPasswordWithRecoveryCodeFn,
+} from "@/server-functions";
 import { passwordIssues } from "@/lib/validation";
 
 export const Route = createFileRoute("/hrdo/forgot-password")({ component: HrdoForgotPassword });
@@ -20,10 +24,15 @@ function HrdoForgotPassword() {
   async function sendCode(event: FormEvent) {
     event.preventDefault();
     if (busy) return;
-    setBusy(true); setError(""); setMessage("");
+    setBusy(true);
+    setError("");
+    setMessage("");
     const result = await requestHrdoPasswordRecoveryFn({ data: { email } });
     setBusy(false);
-    if (!result.ok) { setError(result.error); return; }
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
     setSent(true);
     setMessage("If an HRDO account exists for this email, a recovery code has been sent.");
   }
@@ -32,21 +41,43 @@ function HrdoForgotPassword() {
     event.preventDefault();
     if (busy) return;
     const issues = passwordIssues(newPassword);
-    if (issues.length) { setError(`Password must contain ${issues.join(", ")}.`); return; }
-    setBusy(true); setError("");
-    const result = await resetHrdoPasswordWithRecoveryCodeFn({ data: { email, code, newPassword } });
+    if (issues.length) {
+      setError(`Password must contain ${issues.join(", ")}.`);
+      return;
+    }
+    setBusy(true);
+    setError("");
+    const result = await resetHrdoPasswordWithRecoveryCodeFn({
+      data: { email, code, newPassword },
+    });
     setBusy(false);
-    if (!result.ok) { setError(result.error); return; }
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
     window.location.assign("/hrdo/login?reset=success");
   }
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-muted/30 px-4 py-10">
       <section className="w-full max-w-md rounded-lg border bg-card p-6 shadow-sm sm:p-8">
+        <Link
+          to="/hrdo/login"
+          className="mb-4 inline-flex w-fit items-center gap-1.5 text-sm font-semibold text-primary hover:underline"
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden />
+          Back to Sign In
+        </Link>
         <h1 className="text-2xl font-semibold">Recover HRDO password</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Use your HRDO account email to receive a six-digit code.</p>
-        {error && <p className="mt-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
-        {message && <p className="mt-4 rounded-md bg-success/10 p-3 text-sm text-success">{message}</p>}
+        <p className="mt-2 text-sm text-muted-foreground">
+          Use your HRDO account email to receive a six-digit code.
+        </p>
+        {error && (
+          <p className="mt-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
+        )}
+        {message && (
+          <p className="mt-4 rounded-md bg-success/10 p-3 text-sm text-success">{message}</p>
+        )}
         {!sent ? (
           <form onSubmit={sendCode} className="mt-6 space-y-4">
             <label className="block space-y-1.5 text-sm font-medium">
@@ -61,7 +92,9 @@ function HrdoForgotPassword() {
                 onChange={(event) => setEmail(event.target.value)}
               />
             </label>
-            <Button className="w-full" disabled={busy}>{busy ? "Sending…" : "Send recovery code"}</Button>
+            <Button className="w-full" disabled={busy}>
+              {busy ? "Sending…" : "Send recovery code"}
+            </Button>
           </form>
         ) : (
           <form onSubmit={reset} className="mt-6 space-y-4">
@@ -90,10 +123,11 @@ function HrdoForgotPassword() {
                 onChange={(event) => setNewPassword(event.target.value)}
               />
             </label>
-            <Button className="w-full" disabled={busy}>{busy ? "Updating…" : "Update password"}</Button>
+            <Button className="w-full" disabled={busy}>
+              {busy ? "Updating…" : "Update password"}
+            </Button>
           </form>
         )}
-        <Link to="/hrdo/login" className="mt-6 inline-block text-sm text-primary underline-offset-4 hover:underline">Back to HRDO sign in</Link>
       </section>
     </main>
   );

@@ -4,6 +4,18 @@ const email = z.string().trim().toLowerCase().min(3).max(190).email("Enter a val
 
 export const INSTITUTIONAL_EMAIL_DOMAIN = "lyceumalabang.edu.ph";
 
+export function normalizePhilippineMobileNumber(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (!/^\+?[0-9().\-\s]+$/.test(trimmed)) return null;
+
+  const digits = trimmed.replace(/\D/g, "");
+  if (digits.length === 11 && digits.startsWith("09")) return digits;
+  if (digits.length === 10 && digits.startsWith("9")) return `0${digits}`;
+  if (digits.length === 12 && digits.startsWith("639")) return `+${digits}`;
+  return null;
+}
+
 const personName = z
   .string()
   .trim()
@@ -33,7 +45,6 @@ export function passwordIssues(value: string): string[] {
   if (!/[^A-Za-z0-9]/.test(value)) issues.push("a symbol");
   return issues;
 }
-
 
 export const password = z
   .string()

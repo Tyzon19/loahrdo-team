@@ -47,6 +47,7 @@ const requests: CoeRequest[] = [
   request({ id: "aaaaaaaa-1111-4111-8111-111111111111", status: "pending" }),
   request({ purpose: "Scholarship application", status: "under_review" }),
   request({ purpose: "Employment verification", status: "processing", copyType: "soft" }),
+  request({ purpose: "Template review", status: "awaiting_review" }),
   request({
     id: "bbbbbbbb-1111-4111-8111-111111111111",
     purpose: "Visa requirement",
@@ -65,8 +66,16 @@ const requests: CoeRequest[] = [
 describe("COE requestor summary", () => {
   it("counts every request in exactly one card", () => {
     const counts = coeRequestorCounts(requests);
-    expect(counts).toEqual({ review: 2, processing: 1, action: 1, ready: 2 });
-    expect(counts.review + counts.processing + counts.action + counts.ready).toBe(requests.length);
+    expect(counts).toEqual({
+      review: 2,
+      processing: 1,
+      awaiting_review: 1,
+      action: 1,
+      ready: 2,
+    });
+    expect(
+      counts.review + counts.processing + counts.awaiting_review + counts.action + counts.ready,
+    ).toBe(requests.length);
   });
 
   it("groups correction requests and rejections under Needs Action", () => {
@@ -75,17 +84,18 @@ describe("COE requestor summary", () => {
         request({ status: "correction_requested" }),
         request({ status: "rejected" }),
       ]),
-    ).toEqual({ review: 0, processing: 0, action: 2, ready: 0 });
+    ).toEqual({ review: 0, processing: 0, awaiting_review: 0, action: 2, ready: 0 });
   });
 });
 
 describe("HR workload summary", () => {
   it("counts each queue and keeps deadline urgency separate", () => {
     const summary = hrCoeSummary(requests, NOW);
-    expect(summary.total).toBe(6);
+    expect(summary.total).toBe(7);
     expect(summary.newCount).toBe(1);
     expect(summary.underReview).toBe(1);
     expect(summary.processing).toBe(1);
+    expect(summary.awaitingReview).toBe(1);
     expect(summary.readyForPickup).toBe(1);
     expect(summary.released).toBe(1);
     expect(summary.dueSoon + summary.overdue).toBe(0);
@@ -113,6 +123,7 @@ describe("COE deadline", () => {
 
   it("reports overdue, due soon and on track", () => {
     expect(coeDeadlineInfo("2026-10-27T12:00:00Z", "processing", NOW).state).toBe("overdue");
+    expect(coeDeadlineInfo("2026-10-27T12:00:00Z", "awaiting_review", NOW).state).toBe("overdue");
     expect(coeDeadlineInfo("2026-10-29T06:00:00Z", "pending", NOW).state).toBe("due_soon");
     expect(coeDeadlineInfo("2026-10-31T09:00:00Z", "pending", NOW).state).toBe("on_track");
   });
@@ -121,6 +132,7 @@ describe("COE deadline", () => {
 describe("COE filtering", () => {
   it("filters by status", () => {
     expect(filterCoeRequests(requests, { status: "rejected" })).toHaveLength(1);
+    expect(filterCoeRequests(requests, { status: "awaiting_review" })).toHaveLength(1);
   });
 
   it("searches by request ID, purpose, employee name and Employee ID", () => {
@@ -177,6 +189,7 @@ describe("COE staff processing actions", () => {
   });
 
   it("offers release only once the printed copy is ready", () => {
+    expect(coeStaffActions({ ...base, status: "awaiting_review" })).toEqual(["process"]);
     expect(coeStaffActions({ ...base, status: "ready_for_pickup" })).toEqual(["release"]);
     expect(coeStaffActions({ ...base, status: "released" })).toEqual([]);
     expect(coeStaffActions({ ...base, status: "correction_requested" })).toEqual([]);

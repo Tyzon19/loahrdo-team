@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
-import { Link, useRouter, useRouterState } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import {
   ChevronDown,
   FileBadge,
@@ -20,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { hrdoLogoutFn } from "@/server-functions";
 import { LoadingScreen } from "@/components/app/LoadingPanel";
+import { unwrap } from "@/lib/api";
 import type { HrdoViewer } from "@/lib/hrdo";
 
 type NavItem = {
@@ -44,13 +46,6 @@ function navItems(user: HrdoViewer): NavItem[] {
     ];
   }
   return [
-    {
-      to: "/hrdo/dashboard",
-      label: "My COE Requests",
-      mobileLabel: "COE",
-      icon: LayoutDashboard,
-      alsoStartsWith: ["/hrdo/coe/"],
-    },
     {
       to: "/hrdo/coe",
       label: "New COE Request",
@@ -163,17 +158,22 @@ function MobileNav({ items, onNavigate }: { items: NavItem[]; onNavigate?: () =>
 
 export function HrdoShell({ user, children }: { user: HrdoViewer; children: ReactNode }) {
   const [signingOut, setSigningOut] = useState(false);
-  const router = useRouter();
   const queryClient = useQueryClient();
   const items = navItems(user);
 
   async function signOut() {
     if (signingOut) return;
     setSigningOut(true);
-    await hrdoLogoutFn();
-    queryClient.clear();
-    await router.invalidate();
-    window.location.assign("/#main-content");
+    try {
+      await unwrap(hrdoLogoutFn());
+      queryClient.clear();
+      window.location.replace("/#main-content");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "We couldn't sign you out. Please try again.",
+      );
+      setSigningOut(false);
+    }
   }
 
   return (
@@ -219,15 +219,15 @@ export function HrdoShell({ user, children }: { user: HrdoViewer; children: Reac
                 <DropdownMenuItem asChild>
                   <Link to="/hrdo/profile">Profile</Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link to="/hrdo/dashboard">
-                    {user.role === "hrdo_staff" ? "COE Dashboard" : "My COE Requests"}
-                  </Link>
-                </DropdownMenuItem>
                 {user.role === "hrdo_staff" && (
-                  <DropdownMenuItem asChild>
-                    <Link to="/hrdo/requests">COE Requests</Link>
-                  </DropdownMenuItem>
+                  <>
+                    <DropdownMenuItem asChild>
+                      <Link to="/hrdo/dashboard">COE Dashboard</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to="/hrdo/requests">COE Requests</Link>
+                    </DropdownMenuItem>
+                  </>
                 )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={signOut}>

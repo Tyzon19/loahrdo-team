@@ -53,7 +53,7 @@ function ForgotPasswordPage() {
   }
 
   return (
-    <AuthLayout title="Reset Password">
+    <AuthLayout title="Reset Password" back>
       <p className="mb-4 text-sm text-muted-foreground">
         Enter the email address linked to your account and we&apos;ll send you a code to reset your
         password.

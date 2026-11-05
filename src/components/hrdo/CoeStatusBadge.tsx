@@ -19,6 +19,7 @@ const MAP: Record<CoeStatus, { icon: typeof Clock; cls: string }> = {
     cls: "bg-warning-soft text-warning border-warning/30",
   },
   processing: { icon: CircleDot, cls: "bg-warning-soft text-warning border-warning/30" },
+  awaiting_review: { icon: Eye, cls: "bg-info-soft text-primary border-primary/25" },
   ready_for_pickup: {
     icon: PackageCheck,
     cls: "bg-success-soft text-success border-success/30",

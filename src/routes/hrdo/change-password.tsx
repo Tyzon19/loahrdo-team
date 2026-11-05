@@ -67,7 +67,7 @@ function HrdoChangePassword() {
 
     await router.invalidate();
     toast.success("Password updated.");
-    await navigate({ to: "/hrdo/dashboard" });
+    await navigate({ to: hrdoViewer.role === "hrdo_staff" ? "/hrdo/dashboard" : "/hrdo/coe" });
   }
 
   return (

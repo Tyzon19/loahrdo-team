@@ -492,6 +492,7 @@ export async function sendCoeStatusEmail(input: {
     | "correction_requested"
     | "rejected"
     | "processing"
+    | "awaiting_review"
     | "ready_for_pickup"
     | "released";
   title: string;
@@ -511,6 +512,7 @@ export async function sendCoeStatusEmail(input: {
       correction_requested: "Action needed for your COE request",
       rejected: "Your COE request was not approved",
       processing: "Your COE request is being processed",
+      awaiting_review: "Your filled COE template is ready for review",
       ready_for_pickup: "Your COE is ready for pickup",
       released: "Your COE has been released",
     };

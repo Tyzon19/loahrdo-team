@@ -227,7 +227,7 @@ function RegisterPage() {
         />
       )}
 
-      <AuthLayout title={verificationStarted ? "Verify Your Email" : "Create Account"}>
+      <AuthLayout title={verificationStarted ? "Verify Your Email" : "Create Account"} back>
         <form onSubmit={onSubmit} noValidate>
           {error && (
             <p className="mb-3 text-sm text-destructive" role="alert">

@@ -3,7 +3,9 @@ import { serverEnv, serverEnvOptional } from "./env";
 
 const DB_CONNECTION_LIMIT = 5;
 
-let poolPromise: Promise<Pool> | undefined;
+const globalForDb = globalThis as typeof globalThis & {
+  __loaDbPoolPromise?: Promise<Pool>;
+};
 
 function slowQueryThresholdMs() {
   const raw = serverEnvOptional("DB_SLOW_QUERY_MS");
@@ -28,6 +30,7 @@ export async function getPool(): Promise<Pool> {
   if (typeof window !== "undefined") {
     throw new Error("Database access is server-only.");
   }
+  let poolPromise = globalForDb.__loaDbPoolPromise;
   if (!poolPromise) {
     poolPromise = (async () => {
       const mysql = await import("mysql2/promise");
@@ -47,22 +50,16 @@ export async function getPool(): Promise<Pool> {
         enableKeepAlive: true,
       });
     })();
+    globalForDb.__loaDbPoolPromise = poolPromise;
   }
-  return poolPromise;
-}
-
-if (import.meta.hot) {
-  import.meta.hot.dispose(() => {
-    void poolPromise
-      ?.then((pool) => pool.end())
-      .catch((error: unknown) => {
-        console.error(
-          `[db] Failed to close the previous development pool: ${
-            error instanceof Error ? error.message : "unknown error"
-          }`,
-        );
-      });
-  });
+  try {
+    return await poolPromise;
+  } catch (error) {
+    if (globalForDb.__loaDbPoolPromise === poolPromise) {
+      delete globalForDb.__loaDbPoolPromise;
+    }
+    throw error;
+  }
 }
 
 export type Db = Pool | PoolConnection;
