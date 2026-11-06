@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
@@ -38,6 +38,11 @@ import type { EmailMessage } from "@/lib/types";
 import { FACEBOOK_URL, LOGO_URL } from "@/components/AuthLayout";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
+  beforeLoad: ({ context }) => {
+    if (context.viewer?.role === "requisitioner") {
+      throw redirect({ to: "/requests/new" });
+    }
+  },
   head: () => ({
     meta: [
       { title: "LOA HRDO Desk | Lyceum of Alabang" },
@@ -77,7 +82,7 @@ const SERVICES: Service[] = [
   },
   {
     title: "COE Request",
-    desc: "Request your Certificate of Employment in a few clicks.",
+    desc: "Request your Certificate of Employment.",
     icon: FileBadge,
     tag: "Documents",
     to: "/hrdo/coe",
@@ -105,8 +110,6 @@ function Dashboard() {
 function ServicesDashboard() {
   const [q, setQ] = useState("");
   const [signingOut, setSigningOut] = useState(false);
-  const navigate = useNavigate();
-  const router = useRouter();
   const queryClient = useQueryClient();
   const list = SERVICES.filter((service) =>
     `${service.title} ${service.desc} ${service.tag}`.toLowerCase().includes(q.toLowerCase()),
@@ -118,8 +121,7 @@ function ServicesDashboard() {
     try {
       await unwrap(logoutFn());
       queryClient.clear();
-      await router.invalidate();
-      navigate({ to: "/" });
+      window.location.replace("/#main-content");
     } catch {
       toast.error("We couldn't sign you out. Please try again.");
       setSigningOut(false);
@@ -252,7 +254,7 @@ function ServicesDashboard() {
       <footer className="bg-primary text-primary-foreground">
         <div className="mx-auto grid max-w-6xl gap-6 px-4 py-10 text-xs font-semibold uppercase tracking-wide sm:px-6 md:grid-cols-3 md:items-center">
           <div className="flex items-center gap-3">
-            Follow us
+            Message us
             <a
               href={FACEBOOK_URL}
               target="_blank"

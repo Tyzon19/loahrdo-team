@@ -238,6 +238,13 @@ export const createAssistantAccountSchema = z.object({
   department,
 });
 
+export const createHrdoProcessorAccountSchema = z.object({
+  name: personName,
+  email: email.refine(institutionalEmailAllowed, "Use your @lyceumalabang.edu.ph address."),
+  department,
+  isHrdoAdmin: z.boolean().default(false),
+});
+
 export const resetUserPasswordSchema = z.object({
   userId: z.string().uuid(),
 });

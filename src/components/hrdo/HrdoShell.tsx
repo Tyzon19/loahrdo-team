@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   ChevronDown,
+  BarChart3,
   FileBadge,
   LayoutDashboard,
   LogOut,
@@ -22,7 +23,7 @@ import { cn } from "@/lib/utils";
 import { hrdoLogoutFn } from "@/server-functions";
 import { LoadingScreen } from "@/components/app/LoadingPanel";
 import { unwrap } from "@/lib/api";
-import type { HrdoViewer } from "@/lib/hrdo";
+import { canManageHrdoAccounts, isHrdoStaffRole, type HrdoViewer } from "@/lib/hrdo";
 
 type NavItem = {
   to: string;
@@ -34,7 +35,7 @@ type NavItem = {
 };
 
 function navItems(user: HrdoViewer): NavItem[] {
-  if (user.role === "hrdo_staff") {
+  if (isHrdoStaffRole(user.role)) {
     return [
       {
         to: "/hrdo/dashboard",
@@ -42,6 +43,16 @@ function navItems(user: HrdoViewer): NavItem[] {
         mobileLabel: "Overview",
         icon: LayoutDashboard,
       },
+      ...(canManageHrdoAccounts(user)
+        ? [
+            {
+              to: "/hrdo/analytics",
+              label: "COE Analytics",
+              mobileLabel: "Analytics",
+              icon: BarChart3,
+            },
+          ]
+        : []),
       { to: "/hrdo/profile", label: "Profile", mobileLabel: "Profile", icon: UserRound },
     ];
   }
@@ -197,7 +208,7 @@ export function HrdoShell({ user, children }: { user: HrdoViewer; children: Reac
             />
           </div>
           <span className="truncate text-sm font-semibold">
-            {user.role === "hrdo_staff" ? "HRDO Staff Portal" : "Employee Portal"}
+            {canManageHrdoAccounts(user) ? "HRDO Admin Portal" : isHrdoStaffRole(user.role) ? "HRDO Staff Portal" : "Employee Portal"}
           </span>
           <div className="ml-auto flex items-center gap-1">
             <DropdownMenu>
@@ -219,7 +230,7 @@ export function HrdoShell({ user, children }: { user: HrdoViewer; children: Reac
                 <DropdownMenuItem asChild>
                   <Link to="/hrdo/profile">Profile</Link>
                 </DropdownMenuItem>
-                {user.role === "hrdo_staff" && (
+                {isHrdoStaffRole(user.role) && (
                   <>
                     <DropdownMenuItem asChild>
                       <Link to="/hrdo/dashboard">COE Dashboard</Link>
@@ -227,6 +238,11 @@ export function HrdoShell({ user, children }: { user: HrdoViewer; children: Reac
                     <DropdownMenuItem asChild>
                       <Link to="/hrdo/requests">COE Requests</Link>
                     </DropdownMenuItem>
+                    {canManageHrdoAccounts(user) && (
+                      <DropdownMenuItem asChild>
+                        <Link to="/hrdo/analytics">COE Analytics</Link>
+                      </DropdownMenuItem>
+                    )}
                   </>
                 )}
                 <DropdownMenuSeparator />

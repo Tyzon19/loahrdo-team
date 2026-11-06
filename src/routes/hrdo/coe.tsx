@@ -55,13 +55,28 @@ import {
 const COE_STEPS = [
   {
     key: "type",
-    title: "Request type",
+    title: "Request Type",
     blurb: "Choose whether this is your own certificate or a verification for another employer.",
   },
   {
+    key: "copy",
+    title: "Type of Copy",
+    blurb: "Choose how you would like to receive the certificate.",
+  },
+  {
     key: "details",
-    title: "Request details",
-    blurb: "Schedule, delivery, and the information HRDO needs to prepare the certificate.",
+    title: "Details",
+    blurb: "Provide the schedule and information HRDO needs to prepare the certificate.",
+  },
+  {
+    key: "purpose",
+    title: "Purpose",
+    blurb: "Tell us how the certificate or verification will be used.",
+  },
+  {
+    key: "documents",
+    title: "Documents",
+    blurb: "Select the document details that should appear on the certificate.",
   },
   {
     key: "review",
@@ -90,7 +105,7 @@ function addWorkingDays(start: Date, count: number) {
 
 export const Route = createFileRoute("/hrdo/coe")({
   beforeLoad: ({ context }) => {
-    if (context.hrdoViewer?.role === "hrdo_staff") {
+    if (context.hrdoViewer?.role === "hrdo_staff" || context.hrdoViewer?.role === "hrdo_admin") {
       throw redirect({ to: "/hrdo/requests" });
     }
   },
@@ -127,6 +142,7 @@ function CoeRequestPage() {
   const [customDepartment, setCustomDepartment] = useState("");
   const [employmentStatus, setEmploymentStatus] = useState("");
   const [copyType, setCopyType] = useState<CoeCopyType>("original");
+  const [copyTypeSelected, setCopyTypeSelected] = useState(false);
   const [verifierCompany, setVerifierCompany] = useState("");
   const [verifierName, setVerifierName] = useState("");
   const [verifierEmail, setVerifierEmail] = useState("");
@@ -176,6 +192,7 @@ function CoeRequestPage() {
             ].join(" | ")
           : [
               `Requestor type: Third-Party Verifier`,
+              `Purpose of verification: ${purpose.trim()}`,
               `Subject title: ${subjectTitle}`,
               `Verifier company: ${verifierCompany || "Not provided"}`,
               `Authorized representative: ${verifierName || "Not provided"}`,
@@ -242,6 +259,7 @@ function CoeRequestPage() {
       setCustomDepartment("");
       setEmploymentStatus("");
       setCopyType("original");
+      setCopyTypeSelected(false);
       setVerifierCompany("");
       setVerifierName("");
       setVerifierEmail("");
@@ -287,7 +305,7 @@ function CoeRequestPage() {
             </p>
             {submissionSummary.copyType !== "soft" && (
               <p className="coe-success-message">
-                You will receive an email when your hardcopy is ready for pickup at HRDO.
+                You will receive an email when your hardcopy is ready for pickup at <strong>HUMAN RESOURCE DEVELOPMENT OFFICE.</strong>
               </p>
             )}
             <p className="coe-success-reference">
@@ -333,12 +351,13 @@ function CoeRequestPage() {
     if (key === "type" && !requestorType) {
       return "Choose Employee request or Third-party verification.";
     }
+    if (key === "copy" && !copyTypeSelected) {
+      return "Choose a copy type to continue.";
+    }
     if (key === "details") {
       if (!dateNeeded || dateNeeded < minimumDateNeeded) {
         return "Choose a date needed at least 3 working days from today.";
       }
-      const descriptionError = missingDescription();
-      if (descriptionError) return descriptionError;
       if (requestorType === "internal") {
         if (!employeeTitle) return "Select a title.";
         if (employeeName.firstName.trim().length < 2) return "Enter your first name.";
@@ -355,7 +374,6 @@ function CoeRequestPage() {
         const departmentName = department === "Other" ? customDepartment.trim() : department.trim();
         if (!departmentName) return "Choose your department or office, or specify Other.";
         if (!employmentStatus) return "Select your employment status.";
-        if (purpose.trim().length < 5) return "Enter the purpose of use.";
       }
       if (requestorType === "third_party") {
         if (!verifierCompany.trim()) return "Enter the verifying company or agency name.";
@@ -378,6 +396,15 @@ function CoeRequestPage() {
           return "Last day of employment cannot be in the future.";
         }
       }
+    }
+    if (key === "purpose" && purpose.trim().length < 5) {
+      return requestorType === "third_party"
+        ? "Enter the purpose of this employment verification."
+        : "Enter the purpose of use.";
+    }
+    if (key === "documents") {
+      const descriptionError = missingDescription();
+      if (descriptionError) return descriptionError;
     }
     if (key === "review") {
       if (!privacyChecked) return "Agree to the data privacy statement before submitting.";
@@ -418,7 +445,7 @@ function CoeRequestPage() {
       )}
       <div className="coe-request">
         <main className="coe-main">
-          <PageHeader title="CERTIFICATE OF EMPLOYMENT" description={currentBatch.blurb} />
+          <PageHeader title="Certificate of Employment" description={currentBatch.blurb} />
           <ol className="coe-steps" aria-label="Request progress">
             {COE_STEPS.map((step, index) => {
               const state =
@@ -478,6 +505,64 @@ function CoeRequestPage() {
             )}
 
             {currentStep === 1 && (
+              <Section title="Type of copy & delivery">
+                <p className="coe-section-description">
+                  Choose how you&apos;d like to receive your certificate.
+                </p>
+                <RadioGroup
+                  value={copyType}
+                  onValueChange={(value) => {
+                    setCopyType(value as CoeCopyType);
+                    setCopyTypeSelected(true);
+                  }}
+                  className="coe-deliveries"
+                  aria-label="Type of copy and delivery"
+                >
+                  {[
+                    {
+                      value: "original",
+                      label: "Hardcopy",
+                      description: "Original, pick up at HR",
+                      icon: FileText,
+                    },
+                    {
+                      value: "soft",
+                      label: "Softcopy",
+                      description: "Send PDF via email",
+                      icon: Mail,
+                    },
+                    {
+                      value: "both",
+                      label: "Both",
+                      description: "Hardcopy + Softcopy",
+                      icon: Layers,
+                    },
+                  ].map((option) => (
+                    <div className="coe-delivery-option" key={option.value}>
+                      <RadioGroupItem
+                        value={option.value}
+                        id={`copy-type-${option.value}`}
+                        className="coe-radio-hidden"
+                      />
+                      <Label htmlFor={`copy-type-${option.value}`} className="coe-delivery-label">
+                        <span className="coe-delivery-icon">
+                          <option.icon aria-hidden />
+                        </span>
+                        <span className="coe-delivery-copy">
+                          <span className="coe-delivery-name">{option.label}</span>
+                          <span className="coe-delivery-description">{option.description}</span>
+                        </span>
+                        {copyType === option.value && (
+                          <Check className="coe-delivery-check" aria-hidden />
+                        )}
+                      </Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+              </Section>
+            )}
+
+            {currentStep === 2 && (
               <>
                 <Section title="Request schedule">
                   <p className="coe-section-description">When do you need your certificate?</p>
@@ -510,66 +595,14 @@ function CoeRequestPage() {
                     </div>
                   </div>
                 </Section>
-                <Section title="Type of copy &amp; delivery">
-                  <p className="coe-section-description">
-                    Choose how you&apos;d like to receive it.
-                  </p>
-                  <RadioGroup
-                    value={copyType}
-                    onValueChange={(value) => setCopyType(value as CoeCopyType)}
-                    className="coe-deliveries"
-                    aria-label="Type of copy and delivery"
-                  >
-                    {[
-                      {
-                        value: "original",
-                        label: "Hardcopy",
-                        description: "Original, pick up at HR",
-                        icon: FileText,
-                      },
-                      {
-                        value: "soft",
-                        label: "Softcopy",
-                        description: "Digital PDF via email",
-                        icon: Mail,
-                      },
-                      {
-                        value: "both",
-                        label: "Both",
-                        description: "Hardcopy + Softcopy",
-                        icon: Layers,
-                      },
-                    ].map((option) => (
-                      <div className="coe-delivery-option" key={option.value}>
-                        <RadioGroupItem
-                          value={option.value}
-                          id={`copy-type-${option.value}`}
-                          className="coe-radio-hidden"
-                        />
-                        <Label htmlFor={`copy-type-${option.value}`} className="coe-delivery-label">
-                          <span className="coe-delivery-icon">
-                            <option.icon aria-hidden />
-                          </span>
-                          <span className="coe-delivery-copy">
-                            <span className="coe-delivery-name">{option.label}</span>
-                            <span className="coe-delivery-description">{option.description}</span>
-                          </span>
-                          {copyType === option.value && (
-                            <Check className="coe-delivery-check" aria-hidden />
-                          )}
-                        </Label>
-                      </div>
-                    ))}
-                  </RadioGroup>
-                </Section>
                 {requestorType === "internal" ? (
-                  <div className="space-y-5">
+                  <div className="space-y-4">
                     <Section title="Employee request details">
                       <p className="coe-section-description">
                         Your details for your own employment records.
                       </p>
 
-                      <div className="space-y-5">
+                      <div className="space-y-4">
                         <div className="coe-fields coe-fields-name">
                           <div>
                             <Label htmlFor="employee-title">Title</Label>
@@ -722,95 +755,17 @@ function CoeRequestPage() {
                           </div>
                         </div>
 
-                        <div>
-                          <Label htmlFor="purpose">Purpose of use</Label>
-                          <Textarea
-                            id="purpose"
-                            className="mt-1 min-h-24"
-                            value={purpose}
-                            onChange={(event) => setPurpose(event.target.value)}
-                            placeholder="Enter the purpose of use"
-                            maxLength={255}
-                            required
-                          />
-                        </div>
-                        <div className="coe-documents">
-                          <h3 className="coe-documents-title">Documents needed</h3>
-                          <div className="coe-document-grid">
-                            {COE_DESCRIPTION_OPTIONS.map((option) => (
-                              <label
-                                key={option}
-                                className="coe-document"
-                                data-selected={descriptionOptions.includes(option)}
-                              >
-                                <Checkbox
-                                  checked={descriptionOptions.includes(option)}
-                                  onCheckedChange={(checked) =>
-                                    setDescriptionOptions((current) =>
-                                      checked
-                                        ? [...current, option]
-                                        : current.filter((value) => value !== option),
-                                    )
-                                  }
-                                />
-                                {COE_DESCRIPTION_TEXT_OPTIONS.has(option) ? (
-                                  <span className="flex min-w-0 flex-1 items-center gap-1 text-sm">
-                                    <span className="shrink-0">{option}</span>
-                                    <Input
-                                      aria-label={`${option} details`}
-                                      className="h-8 min-w-0 flex-1"
-                                      value={descriptionDetails[option] ?? ""}
-                                      onChange={(event) =>
-                                        setDescriptionDetails((current) => ({
-                                          ...current,
-                                          [option]: event.target.value,
-                                        }))
-                                      }
-                                      placeholder="Specify"
-                                      maxLength={255}
-                                      disabled={!descriptionOptions.includes(option)}
-                                      onClick={(event) => event.stopPropagation()}
-                                    />
-                                  </span>
-                                ) : (
-                                  <span className="text-sm">{option}</span>
-                                )}
-                              </label>
-                            ))}
-                          </div>
-                          {descriptionOptions.includes(COE_DESCRIPTION_OTHER) && (
-                            <Input
-                              id="custom-description"
-                              className="mt-3"
-                              value={customDescription}
-                              onChange={(event) => setCustomDescription(event.target.value)}
-                              placeholder="Specify other description"
-                              maxLength={255}
-                            />
-                          )}
-                        </div>
-                        <div>
-                          <Label htmlFor="note">Additional note / special instructions</Label>
-                          <Textarea
-                            id="note"
-                            className="mt-1 min-h-28"
-                            value={note}
-                            onChange={(event) => setNote(event.target.value)}
-                            placeholder="e.g., Please address to BDO Bank"
-                            maxLength={2000}
-                          />
-                        </div>
                       </div>
                     </Section>
                   </div>
                 ) : (
-                  <div className="space-y-5">
+                  <div className="space-y-4">
                     <Section title="Third-party employment verification">
                       <p className="coe-section-description">
                         Details of the company requesting verification.
                       </p>
 
-                      <div className="space-y-5">
+                      <div className="space-y-4">
                         <div className="coe-fields coe-fields-verification">
                           <div>
                             <Label htmlFor="verifier-company">Employer / Company Name</Label>
@@ -926,60 +881,6 @@ function CoeRequestPage() {
                           </div>
                         </div>
 
-                        <div className="coe-documents">
-                          <h3 className="coe-documents-title">Documents needed</h3>
-                          <div className="coe-document-grid">
-                            {COE_DESCRIPTION_OPTIONS.map((option) => (
-                              <label
-                                key={option}
-                                className="coe-document"
-                                data-selected={descriptionOptions.includes(option)}
-                              >
-                                <Checkbox
-                                  checked={descriptionOptions.includes(option)}
-                                  onCheckedChange={(checked) =>
-                                    setDescriptionOptions((current) =>
-                                      checked
-                                        ? [...current, option]
-                                        : current.filter((value) => value !== option),
-                                    )
-                                  }
-                                />
-                                {COE_DESCRIPTION_TEXT_OPTIONS.has(option) ? (
-                                  <span className="min-w-0 flex-1">
-                                    <span className="text-sm">{option}</span>
-                                    <Input
-                                      className="mt-1 h-8"
-                                      value={descriptionDetails[option] || ""}
-                                      onChange={(event) =>
-                                        setDescriptionDetails((current) => ({
-                                          ...current,
-                                          [option]: event.target.value,
-                                        }))
-                                      }
-                                      placeholder="Specify"
-                                      maxLength={255}
-                                      disabled={!descriptionOptions.includes(option)}
-                                      onClick={(event) => event.stopPropagation()}
-                                    />
-                                  </span>
-                                ) : (
-                                  <span className="text-sm">{option}</span>
-                                )}
-                              </label>
-                            ))}
-                          </div>
-                          {descriptionOptions.includes(COE_DESCRIPTION_OTHER) && (
-                            <Input
-                              id="third-party-custom-description"
-                              className="mt-3"
-                              value={customDescription}
-                              onChange={(event) => setCustomDescription(event.target.value)}
-                              placeholder="Specify other description"
-                              maxLength={255}
-                            />
-                          )}
-                        </div>
                       </div>
                     </Section>
                   </div>
@@ -987,7 +888,112 @@ function CoeRequestPage() {
               </>
             )}
 
-            {currentStep === 2 && (
+            {currentStep === 3 && (
+              <Section
+                title={requestorType === "third_party" ? "Purpose of verification" : "Purpose of use"}
+              >
+                <p className="coe-section-description">
+                  {requestorType === "third_party"
+                    ? "Tell us why this employment verification is needed."
+                    : "Tell us where or why you need this certificate."}
+                </p>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="purpose">
+                      {requestorType === "third_party" ? "Purpose of verification" : "Purpose of use"}
+                    </Label>
+                    <Textarea
+                      id="purpose"
+                      className="mt-1 min-h-24"
+                      value={purpose}
+                      onChange={(event) => setPurpose(event.target.value)}
+                      placeholder={
+                        requestorType === "third_party"
+                          ? "Explain why the employee's work history is being verified"
+                          : "Enter the purpose of use"
+                      }
+                      maxLength={255}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="note">Additional note / special instructions (optional)</Label>
+                    <Textarea
+                      id="note"
+                      className="mt-1 min-h-20"
+                      value={note}
+                      onChange={(event) => setNote(event.target.value)}
+                      placeholder="Add any instructions HRDO should know"
+                      maxLength={2000}
+                    />
+                  </div>
+                </div>
+              </Section>
+            )}
+
+            {currentStep === 4 && (
+              <Section title="Documents needed">
+                <p className="coe-section-description">
+                  Select the information to include in the certificate. Choose at least one option.
+                </p>
+                <div className="coe-documents">
+                  <div className="coe-document-grid">
+                    {COE_DESCRIPTION_OPTIONS.map((option) => (
+                      <label
+                        key={option}
+                        className="coe-document"
+                        data-selected={descriptionOptions.includes(option)}
+                      >
+                        <Checkbox
+                          checked={descriptionOptions.includes(option)}
+                          onCheckedChange={(checked) =>
+                            setDescriptionOptions((current) =>
+                              checked
+                                ? [...current, option]
+                                : current.filter((value) => value !== option),
+                            )
+                          }
+                        />
+                        {COE_DESCRIPTION_TEXT_OPTIONS.has(option) ? (
+                          <span className="min-w-0 flex-1">
+                            <span className="text-sm">{option}</span>
+                            <Input
+                              aria-label={`${option} details`}
+                              className="mt-1 h-8"
+                              value={descriptionDetails[option] ?? ""}
+                              onChange={(event) =>
+                                setDescriptionDetails((current) => ({
+                                  ...current,
+                                  [option]: event.target.value,
+                                }))
+                              }
+                              placeholder="Specify"
+                              maxLength={255}
+                              disabled={!descriptionOptions.includes(option)}
+                              onClick={(event) => event.stopPropagation()}
+                            />
+                          </span>
+                        ) : (
+                          <span className="text-sm">{option}</span>
+                        )}
+                      </label>
+                    ))}
+                  </div>
+                  {descriptionOptions.includes(COE_DESCRIPTION_OTHER) && (
+                    <Input
+                      id="custom-description"
+                      className="mt-3"
+                      value={customDescription}
+                      onChange={(event) => setCustomDescription(event.target.value)}
+                      placeholder="Specify other description"
+                      maxLength={255}
+                    />
+                  )}
+                </div>
+              </Section>
+            )}
+
+            {currentStep === 5 && (
               <div className="coe-review">
                 <Section title="Review your request">
                   <p className="coe-section-description">
@@ -1079,7 +1085,7 @@ function CoeRequestPage() {
                       </>
                     )}
                     <div className="sm:col-span-2">
-                      <dt className="text-muted-foreground">Description</dt>
+                      <dt className="text-muted-foreground">Documents needed</dt>
                       <dd className="font-medium">
                         {descriptionOptions
                           .map(
@@ -1090,12 +1096,12 @@ function CoeRequestPage() {
                         {customDescription.trim() ? ` - ${customDescription.trim()}` : ""}
                       </dd>
                     </div>
-                    {requestorType === "internal" && (
-                      <div className="sm:col-span-2">
-                        <dt className="text-muted-foreground">Purpose of use</dt>
-                        <dd className="whitespace-pre-line font-medium">{purpose}</dd>
-                      </div>
-                    )}
+                    <div className="sm:col-span-2">
+                      <dt className="text-muted-foreground">
+                        {requestorType === "third_party" ? "Purpose of verification" : "Purpose of use"}
+                      </dt>
+                      <dd className="whitespace-pre-line font-medium">{purpose}</dd>
+                    </div>
                     {note.trim() && (
                       <div className="sm:col-span-2">
                         <dt className="text-muted-foreground">Additional note</dt>
@@ -1171,7 +1177,11 @@ function CoeRequestPage() {
                 <Button
                   type="submit"
                   className="coe-button coe-button-next"
-                  disabled={submit.isPending || (currentStep === 0 && !requestorType)}
+                  disabled={
+                    submit.isPending ||
+                    (currentStep === 0 && !requestorType) ||
+                    (currentStep === 1 && !copyTypeSelected)
+                  }
                 >
                   {submit.isPending ? (
                     <ButtonLoading label="Submitting…" />

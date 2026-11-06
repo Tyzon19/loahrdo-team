@@ -612,10 +612,10 @@ export async function verifyRegistrationOtp(
       }
 
       const hrdoAccounts = await all<
-        Array<RowDataPacket & { id: string; role: "employee" | "hrdo_staff" }>
+        Array<RowDataPacket & { id: string; role: "employee" | "hrdo_staff" | "hrdo_admin" }>
       >("SELECT id, role FROM hrdo_users WHERE email = ? LIMIT 1 FOR UPDATE", [email], conn);
       const hrdoAccount = hrdoAccounts[0];
-      if (hrdoAccount?.role === "hrdo_staff") {
+      if (hrdoAccount?.role === "hrdo_staff" || hrdoAccount?.role === "hrdo_admin") {
         await run("DELETE FROM registration_otps WHERE email = ?", [email], conn);
         return new AppError(
           "This email already has an HRDO staff account. Contact an administrator to link modules.",

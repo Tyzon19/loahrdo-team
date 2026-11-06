@@ -58,6 +58,12 @@ export function CoeRequestTable({
                 <dt className="text-[10px] text-muted-foreground">Purpose</dt>
                 <dd className="break-words">{request.purpose}</dd>
               </div>
+              {staff && (
+                <div className="col-span-2 min-w-0">
+                  <dt className="text-[10px] text-muted-foreground">Last handled by</dt>
+                  <dd className="break-words">{request.processedByName || "No HRDO action yet"}</dd>
+                </div>
+              )}
             </dl>
             <Link
               to="/hrdo/coe/$id"
@@ -84,6 +90,7 @@ export function CoeRequestTable({
                     <th className="px-2 py-1.5 font-medium">Dept.</th>
                     <th className="px-2 py-1.5 font-medium">Date</th>
                     <th className="px-2 py-1.5 font-medium">Copy</th>
+                    <th className="px-2 py-1.5 font-medium">Last handled by</th>
                   </>
                 ) : (
                   <>
@@ -116,6 +123,9 @@ export function CoeRequestTable({
                       <td className="whitespace-nowrap px-2 py-1.5">{fmtDate(request.requestedAt)}</td>
                       <td className="whitespace-nowrap px-2 py-1.5">
                         {COE_COPY_TYPE_LABELS[request.copyType]}
+                      </td>
+                      <td className="px-2 py-1.5 break-words">
+                        {request.processedByName || "No HRDO action yet"}
                       </td>
                     </>
                   ) : (

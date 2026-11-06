@@ -1,10 +1,8 @@
 import { useState, type InputHTMLAttributes, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { AlertCircle, CircleCheck, Eye, EyeOff, Facebook, LoaderCircle, type LucideIcon } from "lucide-react";
-
 const FACEBOOK_URL = "https://www.facebook.com/lyceumhrdo";
 const LOGO_URL = "/loa-loading.png";
-
 export function AuthShell({
   heading,
   hint,
@@ -27,7 +25,6 @@ export function AuthShell({
           <header className="module-login-form-heading">
             <h2 id="auth-heading">{heading}</h2>
           </header>
-
           {hint ? <p className="module-auth-hint">{hint}</p> : null}
 
           {children}
@@ -58,17 +55,14 @@ export function AuthShell({
     </div>
   );
 }
-
 type AuthFieldProps = InputHTMLAttributes<HTMLInputElement> & {
   icon: LucideIcon;
   label: string;
   error?: string | undefined;
 };
-
 export function AuthField({ icon: Icon, label, error, id, type, ...props }: AuthFieldProps) {
   const [show, setShow] = useState(false);
   const isPassword = type === "password";
-
   return (
     <div className="module-login-field">
       <label htmlFor={id}>{label}</label>
@@ -101,7 +95,6 @@ export function AuthField({ icon: Icon, label, error, id, type, ...props }: Auth
     </div>
   );
 }
-
 export function AuthCaptcha() {
   const [checked, setChecked] = useState(false);
 
@@ -117,7 +110,6 @@ export function AuthCaptcha() {
     </label>
   );
 }
-
 export function AuthSubmit({ children, busy = false }: { children: ReactNode; busy?: boolean }) {
   return (
     <button type="submit" className="module-login-submit" disabled={busy}>
@@ -132,7 +124,6 @@ export function AuthSubmit({ children, busy = false }: { children: ReactNode; bu
     </button>
   );
 }
-
 export function AuthAlert({
   children,
   tone = "error",
@@ -149,7 +140,6 @@ export function AuthAlert({
     </div>
   );
 }
-
 export function GoogleMark() {
   return (
     <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">

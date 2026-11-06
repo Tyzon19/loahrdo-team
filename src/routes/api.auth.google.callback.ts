@@ -170,7 +170,11 @@ export const Route = createFileRoute("/api/auth/google/callback")({
               await Promise.all([import("@/server/hrdo/auth"), import("@/server/env")]);
 
             const account = await ensureHrdoGoogleAccount(email);
-            if (account.role !== "employee" && account.role !== "hrdo_staff") {
+            if (
+              account.role !== "employee" &&
+              account.role !== "hrdo_staff" &&
+              account.role !== "hrdo_admin"
+            ) {
               return failure("google_role", cleared, mode);
             }
 

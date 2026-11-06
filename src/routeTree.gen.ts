@@ -24,6 +24,7 @@ import { Route as AuthenticatedPhoneDirectoryRouteImport } from './routes/_authe
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 import { Route as AuthenticatedTripArchiveRouteImport } from './routes/_authenticated/trip-archive'
 import { Route as AuthenticatedVehiclesRouteImport } from './routes/_authenticated/vehicles'
+import { Route as HrdoAnalyticsRouteImport } from './routes/hrdo/analytics'
 import { Route as HrdoChangePasswordRouteImport } from './routes/hrdo/change-password'
 import { Route as HrdoCoeRouteImport } from './routes/hrdo/coe'
 import { Route as HrdoDashboardRouteImport } from './routes/hrdo/dashboard'
@@ -123,6 +124,11 @@ const AuthenticatedVehiclesRoute = AuthenticatedVehiclesRouteImport.update({
   id: '/vehicles',
   path: '/vehicles',
   getParentRoute: () => AuthenticatedRoute,
+} as any)
+const HrdoAnalyticsRoute = HrdoAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => HrdoRoute,
 } as any)
 const HrdoChangePasswordRoute = HrdoChangePasswordRouteImport.update({
   id: '/change-password',
@@ -247,6 +253,7 @@ export interface FileRoutesByFullPath {
   '/profile': typeof AuthenticatedProfileRoute
   '/trip-archive': typeof AuthenticatedTripArchiveRoute
   '/vehicles': typeof AuthenticatedVehiclesRoute
+  '/hrdo/analytics': typeof HrdoAnalyticsRoute
   '/hrdo/change-password': typeof HrdoChangePasswordRoute
   '/hrdo/coe': typeof HrdoCoeRoute
   '/hrdo/dashboard': typeof HrdoDashboardRoute
@@ -284,6 +291,7 @@ export interface FileRoutesByTo {
   '/profile': typeof AuthenticatedProfileRoute
   '/trip-archive': typeof AuthenticatedTripArchiveRoute
   '/vehicles': typeof AuthenticatedVehiclesRoute
+  '/hrdo/analytics': typeof HrdoAnalyticsRoute
   '/hrdo/change-password': typeof HrdoChangePasswordRoute
   '/hrdo/coe': typeof HrdoCoeRoute
   '/hrdo/dashboard': typeof HrdoDashboardRoute
@@ -323,6 +331,7 @@ export interface FileRoutesById {
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/trip-archive': typeof AuthenticatedTripArchiveRoute
   '/_authenticated/vehicles': typeof AuthenticatedVehiclesRoute
+  '/hrdo/analytics': typeof HrdoAnalyticsRoute
   '/hrdo/change-password': typeof HrdoChangePasswordRoute
   '/hrdo/coe': typeof HrdoCoeRoute
   '/hrdo/dashboard': typeof HrdoDashboardRoute
@@ -362,6 +371,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/trip-archive'
     | '/vehicles'
+    | '/hrdo/analytics'
     | '/hrdo/change-password'
     | '/hrdo/coe'
     | '/hrdo/dashboard'
@@ -399,6 +409,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/trip-archive'
     | '/vehicles'
+    | '/hrdo/analytics'
     | '/hrdo/change-password'
     | '/hrdo/coe'
     | '/hrdo/dashboard'
@@ -437,6 +448,7 @@ export interface FileRouteTypes {
     | '/_authenticated/profile'
     | '/_authenticated/trip-archive'
     | '/_authenticated/vehicles'
+    | '/hrdo/analytics'
     | '/hrdo/change-password'
     | '/hrdo/coe'
     | '/hrdo/dashboard'
@@ -583,6 +595,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/vehicles'
       preLoaderRoute: typeof AuthenticatedVehiclesRouteImport
       parentRoute: typeof AuthenticatedRoute
+    }
+    '/hrdo/analytics': {
+      id: '/hrdo/analytics'
+      path: '/analytics'
+      fullPath: '/hrdo/analytics'
+      preLoaderRoute: typeof HrdoAnalyticsRouteImport
+      parentRoute: typeof HrdoRoute
     }
     '/hrdo/change-password': {
       id: '/hrdo/change-password'
@@ -769,6 +788,7 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 )
 
 interface HrdoRouteChildren {
+  HrdoAnalyticsRoute: typeof HrdoAnalyticsRoute
   HrdoChangePasswordRoute: typeof HrdoChangePasswordRoute
   HrdoCoeRoute: typeof HrdoCoeRoute
   HrdoDashboardRoute: typeof HrdoDashboardRoute
@@ -781,6 +801,7 @@ interface HrdoRouteChildren {
 }
 
 const HrdoRouteChildren: HrdoRouteChildren = {
+  HrdoAnalyticsRoute: HrdoAnalyticsRoute,
   HrdoChangePasswordRoute: HrdoChangePasswordRoute,
   HrdoCoeRoute: HrdoCoeRoute,
   HrdoDashboardRoute: HrdoDashboardRoute,

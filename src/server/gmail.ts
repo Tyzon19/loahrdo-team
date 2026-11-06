@@ -63,6 +63,15 @@ function validEmail(value: string): boolean {
   return /^[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+$/.test(value) && !/[\r\n]/.test(value);
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function siteUrlForEmail(): URL {
   let url: URL;
   try {
@@ -531,14 +540,20 @@ export async function sendCoeStatusEmail(input: {
       "Thank you,",
       "Lyceum of Alabang HRDO",
     ].join("\n");
+    const safeMessage = escapeHtml(input.message).replace(/\r?\n/g, "<br />");
+    const messageHtml =
+      input.status === "rejected"
+        ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:16px 0;border:1px solid #fecaca;border-left:4px solid #dc2626;border-radius:5px;background-color:#fef2f2;"><tr><td style="padding:14px 16px;color:#991b1b;font-family:Arial,sans-serif;font-size:14px;line-height:1.6;"><strong style="display:block;margin-bottom:4px;color:#b91c1c;font-size:13px;">Reason for rejection</strong><span>${safeMessage}</span></td></tr></table>`
+        : `<p>${safeMessage}</p>`;
     const html = `
       <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
         <p>Dear ${input.recipientName},</p>
         <p><strong>Update for your COE request (${input.requestId})</strong></p>
         <p>${input.title}</p>
-        <p>${input.message.replace(/\n/g, "<br />")}</p>
+        ${messageHtml}
         <p><a href="${new URL(`/hrdo/coe/${encodeURIComponent(input.requestId)}`, siteUrl.origin).toString()}">Open your COE request</a></p>
         <p>Thank you,<br/>Lyceum of Alabang HRDO</p>
+        <p style="margin:20px 0 0;color:#ff3333;font-size:13px;font-weight:700;line-height:1.6;">This is an automated notification. Please do not reply to this email.</p>
       </div>
     `;
 
@@ -651,6 +666,8 @@ export async function sendTemporaryPasswordEmail(input: {
   temporaryPassword: string;
   signatoryTitle: string;
   accountAction?: "created" | "password-reset";
+  loginPath?: "/login" | "/hrdo/login";
+  systemName?: string;
 }): Promise<EmailDeliveryResult> {
   try {
     if (!validEmail(input.recipientEmail)) {
@@ -663,7 +680,8 @@ export async function sendTemporaryPasswordEmail(input: {
         email: input.recipientEmail,
         temporaryPassword: input.temporaryPassword,
         signatoryTitle: input.signatoryTitle,
-        loginUrl: new URL("/login", siteUrl.origin).toString(),
+        loginUrl: new URL(input.loginPath ?? "/login", siteUrl.origin).toString(),
+        ...(input.systemName ? { systemName: input.systemName } : {}),
         ...(input.accountAction ? { accountAction: input.accountAction } : {}),
       },
       LOGO_CONTENT_ID,
@@ -683,7 +701,7 @@ export async function sendTemporaryPasswordEmail(input: {
     return { sent: true, delivered: 1, failed: 0 };
   } catch (error) {
     console.error(
-      `[email] Signatory account email failed: ${
+      `[email] Temporary account email failed: ${
         error instanceof AppError ? error.message : error instanceof Error ? error.name : "unknown"
       }`,
     );

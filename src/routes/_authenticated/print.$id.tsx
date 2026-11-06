@@ -33,6 +33,7 @@ export const Route = createFileRoute("/_authenticated/print/$id")({
 function PrintTicket() {
   const { id } = Route.useParams();
   const { viewer } = Route.useRouteContext();
+  const navigate = Route.useNavigate();
   const queryClient = useQueryClient();
   const sheetRef = useRef<HTMLDivElement>(null);
   const [sending, setSending] = useState(false);
@@ -239,13 +240,22 @@ function PrintTicket() {
         return;
       }
       setTicketSent(true);
-      await queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+        queryClient.invalidateQueries({ queryKey: ["requests"] }),
+        queryClient.invalidateQueries({ queryKey: ["request", r.id], refetchType: "none" }),
+      ]);
       if (result.data.emailDelivery.sent) {
         setTicketEmailSent(true);
         toast.success("Trip ticket emailed to the requisitioner's configured address.");
       } else {
         toast.error(result.data.emailDelivery.message);
       }
+      await navigate({
+        to: "/requests/$id",
+        params: { id: r.id },
+        search: { notice: "ticket-sent" },
+      });
     } catch {
       toast.error("We couldn't create the trip ticket photo. Try again.");
     } finally {

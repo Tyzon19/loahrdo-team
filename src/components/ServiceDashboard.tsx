@@ -36,7 +36,7 @@ const SERVICES: Service[] = [
   },
   {
     title: "COE Request",
-    desc: "Request your Certificate of Employment in a few clicks.",
+    desc: "Request your Certificate of Employment.",
     icon: FileBadge,
     tag: "Documents",
     to: "/hrdo/coe",
@@ -81,7 +81,7 @@ export function ServiceDashboard({
 
   return (
     <div className="flex min-h-screen flex-col bg-muted/40">
-      {signingOut && <LoadingScreen label="Signing out of LOA" mode="overlay" immediate />}
+      {signingOut && <LoadingScreen label="Signing out" mode="overlay" immediate />}
       <header className="sticky top-0 z-20 border-b border-border bg-background/90 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
@@ -218,7 +218,7 @@ export function ServiceDashboard({
       <footer className="bg-primary text-primary-foreground">
         <div className="mx-auto grid max-w-6xl gap-6 px-4 py-10 text-xs font-semibold uppercase tracking-wide sm:px-6 md:grid-cols-3 md:items-center">
           <div className="flex items-center gap-3">
-            Follow us
+            Message us
             <a
               href={FACEBOOK_URL}
               target="_blank"

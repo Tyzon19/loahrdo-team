@@ -89,10 +89,6 @@ export const Route = createFileRoute("/hrdo/coe_/$id")({
   component: CoeDetailPage,
 });
 
-/* -------------------------------------------------------------------------- */
-/* Constants & helpers                                                         */
-/* -------------------------------------------------------------------------- */
-
 const ACTION_LABELS: Record<CoeAction, string> = {
   verify: "Verify information",
   process: "Start processing",
@@ -114,7 +110,7 @@ type ActionPayload =
   | { kind: "process" }
   | { kind: "correction"; message: string }
   | { kind: "reject"; remarks: string }
-  | { kind: "upload"; fileName: string; dataUrl: string }
+  | { kind: "upload"; file: File }
   | { kind: "ready" }
   | { kind: "release"; receivedByName: string };
 
@@ -417,13 +413,13 @@ function CoeDetailPage() {
   const { id } = Route.useParams();
   const { hrdoViewer } = Route.useRouteContext();
   const queryClient = useQueryClient();
-  const isStaff = hrdoViewer?.role === "hrdo_staff";
+  const isStaff = hrdoViewer?.role === "hrdo_staff" || hrdoViewer?.role === "hrdo_admin";
 
   const [active, setActive] = useState<CoeAction | null>(null);
   const [templateOpen, setTemplateOpen] = useState(false);
   const [correction, setCorrection] = useState("");
   const [receivedBy, setReceivedBy] = useState("");
-  const [file, setFile] = useState<{ name: string; dataUrl: string } | null>(null);
+  const [file, setFile] = useState<File | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [sending, setSending] = useState(false);
@@ -451,12 +447,12 @@ function CoeDetailPage() {
           return unwrap(requestCoeCorrectionFn({ data: { id, message: payload.message } }));
         case "reject":
           return unwrap(rejectCoeRequestFn({ data: { id, remarks: payload.remarks } }));
-        case "upload":
-          return unwrap(
-            uploadCoeDocumentFn({
-              data: { id, fileName: payload.fileName, dataUrl: payload.dataUrl },
-            }),
-          );
+        case "upload": {
+          const data = new FormData();
+          data.set("id", id);
+          data.set("file", payload.file, payload.file.name);
+          return unwrap(uploadCoeDocumentFn({ data }));
+        }
         case "ready":
           return unwrap(markCoeReadyFn({ data: { id } }));
         case "release":
@@ -578,7 +574,7 @@ function CoeDetailPage() {
         toast.error("Choose the signed COE document first.");
         return;
       }
-      action.mutate({ kind: "upload", fileName: file.name, dataUrl: file.dataUrl });
+      action.mutate({ kind: "upload", file });
     }
   };
 
@@ -601,13 +597,7 @@ function CoeDetailPage() {
       toast.error("The signed COE must be 5 MB or smaller.");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = String(reader.result).replace(/^data:[^;,]*;base64,/, `data:${mime};base64,`);
-      setFile({ name: selected.name, dataUrl });
-    };
-    reader.onerror = () => toast.error("We couldn't read that file. Try another copy.");
-    reader.readAsDataURL(selected);
+    setFile(selected);
   };
 
   /* ---- COE template ---- */

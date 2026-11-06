@@ -9,7 +9,7 @@ const globalForDb = globalThis as typeof globalThis & {
 
 function slowQueryThresholdMs() {
   const raw = serverEnvOptional("DB_SLOW_QUERY_MS");
-  if (!raw) return 500;
+  if (!raw) return 1000;
 
   const threshold = Number(raw);
   if (!Number.isInteger(threshold) || threshold < 50 || threshold > 60_000) {

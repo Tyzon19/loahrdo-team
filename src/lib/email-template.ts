@@ -28,6 +28,7 @@ export interface TemporaryPasswordEmailInput {
   temporaryPassword: string;
   signatoryTitle: string;
   loginUrl: string;
+  systemName?: string;
   accountAction?: "created" | "password-reset";
 }
 
@@ -316,16 +317,19 @@ export function renderTemporaryPasswordEmail(
   const title = escapeHtml(input.signatoryTitle);
   const logo = escapeHtml(logoContentId);
   const actionUrl = escapeHtml(loginUrl.toString());
+  const systemName = input.systemName ?? "LOA Vehicle Reservation & Trip Ticket";
+  const hrdoSystem = input.systemName === "LOA HRDO Certificate of Employment";
+  const subjectPrefix = hrdoSystem ? "[LOA HRDO COE]" : "[LOA Vehicle Request]";
   const isPasswordReset = input.accountAction === "password-reset";
   const subject = isPasswordReset
-    ? "[LOA Vehicle Request] Temporary password reset"
-    : "[LOA Vehicle Request] Your account is ready";
+    ? `${subjectPrefix} Temporary password reset`
+    : `${subjectPrefix} Your account is ready`;
   const heading = isPasswordReset
     ? `Your ${input.signatoryTitle} account password was reset`
     : `Your ${input.signatoryTitle} account is ready`;
   const intro = isPasswordReset
-    ? `An administrator reset the password for your ${input.signatoryTitle} account in the LOA Vehicle Reservation & Trip Ticket system.`
-    : `An administrator created your ${input.signatoryTitle} account for the LOA Vehicle Reservation & Trip Ticket system.`;
+    ? `An administrator reset the password for your ${input.signatoryTitle} account in the ${systemName} system.`
+    : `An administrator created your ${input.signatoryTitle} account for the ${systemName} system.`;
   const text = [
     `Dear ${input.recipientName},`,
     "",
@@ -339,7 +343,7 @@ export function renderTemporaryPasswordEmail(
     "If you were not expecting this account, contact the system administrator.",
     "",
     "Lyceum of Alabang",
-    "Vehicle Reservation & Trip Ticket",
+    systemName,
     "This is an automated message. Please do not reply.",
   ].join("\n");
   const html = `<!doctype html>
@@ -371,7 +375,7 @@ export function renderTemporaryPasswordEmail(
             <p style="margin:0;padding:12px 14px;background-color:#f7f8fa;border-left:3px solid #1f3b68;color:#454f5e;font-size:12px;line-height:1.6;">If you were not expecting this account, contact the system administrator.</p>
           </td></tr>
           <tr><td style="padding:0 32px 26px;">
-            <p style="margin:0;color:#353b45;font-size:14px;line-height:1.6;">Kind regards,<br><strong>Lyceum of Alabang<br>LOA HRDO DESK TEAM</strong></p>
+            <p style="margin:0;color:#353b45;font-size:14px;line-height:1.6;">Kind regards,<br><strong>Lyceum of Alabang<br>${hrdoSystem ? "LOA HRDO DESK TEAM" : "LOA PHYSICAL FACILITIES TEAM"}</strong></p>
             <p style="margin:18px 0 0;color:#687386;font-size:11px;line-height:1.6;">This is an automated message. Please do not reply to this email.</p>
           </td></tr>
         </table>

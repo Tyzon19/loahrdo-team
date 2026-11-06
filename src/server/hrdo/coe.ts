@@ -10,19 +10,18 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
 import JSZip from "jszip";
-import type {
-  CoeCopyType,
-  CoeHistoryEntry,
-  CoeHistoryRecord,
-  CoeRequest,
-  CoeStatus,
-  HrdoViewer,
-} from "@/lib/hrdo";
 import {
   COE_DOCUMENT_MIMES,
   COE_MAX_DOCUMENT_BYTES,
   coeNeedsDocument,
   coeRequestsCompensation,
+  isHrdoStaffRole,
+  type CoeCopyType,
+  type CoeHistoryEntry,
+  type CoeHistoryRecord,
+  type CoeRequest,
+  type CoeStatus,
+  type HrdoViewer,
 } from "@/lib/hrdo";
 import { AppError, parseInput } from "@/lib/errors";
 import { normalizePhilippineMobileNumber } from "@/lib/validation";
@@ -109,7 +108,6 @@ const releaseSchema = z.object({
 const uploadSchema = z.object({
   id: z.string().uuid("Invalid request reference."),
   fileName: z.string().trim().min(1, "The uploaded file needs a name.").max(255),
-  dataUrl: z.string().min(32, "Choose a signed COE document to upload.").max(9_000_000),
 });
 
 const dateOnlySchema = z
@@ -172,6 +170,8 @@ const staffRequestListSchema = z
   .object({
     query: z.string().trim().max(100).default(""),
     department: z.string().trim().max(120).default(""),
+    lastHandledBy: z.string().trim().max(120).default(""),
+    handling: z.enum(["all", "no_action"]).default("all"),
     dateFrom: dateOnlySchema,
     dateTo: dateOnlySchema,
     queue: staffRequestQueueSchema.default("all"),
@@ -217,7 +217,7 @@ interface CoeHistoryRow extends RowDataPacket {
   id: string;
   request_id: string;
   actor_name: string;
-  actor_role: "employee" | "hrdo_staff" | "system";
+  actor_role: "employee" | "hrdo_staff" | "hrdo_admin" | "system";
   type: CoeHistoryEntry["type"];
   message: string;
   happened_at_ms: number | string | null;
@@ -395,7 +395,7 @@ async function loadRequest(id: string): Promise<CoeRequest> {
 }
 
 function requireStaff(viewer: HrdoViewer) {
-  if (viewer.role !== "hrdo_staff") {
+  if (!isHrdoStaffRole(viewer.role)) {
     throw new AppError("Only HRDO staff can process COE requests.");
   }
 }
@@ -428,7 +428,7 @@ async function isDocx(bytes: Buffer) {
   }
 }
 
-export async function validateCoeDocumentUpload(fileName: string, dataUrl: string) {
+export async function validateCoeDocumentUpload(fileName: string, bytes: Buffer) {
   const extension = path.extname(fileName).toLowerCase();
   const mime =
     extension === ".pdf"
@@ -436,21 +436,19 @@ export async function validateCoeDocumentUpload(fileName: string, dataUrl: strin
       : extension === ".docx"
         ? COE_DOCUMENT_MIMES.docx
         : "";
-  if (!mime || !dataUrl.startsWith(`data:${mime};base64,`)) {
+  if (!mime) {
     throw new AppError("Upload the signed COE as a PDF or Word (.docx) file.");
   }
 
-  const bytes = Buffer.from(dataUrl.slice(dataUrl.indexOf(",") + 1), "base64");
+  if (bytes.length > COE_MAX_DOCUMENT_BYTES) {
+    throw new AppError("The signed COE must be 5 MB or smaller.");
+  }
   const validDocument = extension === ".pdf" ? isPdf(bytes) : await isDocx(bytes);
   if (!validDocument) {
     throw new AppError(
       `That file is not a valid ${extension === ".pdf" ? "PDF" : "Word document"}.`,
     );
   }
-  if (bytes.length > COE_MAX_DOCUMENT_BYTES) {
-    throw new AppError("The signed COE must be 5 MB or smaller.");
-  }
-
   return { mime, bytes };
 }
 
@@ -588,6 +586,13 @@ export async function searchStaffCoeRequests(input: unknown) {
     where.push("c.department LIKE ?");
     params.push(likePattern(data.department));
   }
+  if (data.lastHandledBy) {
+    where.push("c.processed_by_name LIKE ?");
+    params.push(likePattern(data.lastHandledBy));
+  }
+  if (data.handling === "no_action") {
+    where.push("(c.processed_by_name IS NULL OR TRIM(c.processed_by_name) = '')");
+  }
   if (data.dateFrom) {
     where.push("c.requested_at >= CONCAT(?, ' 00:00:00')");
     params.push(data.dateFrom);
@@ -661,7 +666,7 @@ export async function getCoeRequest(input: unknown): Promise<CoeRequest> {
   const data = parseInput(idSchema, input);
   const row = await loadRow(data.id);
   // Employees may only ever open their own COE request; HRDO staff may open any.
-  if (viewer.role !== "hrdo_staff" && row.employee_id !== viewer.id) {
+  if (!isHrdoStaffRole(viewer.role) && row.employee_id !== viewer.id) {
     throw new AppError("That COE request could not be found.");
   }
   return mapRow(row, await loadHistory(data.id));
@@ -1121,8 +1126,23 @@ export async function sendCoeTemplate(input: unknown) {
 export async function uploadCoeDocument(input: unknown): Promise<CoeRequest> {
   const viewer = await requireHrdoViewer();
   requireStaff(viewer);
-  const data = parseInput(uploadSchema, input);
-  const { mime, bytes } = await validateCoeDocumentUpload(data.fileName, data.dataUrl);
+  if (!(input instanceof FormData)) {
+    throw new AppError("Choose the signed COE document first.");
+  }
+  const uploadedFile = input.get("file");
+  if (
+    !(uploadedFile instanceof Blob) ||
+    !("name" in uploadedFile) ||
+    typeof uploadedFile.name !== "string"
+  ) {
+    throw new AppError("Choose the signed COE document first.");
+  }
+  const data = parseInput(uploadSchema, {
+    id: input.get("id"),
+    fileName: uploadedFile.name,
+  });
+  const bytes = Buffer.from(await uploadedFile.arrayBuffer());
+  const { mime } = await validateCoeDocumentUpload(data.fileName, bytes);
 
   let releaseEmailPayload: {
     requestId: string;
@@ -1414,7 +1434,7 @@ export async function getCoeDocument(
   const data = parseInput(idSchema, input);
 
   const request = await getCoeRequest(data);
-  if (viewer.role !== "hrdo_staff" && !["ready_for_pickup", "released"].includes(request.status)) {
+  if (!isHrdoStaffRole(viewer.role) && !["ready_for_pickup", "released"].includes(request.status)) {
     throw new AppError("This document has not been released yet.");
   }
 

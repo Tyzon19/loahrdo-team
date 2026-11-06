@@ -27,7 +27,19 @@ export const COE_DOCUMENT_MIMES = {
   docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 } as const;
 
-export type HrdoRole = "employee" | "hrdo_staff";
+export type HrdoRole = "employee" | "hrdo_staff" | "hrdo_admin";
+export const HRDO_BOOTSTRAP_ADMIN_EMAIL = "hrdo_admin@lyceumalabang.edu.ph";
+
+export function isHrdoStaffRole(role: HrdoRole | null | undefined): role is "hrdo_staff" | "hrdo_admin" {
+  return role === "hrdo_staff" || role === "hrdo_admin";
+}
+
+export function canManageHrdoAccounts(user: Pick<HrdoViewer, "email" | "role"> | null | undefined) {
+  return (
+    user?.role === "hrdo_admin" ||
+    user?.email.trim().toLowerCase() === HRDO_BOOTSTRAP_ADMIN_EMAIL
+  );
+}
 
 /** Server-verified HRDO account for the current HRDO session. */
 export interface HrdoViewer {

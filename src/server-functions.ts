@@ -291,6 +291,22 @@ export const createMainSignatoryAccountFn = createServerFn({ method: "POST" })
     runSafely(async () => (await import("./server/signatories")).createMainSignatoryAccount(data)),
   );
 
+export const listHrdoProcessorAccountsFn = createServerFn({ method: "GET" }).handler(async () =>
+  runSafely(async () => (await import("./server/hrdo/admin")).listHrdoProcessorAccounts()),
+);
+
+export const getHrdoCoeAnalyticsFn = createServerFn({ method: "GET" }).handler(async () =>
+  runSafely(async () => (await import("./server/hrdo/analytics")).getCoeAnalytics()),
+);
+
+export const createHrdoProcessorAccountFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () =>
+      (await import("./server/hrdo/admin")).createHrdoProcessorAccount(data),
+    ),
+  );
+
 export const resetUserPasswordFn = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) =>

@@ -15,13 +15,12 @@ import { LoadingPanel } from "@/components/app/LoadingPanel";
 import { PageHeader, Section } from "@/components/app/PageHeader";
 import { CoeSummaryCards, type CoeSummaryCard } from "@/components/hrdo/CoeSummaryCards";
 import { CoeRequestTable } from "@/components/hrdo/CoeRequestTable";
-import { CoeHistoryList } from "@/components/hrdo/CoeHistoryList";
 import {
   listAllCoeRequestsFn,
   searchStaffCoeRequestsFn,
 } from "@/server-functions";
 import { unwrap } from "@/lib/api";
-import { hrCoeSummary } from "@/lib/hrdo";
+import { hrCoeSummary, isHrdoStaffRole } from "@/lib/hrdo";
 import { SITE } from "@/lib/site";
 
 const PAGE = 10;
@@ -47,7 +46,7 @@ export const Route = createFileRoute("/hrdo/dashboard")({
 
 function CoeDashboard() {
   const { hrdoViewer } = Route.useRouteContext();
-  if (hrdoViewer?.role !== "hrdo_staff") return null;
+  if (!isHrdoStaffRole(hrdoViewer?.role)) return null;
   return <HrDashboard />;
 }
 
@@ -79,6 +78,8 @@ function HrDashboard() {
   const [queue, setQueue] = useState<StaffQueue>("all");
   const [query, setQuery] = useState("");
   const [department, setDepartment] = useState("");
+  const [lastHandledBy, setLastHandledBy] = useState("");
+  const [handling, setHandling] = useState<"all" | "no_action">("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [sort, setSort] = useState<StaffRequestSort>("priority");
@@ -96,6 +97,8 @@ function HrDashboard() {
       queue,
       deferredQuery,
       department,
+      lastHandledBy,
+      handling,
       dateFrom,
       dateTo,
       sort,
@@ -104,7 +107,17 @@ function HrDashboard() {
     queryFn: () =>
       unwrap(
         searchStaffCoeRequestsFn({
-          data: { queue, query: deferredQuery, department, dateFrom, dateTo, sort, page },
+          data: {
+            queue,
+            query: deferredQuery,
+            department,
+            lastHandledBy,
+            handling,
+            dateFrom,
+            dateTo,
+            sort,
+            page,
+          },
         }),
       ),
     staleTime: 10_000,
@@ -160,16 +173,11 @@ function HrDashboard() {
   const activeFilters =
     Boolean(query.trim()) ||
     Boolean(department.trim()) ||
+    Boolean(lastHandledBy.trim()) ||
+    handling !== "all" ||
     Boolean(dateFrom) ||
     Boolean(dateTo) ||
     sort !== "priority";
-  const recentActivity = rows
-    .flatMap((request) =>
-      request.history.map((entry) => ({ ...entry, employeeName: request.employeeName })),
-    )
-    .sort((a, b) => Date.parse(b.happenedAt) - Date.parse(a.happenedAt))
-    .slice(0, 5);
-
   return (
     <>
       <PageHeader
@@ -203,109 +211,161 @@ function HrDashboard() {
             }}
           />
 
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_300px]">
-            <Section
-              title={
-                queue === "all"
-                  ? "COE requests"
-                  : (cards.find((card) => card.key === queue)?.label ?? "COE requests")
-              }
-              actions={
-                <Link
-                  to="/hrdo/requests"
-                  className="text-sm font-medium text-primary hover:underline"
-                >
-                  View all ({summary.total})
-                </Link>
-              }
-            >
-              <div className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-                <Input
-                  aria-label="Search COE requests"
-                  placeholder="Requestor, department, date, request ID…"
-                  value={query}
-                  onChange={(event) => {
-                    setQuery(event.target.value);
-                    setPage(0);
-                  }}
-                  maxLength={100}
-                />
-                <Input
-                  aria-label="Filter by department"
-                  placeholder="Filter by department"
-                  value={department}
-                  onChange={(event) => {
-                    setDepartment(event.target.value);
-                    setPage(0);
-                  }}
-                  maxLength={120}
-                />
-                <Input
-                  aria-label="Requests from date"
-                  type="date"
-                  value={dateFrom}
-                  max={dateTo || undefined}
-                  onChange={(event) => {
-                    setDateFrom(event.target.value);
-                    setPage(0);
-                  }}
-                />
-                <Input
-                  aria-label="Requests through date"
-                  type="date"
-                  value={dateTo}
-                  min={dateFrom || undefined}
-                  onChange={(event) => {
-                    setDateTo(event.target.value);
-                    setPage(0);
-                  }}
-                />
-                <Select
-                  value={sort}
-                  onValueChange={(value) => {
-                    setSort(value as StaffRequestSort);
-                    setPage(0);
-                  }}
-                >
-                  <SelectTrigger aria-label="Sort COE requests">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="priority">Priority / due date</SelectItem>
-                    <SelectItem value="date_newest">Request date: newest first</SelectItem>
-                    <SelectItem value="date_oldest">Request date: oldest first</SelectItem>
-                    <SelectItem value="requestor_asc">Requestor: A to Z</SelectItem>
-                    <SelectItem value="requestor_desc">Requestor: Z to A</SelectItem>
-                    <SelectItem value="department_asc">Department: A to Z</SelectItem>
-                    <SelectItem value="department_desc">Department: Z to A</SelectItem>
-                    <SelectItem value="id_asc">Request ID: A to Z</SelectItem>
-                    <SelectItem value="id_desc">Request ID: Z to A</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <span>
-                  {totalMatches} matching request{totalMatches === 1 ? "" : "s"}
-                </span>
-                {activeFilters && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 px-2"
-                    onClick={() => {
-                      setQuery("");
-                      setDepartment("");
-                      setDateFrom("");
-                      setDateTo("");
-                      setSort("priority");
+          <Section
+            title={
+              queue === "all"
+                ? "COE requests"
+                : (cards.find((card) => card.key === queue)?.label ?? "COE requests")
+            }
+            actions={
+              <Link
+                to="/hrdo/requests"
+                className="text-sm font-medium text-primary hover:underline"
+              >
+                View all ({summary.total})
+              </Link>
+            }
+          >
+            <div className="mb-4 rounded-lg border bg-muted/20 p-3 sm:p-4">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <label className="grid gap-1.5 text-xs font-medium text-muted-foreground md:col-span-2 xl:col-span-2">
+                  Search requests
+                  <Input
+                    aria-label="Search COE requests"
+                    placeholder="Requestor, department, date, or request ID"
+                    value={query}
+                    onChange={(event) => {
+                      setQuery(event.target.value);
+                      setPage(0);
+                    }}
+                    maxLength={100}
+                  />
+                </label>
+                <label className="grid gap-1.5 text-xs font-medium text-muted-foreground">
+                  Department
+                  <Input
+                    aria-label="Filter by department"
+                    placeholder="All departments"
+                    value={department}
+                    onChange={(event) => {
+                      setDepartment(event.target.value);
+                      setPage(0);
+                    }}
+                    maxLength={120}
+                  />
+                </label>
+                <label className="grid gap-1.5 text-xs font-medium text-muted-foreground">
+                  Last handled by
+                  <Input
+                    aria-label="Filter by last HRDO handler"
+                    placeholder="Any staff member"
+                    value={lastHandledBy}
+                    onChange={(event) => {
+                      setLastHandledBy(event.target.value);
+                      setHandling("all");
+                      setPage(0);
+                    }}
+                    maxLength={120}
+                  />
+                </label>
+                <div className="grid gap-1.5 text-xs font-medium text-muted-foreground">
+                  <span>HRDO activity</span>
+                  <Select
+                    value={handling}
+                    onValueChange={(value) => {
+                      const nextHandling = value as "all" | "no_action";
+                      setHandling(nextHandling);
+                      if (nextHandling === "no_action") setLastHandledBy("");
                       setPage(0);
                     }}
                   >
-                    Clear filters
-                  </Button>
-                )}
+                    <SelectTrigger aria-label="Filter by HRDO handling activity">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All requests</SelectItem>
+                      <SelectItem value="no_action">No action yet</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <label className="grid gap-1.5 text-xs font-medium text-muted-foreground">
+                  Requested from
+                  <Input
+                    aria-label="Requests from date"
+                    type="date"
+                    value={dateFrom}
+                    max={dateTo || undefined}
+                    onChange={(event) => {
+                      setDateFrom(event.target.value);
+                      setPage(0);
+                    }}
+                  />
+                </label>
+                <label className="grid gap-1.5 text-xs font-medium text-muted-foreground">
+                  Requested through
+                  <Input
+                    aria-label="Requests through date"
+                    type="date"
+                    value={dateTo}
+                    min={dateFrom || undefined}
+                    onChange={(event) => {
+                      setDateTo(event.target.value);
+                      setPage(0);
+                    }}
+                  />
+                </label>
+                <div className="grid gap-1.5 text-xs font-medium text-muted-foreground">
+                  <span>Sort requests</span>
+                  <Select
+                    value={sort}
+                    onValueChange={(value) => {
+                      setSort(value as StaffRequestSort);
+                      setPage(0);
+                    }}
+                  >
+                    <SelectTrigger aria-label="Sort COE requests">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="priority">Priority / due date</SelectItem>
+                      <SelectItem value="date_newest">Request date: newest first</SelectItem>
+                      <SelectItem value="date_oldest">Request date: oldest first</SelectItem>
+                      <SelectItem value="requestor_asc">Requestor: A to Z</SelectItem>
+                      <SelectItem value="requestor_desc">Requestor: Z to A</SelectItem>
+                      <SelectItem value="department_asc">Department: A to Z</SelectItem>
+                      <SelectItem value="department_desc">Department: Z to A</SelectItem>
+                      <SelectItem value="id_asc">Request ID: A to Z</SelectItem>
+                      <SelectItem value="id_desc">Request ID: Z to A</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
+            </div>
+
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+              <span>
+                {totalMatches} matching request{totalMatches === 1 ? "" : "s"}
+              </span>
+              {activeFilters && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2"
+                  onClick={() => {
+                    setQuery("");
+                    setDepartment("");
+                    setLastHandledBy("");
+                    setHandling("all");
+                    setDateFrom("");
+                    setDateTo("");
+                    setSort("priority");
+                    setPage(0);
+                  }}
+                >
+                  Clear filters
+                </Button>
+              )}
+            </div>
 
               {requests.isPending || searchResults.isPending ? (
                 <LoadingPanel label="Loading COE requests" rows={6} />
@@ -348,34 +408,9 @@ function HrDashboard() {
                       </Button>
                     </div>
                   )}
-                  <p className="mt-3 text-xs text-muted-foreground">
-                    Sorting uses MySQL&apos;s external merge sort for larger result sets.
-                  </p>
                 </>
               )}
-            </Section>
-
-            <Section
-              title="Recent activity"
-              actions={
-                <Link
-                  to="/hrdo/history"
-                  className="text-sm font-medium text-primary hover:underline"
-                >
-                  Request history
-                </Link>
-              }
-            >
-              {requests.isPending ? (
-                <LoadingPanel label="Loading recent activity" rows={3} />
-              ) : (
-                <CoeHistoryList
-                  entries={recentActivity}
-                  empty="No COE activity has been recorded yet."
-                />
-              )}
-            </Section>
-          </div>
+          </Section>
         </>
       )}
     </>

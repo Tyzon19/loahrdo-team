@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BadgeCheck,
   AlertTriangle,
+  Check,
   CheckCircle2,
   CornerUpLeft,
   Info,
@@ -38,14 +39,18 @@ import { fmtDate, fmtDateTime, fmtRange, fmtTime } from "@/lib/format";
 import { SITE } from "@/lib/site";
 import { canViewAllRequests } from "@/lib/access";
 
-type Search = { notice?: "submitted" | "resubmitted" | "edited" | undefined };
+type Search = {
+  notice?: "submitted" | "resubmitted" | "edited" | "signed" | "ticket-sent" | undefined;
+};
 
 export const Route = createFileRoute("/_authenticated/requests/$id")({
   validateSearch: (search: Record<string, unknown>): Search => ({
     notice:
       search["notice"] === "submitted" ||
       search["notice"] === "resubmitted" ||
-      search["notice"] === "edited"
+      search["notice"] === "edited" ||
+      search["notice"] === "signed" ||
+      search["notice"] === "ticket-sent"
         ? search["notice"]
         : undefined,
   }),
@@ -156,6 +161,62 @@ function RequestDetailPage() {
   const isOwner = r.requisitionerId === viewer.id;
   const canSendTripTicket = canViewAllRequests(viewer.role);
   const sigs = currentSignatures(r);
+  const allStagesSigned = STAGES.every((approvalStage) =>
+    sigs.some((signature) => signature.stage === approvalStage.key),
+  );
+  const viewerSignature = sigs.filter((signature) => signature.signerId === viewer.id).at(-1);
+  const showApprovalSignSuccess =
+    search.notice === "signed" &&
+    Boolean(viewerSignature) &&
+    ["pending_recommendation", "pending_approval"].includes(r.status);
+  const showSignatorySuccess =
+    search.notice === "ticket-sent" &&
+    allStagesSigned &&
+    Boolean(viewerSignature) &&
+    detail.tripTicketAttached &&
+    ["approved", "dispatched", "completed"].includes(r.status);
+
+  if (showSignatorySuccess || showApprovalSignSuccess) {
+    return (
+      <div className="coe-success-wrap">
+        <section className="panel coe-success-card" aria-labelledby="coe-success-title">
+          <div className="coe-success-logos" aria-label="Lyceum of Alabang and HRDO">
+            <img src="/lyceum-logo.png.png" alt="Lyceum of Alabang seal" />
+            <img src="/HRDO%20LOGO.png" alt="Human Resources Development Office logo" />
+          </div>
+          <div className="coe-success-icon" aria-hidden="true">
+            <Check />
+          </div>
+          <h1 id="coe-success-title">
+            {showSignatorySuccess ? "Request Approved Successfully" : "Request Signed Successfully"}
+          </h1>
+          <p className="coe-success-lead">
+            {showSignatorySuccess
+              ? `All required signatures are complete for vehicle request ${r.number}.`
+              : `Your signature for vehicle request ${r.number} has been recorded.`}
+          </p>
+          <p className="coe-success-message">
+            {showSignatorySuccess
+              ? "The approved trip ticket has been sent to the requisitioner."
+              : "The request has been forwarded to the next signatory for review."}
+          </p>
+          <p className="coe-success-reference">
+            Request reference: <strong>{r.number}</strong>
+          </p>
+          <div className="coe-success-actions">
+            <Button asChild>
+              <Link to="/requests">View all requests</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link to="/requests/$id" params={{ id: r.id }} search={{ notice: undefined }}>
+                View request details
+              </Link>
+            </Button>
+          </div>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -223,14 +284,39 @@ function RequestDetailPage() {
       )}
 
       {search.notice === "submitted" && isOwner && r.status === "pending_review" && (
-        <Notice
-          tone="success"
-          icon={CheckCircle2}
-          title={`Your vehicle request ${r.number} has been submitted successfully.`}
-        >
-          It is now waiting for review by the Head of Transport Services. Updates appear in your
-          notifications or email.
-        </Notice>
+        <div className="coe-success-wrap">
+          <section className="panel coe-success-card" aria-labelledby="coe-success-title">
+            <div className="coe-success-logos" aria-label="Lyceum of Alabang and HRDO">
+              <img src="/lyceum-logo.png.png" alt="Lyceum of Alabang seal" />
+              <img src="/HRDO%20LOGO.png" alt="Human Resources Development Office logo" />
+            </div>
+            <div className="coe-success-icon" aria-hidden="true">
+              <Check />
+            </div>
+            <h1 id="coe-success-title">Request Submitted Successfully</h1>
+            <p className="coe-success-lead">
+              Your vehicle request <strong>{r.number}</strong> has been sent to the Head of
+              Transport Services for review.
+            </p>
+            <p className="coe-success-message">
+              Please allow time for the review team to process your trip request. We will notify you
+              by email or in-app notifications if they need anything else.
+            </p>
+            <p className="coe-success-reference">
+              Request reference: <strong>{r.number}</strong>
+            </p>
+            <div className="coe-success-actions">
+              <Button asChild>
+                <Link to="/requests">View all requests</Link>
+              </Button>
+              <Button variant="outline" asChild>
+                <Link to="/requests/$id" params={{ id: r.id }}>
+                  View request
+                </Link>
+              </Button>
+            </div>
+          </section>
+        </div>
       )}
       {search.notice === "resubmitted" && isOwner && r.status === "pending_review" && (
         <Notice
@@ -435,6 +521,7 @@ function ActionPanel({
   isProxySigner: boolean;
 }) {
   const r = detail.request;
+  const navigate = Route.useNavigate();
   const queryClient = useQueryClient();
   const stage = STAGES.find((x) => x.key === stageKey)!;
   const [approveOpen, setApproveOpen] = useState(false);
@@ -491,6 +578,15 @@ function ActionPanel({
       toast.error(result.data.workflowEmail.message);
     }
     await refresh();
+    if (stageKey === "approve") {
+      await navigate({ to: "/print/$id", params: { id: r.id } });
+    } else {
+      await navigate({
+        to: "/requests/$id",
+        params: { id: r.id },
+        search: { notice: "signed" },
+      });
+    }
   }
 
   async function onReject(reason: string) {

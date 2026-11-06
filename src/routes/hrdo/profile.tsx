@@ -6,7 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader, Section } from "@/components/app/PageHeader";
 import { ButtonLoading } from "@/components/app/LoadingPanel";
+import { HrdoProcessorSettings } from "@/components/app/HrdoProcessorSettings";
 import { hrdoUpdateProfileFn } from "@/server-functions";
+import { canManageHrdoAccounts } from "@/lib/hrdo";
 import { SITE } from "@/lib/site";
 
 export const Route = createFileRoute("/hrdo/profile")({
@@ -110,6 +112,15 @@ function Profile() {
           </Button>
         </aside>
       </div>
+      {canManageHrdoAccounts(hrdoViewer) && (
+        <section className="mt-6 space-y-4" aria-label="HRDO processor account management">
+          <PageHeader
+            title="HRDO processor accounts"
+            description="Create and manage the accounts staff use to process COE requests."
+          />
+          <HrdoProcessorSettings />
+        </section>
+      )}
     </>
   );
 }

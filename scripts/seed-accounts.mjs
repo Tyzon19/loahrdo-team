@@ -58,7 +58,7 @@ const accounts = [
   {
     name: "HRDO Administrator",
     email: "hrdo_admin@lyceumalabang.edu.ph",
-    role: "hrdo_staff",
+    role: "hrdo_admin",
     department: "Human Resources Development Office",
     table: "hrdo_users",
   },

@@ -126,7 +126,7 @@ function LoginPage() {
             type="email"
             placeholder="Email address"
             autoComplete="email"
-            pattern="[A-Za-z0-9._%+\\-]+@lyceumalabang\\.edu\\.ph"
+            pattern="[A-Za-z0-9._%+\x2d]+@lyceumalabang[.]edu[.]ph"
             title="Use a valid @lyceumalabang.edu.ph email address."
             value={email}
             onChange={(event) => setEmail(event.target.value)}

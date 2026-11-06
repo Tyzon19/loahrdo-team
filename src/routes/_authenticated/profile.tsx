@@ -11,6 +11,7 @@ import {
   SignatoryAccountsSettings,
   SignatoryAssignmentSettings,
 } from "@/components/app/SignatorySettings";
+import { HrdoProcessorSettings } from "@/components/app/HrdoProcessorSettings";
 import { ButtonLoading } from "@/components/app/LoadingPanel";
 import { ROLE_TITLES } from "@/lib/workflow";
 import { updateProfileFn } from "@/server-functions";
@@ -189,6 +190,9 @@ function Profile() {
             <TabsTrigger value="accounts" className="h-11 px-3 sm:h-9">
               Signatory accounts
             </TabsTrigger>
+            <TabsTrigger value="hrdo-processors" className="h-11 px-3 sm:h-9">
+              HRDO processors
+            </TabsTrigger>
             <TabsTrigger value="assignments" className="h-11 px-3 sm:h-9">
               Signatory assignments
             </TabsTrigger>
@@ -207,6 +211,15 @@ function Profile() {
               existing account.
             </p>
             <SignatoryAccountsSettings />
+          </TabsContent>
+
+          <TabsContent value="hrdo-processors" className="mt-0 space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Create separate staff accounts for the HRDO COE system. Processor accounts sign in at
+              /hrdo/login and do not use the trip-ticket signatory roles. You can also grant HRDO
+              administrator access to the first HRDO account.
+            </p>
+            <HrdoProcessorSettings canCreateAdmin />
           </TabsContent>
 
           <TabsContent value="assignments" className="mt-0 space-y-4">

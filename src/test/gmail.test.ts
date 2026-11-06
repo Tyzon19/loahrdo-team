@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EmailMessage, VehicleRequest } from "@/lib/types";
-import { sendTemporaryPasswordEmail, sendWorkflowEmails } from "@/server/gmail";
+import { sendCoeStatusEmail, sendTemporaryPasswordEmail, sendWorkflowEmails } from "@/server/gmail";
 
 const request: VehicleRequest = {
   id: "request-1",
@@ -129,6 +129,46 @@ describe("Gmail workflow delivery", () => {
       "one-time-secret",
     );
     expect(sentMime).not.toContain("To: sender@example.com");
+  });
+
+  it("highlights a COE rejection reason in the red warning style and escapes its contents", async () => {
+    let sentMime = "";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = String(input);
+        if (url === "https://oauth2.googleapis.com/token") {
+          return Response.json({ access_token: "mock-access-token" });
+        }
+        if (url === "https://gmail.googleapis.com/gmail/v1/users/me/messages/send") {
+          const body = JSON.parse(String(init?.body)) as { raw: string };
+          sentMime = Buffer.from(body.raw, "base64url").toString("utf8");
+          return Response.json({});
+        }
+        throw new Error(`Unexpected email request: ${url}`);
+      }),
+    );
+
+    const result = await sendCoeStatusEmail({
+      recipientName: "Mark Turingan",
+      recipientEmail: "mark@example.edu",
+      requestId: "coe-request-1",
+      status: "rejected",
+      title: "Your COE request was not approved.",
+      message: "<script>invalid reason</script>",
+    });
+
+    expect(result).toMatchObject({ sent: true, delivered: 1, failed: 0 });
+    const htmlPart = sentMime.match(
+      /Content-Type: text\/html; charset="UTF-8"\r\nContent-Transfer-Encoding: base64\r\n\r\n([\s\S]*?)\r\n--loa_alt_[^\r\n]+/,
+    )?.[1];
+    const html = Buffer.from(htmlPart?.replace(/\s/g, "") ?? "", "base64").toString("utf8");
+    expect(html).toContain("background-color:#fef2f2");
+    expect(html).toContain("border-left:4px solid #dc2626");
+    expect(html).toContain("Reason for rejection");
+    expect(html).toContain("&lt;script&gt;invalid reason&lt;/script&gt;");
+    expect(html).not.toContain("<script>");
+    expect(html).toContain("This is an automated notification. Please do not reply to this email.");
   });
 
   it("reports missing approved sender configuration before attempting delivery", async () => {

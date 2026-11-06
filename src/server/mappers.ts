@@ -36,6 +36,11 @@ export interface RequestDbRow extends RowDataPacket {
   submitted_at: string;
 }
 
+export interface DestinationDbRow extends RowDataPacket {
+  
+}
+
+
 export interface UserDbRow extends RowDataPacket {
   id: string;
   name: string;

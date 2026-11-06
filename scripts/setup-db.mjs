@@ -96,6 +96,26 @@ try {
     );
   }
   await conn.query(
+    "ALTER TABLE hrdo_users MODIFY role ENUM('employee','hrdo_staff','hrdo_admin') NOT NULL DEFAULT 'employee'",
+  );
+  await conn.query(
+    "ALTER TABLE hrdo_coe_history MODIFY actor_role ENUM('employee','hrdo_staff','hrdo_admin','system') NOT NULL",
+  );
+  const [coeDocumentMimeColumn] = await conn.query(
+    `SELECT CHARACTER_MAXIMUM_LENGTH AS maxLength
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'hrdo_coe_documents' AND COLUMN_NAME = 'mime'`,
+    [dbName],
+  );
+  if (coeDocumentMimeColumn.length && Number(coeDocumentMimeColumn[0]?.maxLength ?? 0) < 255) {
+    await conn.query(
+      "ALTER TABLE hrdo_coe_documents MODIFY mime VARCHAR(255) NOT NULL DEFAULT 'application/pdf'",
+    );
+  }
+  await conn.query(
+    "UPDATE hrdo_users SET role = 'hrdo_admin' WHERE email = 'hrdo_admin@lyceumalabang.edu.ph' AND role = 'hrdo_staff'",
+  );
+  await conn.query(
     `ALTER TABLE request_history MODIFY type
      ENUM('submitted','updated','signed','returned','resubmitted','approved','dispatch','completed') NOT NULL`,
   );

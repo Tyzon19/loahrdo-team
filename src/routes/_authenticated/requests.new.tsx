@@ -11,7 +11,7 @@ import { SITE } from "@/lib/site";
 export const Route = createFileRoute("/_authenticated/requests/new")({
   beforeLoad: ({ context }) => {
     if (context.viewer?.role !== "requisitioner") {
-      throw redirect({ to: "/dashboard" });
+      throw redirect({ to: "/requests" });
     }
   },
   head: () => ({

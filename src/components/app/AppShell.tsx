@@ -88,14 +88,7 @@ const ITEMS = {
   },
 } satisfies Record<string, NavItem>;
 export const NAV: Record<Role, NavItem[]> = {
-  requisitioner: [
-    ITEMS.dash,
-    ITEMS.newReq,
-    ITEMS.myReq,
-    ITEMS.notif,
-    ITEMS.phoneDirectory,
-    ITEMS.profile,
-  ],
+  requisitioner: [ITEMS.newReq, ITEMS.myReq, ITEMS.notif, ITEMS.phoneDirectory, ITEMS.profile],
   transport_head: [
     ITEMS.dash,
     ITEMS.req,
@@ -263,7 +256,7 @@ export function AppShell({ user, children }: { user: Viewer; children: ReactNode
   }
   return (
     <div className="flex min-h-screen">
-      {signingOut && <LoadingScreen label="Signing out of LOA" mode="overlay" immediate />}
+      {signingOut && <LoadingScreen label="Signing out" mode="overlay" immediate />}
       <aside className="no-print sticky top-0 hidden h-screen w-56 shrink-0 md:block">
         <SideNav user={user} unread={unread} />
       </aside>

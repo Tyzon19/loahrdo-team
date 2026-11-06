@@ -39,11 +39,6 @@ export function AuthLayout({
             alt="Human Resources Development Office"
             className="h-12 w-12 object-contain"
           />
-          <img
-            src="/lyceum-logo.png.png"
-            alt="Lyceum of Alabang seal"
-            className="h-14 w-14 object-contain"
-          />
         </div>
         <h1 className="mb-6 text-xl font-bold uppercase text-primary">{title}</h1>
         {children}
@@ -60,7 +55,7 @@ export function AuthLayout({
             Terms of Service
           </Link>
           <div className="flex items-center gap-2 text-muted-foreground">
-            <span>Follow us</span>
+            <span>Message us</span>
             <a
               href={FACEBOOK_URL}
               target="_blank"
@@ -127,6 +122,27 @@ export function SubmitButton({
     <button
       type="submit"
       disabled={disabled}
+      className="flex w-full items-center justify-center gap-2 rounded-md bg-primary py-2 text-sm font-medium uppercase text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
+    >
+      <Icon className="h-4 w-4" />
+      {children}
+    </button>
+  );
+}
+
+export function SubmitButtonWithSpinner({
+  icon: Icon,
+  children,
+  busy = false,
+}: {
+  icon: LucideIcon;
+  children: ReactNode;
+  busy?: boolean;
+}) {
+  return (
+    <button
+      type="submit"
+      disabled={busy}
       className="flex w-full items-center justify-center gap-2 rounded-md bg-primary py-2 text-sm font-medium uppercase text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
     >
       <Icon className="h-4 w-4" />

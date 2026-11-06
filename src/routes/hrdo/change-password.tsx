@@ -44,7 +44,9 @@ function HrdoChangePassword() {
     event.preventDefault();
     if (busy) return;
     const dashboardTarget =
-      hrdoViewer?.role === "hrdo_staff" ? "/hrdo/dashboard" : "/hrdo/coe";
+      hrdoViewer?.role === "hrdo_staff" || hrdoViewer?.role === "hrdo_admin"
+        ? "/hrdo/dashboard"
+        : "/hrdo/coe";
     setError(null);
     setFieldErrors({});
 
