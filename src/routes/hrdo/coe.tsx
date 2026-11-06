@@ -1,4 +1,4 @@
-import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
@@ -35,27 +35,40 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PageHeader } from "@/components/app/PageHeader";
-import { ButtonLoading } from "@/components/app/LoadingPanel";
+import { PageHeader, Section } from "@/components/app/PageHeader";
+import { ButtonLoading, LoadingScreen } from "@/components/app/LoadingPanel";
 import { submitCoeRequestFn } from "@/server-functions";
 import { unwrap } from "@/lib/api";
 import { joinFullName } from "@/lib/name";
 import { normalizePhilippineMobileNumber } from "@/lib/validation";
-import { COE_COPY_TYPE_LABELS, type CoeCopyType } from "@/lib/hrdo";
-import { SITE } from "@/lib/site";
+import { COE_COPY_TYPE_LABELS, HRDO, type CoeCopyType } from "@/lib/hrdo";
+import {
+  COE_DEPARTMENTS,
+  COE_DESCRIPTION_OPTIONS,
+  COE_DESCRIPTION_OTHER,
+  COE_DESCRIPTION_TEXT_OPTIONS,
+  COE_EMPLOYMENT_STATUSES,
+  COE_TITLES,
+  formatStoredDescription,
+} from "@/lib/coe-form";
 
-const DESCRIPTION_OTHER = "Others";
-const DESCRIPTION_OPTIONS = [
-  "Certificate of Employment",
-  "Letter of",
-  "Affidavit of",
-  "With compensation review",
-  "Service Record",
-  "Form of",
-  DESCRIPTION_OTHER,
+const COE_STEPS = [
+  {
+    key: "type",
+    title: "Request type",
+    blurb: "Choose whether this is your own certificate or a verification for another employer.",
+  },
+  {
+    key: "details",
+    title: "Request details",
+    blurb: "Schedule, delivery, and the information HRDO needs to prepare the certificate.",
+  },
+  {
+    key: "review",
+    title: "Review",
+    blurb: "Read each line. Use Back if something is wrong.",
+  },
 ] as const;
-const DESCRIPTION_TEXT_OPTIONS = new Set(["Letter of", "Affidavit of", "Form of"]);
-const STEP_LABELS = ["Request type", "Request details", "Review & submit"] as const;
 
 function localDateValue(date: Date) {
   const year = date.getFullYear();
@@ -83,7 +96,7 @@ export const Route = createFileRoute("/hrdo/coe")({
   },
   head: () => ({
     meta: [
-      { title: `COE Request — ${SITE.name}` },
+      { title: `COE Request · ${HRDO.shortName}` },
       { name: "description", content: "Submit and track a Certificate of Employment request." },
       { name: "robots", content: "noindex, nofollow" },
     ],
@@ -94,7 +107,6 @@ export const Route = createFileRoute("/hrdo/coe")({
 function CoeRequestPage() {
   const { hrdoViewer } = Route.useRouteContext();
   const viewerEmail = hrdoViewer?.email ?? "";
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [requestorType, setRequestorType] = useState<"internal" | "third_party" | null>(null);
   const [purpose, setPurpose] = useState("");
@@ -126,6 +138,10 @@ function CoeRequestPage() {
   const [privacyChecked, setPrivacyChecked] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
+  const [submissionSummary, setSubmissionSummary] = useState<{
+    email: string;
+    copyType: CoeCopyType;
+  } | null>(null);
 
   const dateRequested = localDateValue(new Date());
   const minimumDateNeeded = addWorkingDays(new Date(), 3);
@@ -149,14 +165,11 @@ function CoeRequestPage() {
               `Department: ${internalDepartment || "Not provided"}`,
               `Date requested: ${dateRequested}`,
               `Date needed: ${dateNeeded}`,
-              `Description: ${
-                descriptionOptions
-                  .map(
-                    (option) =>
-                      `${option}${descriptionDetails[option] ? ` ${descriptionDetails[option]}` : ""}`,
-                  )
-                  .join(", ") || "Not provided"
-              }${customDescription.trim() ? ` - ${customDescription.trim()}` : ""}`,
+              `Description: ${formatStoredDescription(
+                descriptionOptions,
+                descriptionDetails,
+                customDescription,
+              )}`,
               `Employment status: ${employmentStatus || "Not provided"}`,
               `Date hired: Not provided`,
               `Copy/delivery: ${COE_COPY_TYPE_LABELS[copyType]}`,
@@ -173,14 +186,11 @@ function CoeRequestPage() {
               `Date requested: ${dateRequested}`,
               `Date needed: ${dateNeeded}`,
               `Copy/delivery: ${COE_COPY_TYPE_LABELS[copyType]}`,
-              `Description: ${
-                descriptionOptions
-                  .map(
-                    (option) =>
-                      `${option}${descriptionDetails[option] ? ` ${descriptionDetails[option]}` : ""}`,
-                  )
-                  .join(", ") || "Not provided"
-              }${customDescription.trim() ? ` - ${customDescription.trim()}` : ""}`,
+              `Description: ${formatStoredDescription(
+                descriptionOptions,
+                descriptionDetails,
+                customDescription,
+              )}`,
             ].join(" | "),
       ]
         .filter(Boolean)
@@ -213,7 +223,7 @@ function CoeRequestPage() {
         }),
       );
     },
-    onSuccess: async (created) => {
+    onSuccess: async () => {
       setPurpose("");
       setDescriptionOptions([]);
       setDescriptionDetails({});
@@ -245,219 +255,190 @@ function CoeRequestPage() {
       setCustomDescription("");
       setPrivacyChecked(false);
       setRequestorType(null);
-      toast.success(
-        "Request submitted successfully. Your COE request is now under review and will be processed within 3 working days. It is not automatically approved.",
-        { duration: 6000 },
-      );
       await queryClient.invalidateQueries({ queryKey: ["coe"] });
-      await navigate({ to: "/hrdo/coe/$id", params: { id: created.id } });
     },
   });
 
   if (!hrdoViewer) return null;
 
+  const currentBatch = COE_STEPS[currentStep] ?? COE_STEPS[0];
+  const lastStep = COE_STEPS.length - 1;
+
+  if (submit.isSuccess && submit.data && submissionSummary) {
+    return (
+      <div className="coe-request">
+        <main className="coe-success-wrap">
+          <section className="panel coe-success-card" aria-labelledby="coe-success-title">
+            <div className="coe-success-logos" aria-label="Lyceum of Alabang and HRDO">
+              <img src="/lyceum-logo.png.png" alt="Lyceum of Alabang seal" />
+              <img src="/HRDO%20LOGO.png" alt="Human Resources Development Office logo" />
+            </div>
+            <div className="coe-success-icon" aria-hidden="true">
+              <Check />
+            </div>
+            <h1 id="coe-success-title">COE Request Successful</h1>
+            <p className="coe-success-lead">
+              Your request has been submitted to the Human Resources Development Office.
+            </p>
+            <p className="coe-success-message">
+              Please allow <strong>3 working days</strong> for processing. We will email you at{" "}
+              <strong>{submissionSummary.email}</strong> when there is an update or if we need more
+              information.
+            </p>
+            {submissionSummary.copyType !== "soft" && (
+              <p className="coe-success-message">
+                You will receive an email when your hardcopy is ready for pickup at HRDO.
+              </p>
+            )}
+            <p className="coe-success-reference">
+              Request reference: <strong>{submit.data.id}</strong>
+            </p>
+            <div className="coe-success-actions">
+              <Button asChild>
+                <Link to="/hrdo/coe/$id" params={{ id: submit.data.id }}>
+                  View request status
+                </Link>
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  submit.reset();
+                  setSubmissionSummary(null);
+                  setCurrentStep(0);
+                }}
+              >
+                Submit another request
+              </Button>
+            </div>
+          </section>
+        </main>
+      </div>
+    );
+  }
+
+  function missingDescription() {
+    if (!descriptionOptions.length) return "Choose at least one document or description.";
+    if (descriptionOptions.includes(COE_DESCRIPTION_OTHER) && !customDescription.trim()) {
+      return "Specify the other description.";
+    }
+    const missing = descriptionOptions.find(
+      (option) => COE_DESCRIPTION_TEXT_OPTIONS.has(option) && !descriptionDetails[option]?.trim(),
+    );
+    return missing ? `Complete the "${missing}" field.` : "";
+  }
+
+  function stepError(step: number) {
+    const key = COE_STEPS[step]?.key;
+    if (key === "type" && !requestorType) {
+      return "Choose Employee request or Third-party verification.";
+    }
+    if (key === "details") {
+      if (!dateNeeded || dateNeeded < minimumDateNeeded) {
+        return "Choose a date needed at least 3 working days from today.";
+      }
+      const descriptionError = missingDescription();
+      if (descriptionError) return descriptionError;
+      if (requestorType === "internal") {
+        if (!employeeTitle) return "Select a title.";
+        if (employeeName.firstName.trim().length < 2) return "Enter your first name.";
+        if (employeeName.lastName.trim().length < 2) return "Enter your last name.";
+        if (
+          !employeeEmail.trim() ||
+          !/^[^\s@]+@lyceumalabang\.edu\.ph$/i.test(employeeEmail.trim())
+        ) {
+          return "Use your official email: name@lyceumalabang.edu.ph";
+        }
+        if (employeeNumber.trim() && employeeNumber.trim().length < 3) {
+          return "Employee ID must be 3 or more characters if provided.";
+        }
+        const departmentName = department === "Other" ? customDepartment.trim() : department.trim();
+        if (!departmentName) return "Choose your department or office, or specify Other.";
+        if (!employmentStatus) return "Select your employment status.";
+        if (purpose.trim().length < 5) return "Enter the purpose of use.";
+      }
+      if (requestorType === "third_party") {
+        if (!verifierCompany.trim()) return "Enter the verifying company or agency name.";
+        if (!verifierName.trim()) return "Enter the authorized representative name.";
+        if (!verifierEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(verifierEmail)) {
+          return "Enter a valid company or work email.";
+        }
+        if (!normalizePhilippineMobileNumber(verifierContact)) {
+          return "Enter a valid Philippine mobile number (09XXXXXXXXX or +639XXXXXXXXX).";
+        }
+        if (!subjectName.trim()) return "Enter the employee name.";
+        if (!subjectTitle) return "Select a title for the employee to verify.";
+        if (!subjectDob) return "Enter the hiring date.";
+        if (subjectDob > dateRequested) return "Date hired cannot be in the future.";
+        if (!employmentEndDate) return "Enter the last day of employment.";
+        if (employmentEndDate < subjectDob) {
+          return "Last day of employment must be on or after the hiring date.";
+        }
+        if (employmentEndDate > dateRequested) {
+          return "Last day of employment cannot be in the future.";
+        }
+      }
+    }
+    if (key === "review") {
+      if (!privacyChecked) return "Agree to the data privacy statement before submitting.";
+      if (requestorType === "internal" && joinFullName(employeeName).length < 5) {
+        return "Enter employee name.";
+      }
+    }
+    return "";
+  }
+
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    if (currentStep === 0) {
-      if (!requestorType) {
-        toast.error("Choose Employee Request or Third-Party Employment Verification.");
-        return;
-      }
-      setCurrentStep(1);
+    const error = stepError(currentStep);
+    if (error) {
+      toast.error(error);
       return;
     }
-
-    const fullEmployeeName = joinFullName(employeeName);
-    const trimmedEmployeeEmail = employeeEmail.trim();
-    const trimmedEmployeeNumber = employeeNumber.trim();
-    const trimmedPurpose = purpose.trim();
-    if (!dateNeeded || dateNeeded < minimumDateNeeded) {
-      toast.error("Choose a date needed at least 3 working days from today.");
+    if (currentStep < lastStep) {
+      setCurrentStep(currentStep + 1);
       return;
     }
-
-    if (requestorType === "internal") {
-      if (!employeeTitle) {
-        toast.error("Select a title for the employee.");
-        return;
-      }
-      if (employeeName.firstName.trim().length < 2) {
-        toast.error("Enter your first name.");
-        return;
-      }
-      if (employeeName.lastName.trim().length < 2) {
-        toast.error("Enter last name.");
-        return;
-      }
-      if (
-        !trimmedEmployeeEmail ||
-        !/^[^\s@]+@lyceumalabang\.edu\.ph$/i.test(trimmedEmployeeEmail)
-      ) {
-        toast.error("Use your official institutional email: name@lyceumalabang.edu.ph");
-        return;
-      }
-      if (trimmedEmployeeNumber && trimmedEmployeeNumber.length < 3) {
-        toast.error("Employee ID must be 3 or more characters if provided.");
-        return;
-      }
-      const departmentName = department === "Other" ? customDepartment.trim() : department.trim();
-      if (!departmentName) {
-        toast.error("Choose your department or office, or specify Other.");
-        return;
-      }
-      if (!employmentStatus) {
-        toast.error("Select your employment status.");
-        return;
-      }
-      if (!trimmedPurpose || trimmedPurpose.length < 5) {
-        toast.error("Enter the purpose of use.");
-        return;
-      }
-      if (!descriptionOptions.length) {
-        toast.error("Select at least one description.");
-        return;
-      }
-      if (descriptionOptions.includes(DESCRIPTION_OTHER) && !customDescription.trim()) {
-        toast.error("Specify the other description.");
-        return;
-      }
-      const missingDescriptionDetail = descriptionOptions.find(
-        (option) => DESCRIPTION_TEXT_OPTIONS.has(option) && !descriptionDetails[option]?.trim(),
-      );
-      if (missingDescriptionDetail) {
-        toast.error(`Complete the "${missingDescriptionDetail}" field.`);
-        return;
-      }
-    } else {
-      if (!verifierCompany.trim()) {
-        toast.error("Enter the verifying company or agency name.");
-        return;
-      }
-      if (!verifierName.trim()) {
-        toast.error("Enter the authorized representative name.");
-        return;
-      }
-      if (!verifierEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(verifierEmail)) {
-        toast.error("Enter a valid company email / work email.");
-        return;
-      }
-      if (!normalizePhilippineMobileNumber(verifierContact)) {
-        toast.error("Enter a valid Philippine mobile number (09XXXXXXXXX or +639XXXXXXXXX).");
-        return;
-      }
-      if (!subjectName.trim()) {
-        toast.error("Enter the employee name or full name.");
-        return;
-      }
-      if (!subjectTitle) {
-        toast.error("Select a title for the employee to verify.");
-        return;
-      }
-      if (!subjectDob) {
-        toast.error("Enter the employee hiring date.");
-        return;
-      }
-      if (subjectDob > dateRequested) {
-        toast.error("Date hired cannot be in the future.");
-        return;
-      }
-      if (!employmentEndDate) {
-        toast.error("Enter the former employee's last day of employment.");
-        return;
-      }
-      if (employmentEndDate < subjectDob) {
-        toast.error("Employment end date must be on or after the hiring date.");
-        return;
-      }
-      if (employmentEndDate > dateRequested) {
-        toast.error("Employment end date cannot be in the future.");
-        return;
-      }
-      if (!descriptionOptions.length) {
-        toast.error("Select at least one description.");
-        return;
-      }
-      if (descriptionOptions.includes(DESCRIPTION_OTHER) && !customDescription.trim()) {
-        toast.error("Specify the other description.");
-        return;
-      }
-      const missingDescriptionDetail = descriptionOptions.find(
-        (option) => DESCRIPTION_TEXT_OPTIONS.has(option) && !descriptionDetails[option]?.trim(),
-      );
-      if (missingDescriptionDetail) {
-        toast.error(`Complete the "${missingDescriptionDetail}" field.`);
-        return;
-      }
-    }
-
-    if (currentStep === 1) {
-      setCurrentStep(2);
-      return;
-    }
-
-    if (!privacyChecked) {
-      toast.error("Please agree to the data privacy statement before submitting.");
-      return;
-    }
-
-    if (requestorType === "internal" && fullEmployeeName.length < 5) {
-      toast.error("Enter employee name.");
-      return;
-    }
-
     setShowConfirm(true);
   }
 
   function confirmSubmit() {
     setShowConfirm(false);
+    setSubmissionSummary({
+      email: requestorType === "third_party" ? verifierEmail : employeeEmail,
+      copyType,
+    });
     submit.mutate();
   }
 
   return (
     <>
-      <PageHeader
-        title="Certificate of Employment (COE) & Verification Form"
-        description="Submit a request for employment verification or certification."
-      />
-
+      {submit.isPending && (
+        <LoadingScreen label="Submitting your COE request" mode="overlay" immediate />
+      )}
       <div className="coe-request">
-        <header className="coe-header">
-          <div className="coe-header-inner">
-            <p className="coe-eyebrow">HR Services</p>
-            <h1 className="coe-title">COE Request</h1>
-            {currentStep > 0 && (
-              <ol className="coe-steps" aria-label="Request progress">
-                {STEP_LABELS.map((label, step) => {
-                  const state =
-                    step < currentStep ? "done" : step === currentStep ? "active" : "pending";
-                  return (
-                    <li
-                      key={label}
-                      className="coe-step"
-                      data-state={state}
-                      aria-current={step === currentStep ? "step" : undefined}
-                    >
-                      <div className="coe-step-content">
-                        <span className="coe-step-circle">
-                          {step < currentStep ? <Check aria-hidden /> : step + 1}
-                        </span>
-                        <span className="coe-step-name">{label}</span>
-                      </div>
-                      {step < STEP_LABELS.length - 1 && <span className="coe-step-line" />}
-                    </li>
-                  );
-                })}
-              </ol>
-            )}
-          </div>
-        </header>
-
         <main className="coe-main">
+          <PageHeader title="CERTIFICATE OF EMPLOYMENT" description={currentBatch.blurb} />
+          <ol className="coe-steps" aria-label="Request progress">
+            {COE_STEPS.map((step, index) => {
+              const state =
+                index === currentStep ? "active" : index < currentStep ? "done" : "upcoming";
+              return (
+                <li key={step.key} className="coe-step" data-state={state}>
+                  <div className="coe-step-content">
+                    <span className="coe-step-circle">
+                      {state === "done" ? <Check aria-hidden /> : index + 1}
+                    </span>
+                    <span className="coe-step-name">{step.title}</span>
+                  </div>
+                  {index < COE_STEPS.length - 1 ? <span className="coe-step-line" /> : null}
+                </li>
+              );
+            })}
+          </ol>
           <form className="coe-form" onSubmit={onSubmit} noValidate>
             {currentStep === 0 && (
-              <section className="coe-section">
-                <h2 className="coe-section-title">What type of request are you making?</h2>
+              <Section title="What type of request are you making?">
                 <p className="coe-section-description">
                   Choose the option that best describes your request to continue.
                 </p>
@@ -473,7 +454,7 @@ function CoeRequestPage() {
                   <label htmlFor="requestor-internal" className="coe-request-type">
                     <RadioGroupItem value="internal" id="requestor-internal" className="mt-0.5" />
                     <span>
-                      <span className="block font-medium">Employee Request</span>
+                      <span className="block font-medium">Request my own certificate</span>
                       <span className="mt-1 block text-sm text-muted-foreground">
                         Request a COE for your own employment records.
                       </span>
@@ -493,13 +474,12 @@ function CoeRequestPage() {
                     </span>
                   </label>
                 </RadioGroup>
-              </section>
+              </Section>
             )}
 
             {currentStep === 1 && (
               <>
-                <section className="coe-section">
-                  <h2 className="coe-section-title">Request schedule</h2>
+                <Section title="Request schedule">
                   <p className="coe-section-description">When do you need your certificate?</p>
                   <div className="coe-fields coe-fields-schedule">
                     <div className="coe-date-wrap">
@@ -529,9 +509,8 @@ function CoeRequestPage() {
                       </p>
                     </div>
                   </div>
-                </section>
-                <section className="coe-section">
-                  <h2 className="coe-section-title">Type of copy &amp; delivery</h2>
+                </Section>
+                <Section title="Type of copy &amp; delivery">
                   <p className="coe-section-description">
                     Choose how you&apos;d like to receive it.
                   </p>
@@ -582,11 +561,10 @@ function CoeRequestPage() {
                       </div>
                     ))}
                   </RadioGroup>
-                </section>
+                </Section>
                 {requestorType === "internal" ? (
                   <div className="space-y-5">
-                    <section className="coe-section">
-                      <h2 className="coe-section-title">Employee request details</h2>
+                    <Section title="Employee request details">
                       <p className="coe-section-description">
                         Your details for your own employment records.
                       </p>
@@ -600,13 +578,11 @@ function CoeRequestPage() {
                                 <SelectValue placeholder="Select title" />
                               </SelectTrigger>
                               <SelectContent>
-                                {["Mr", "Ms", "Mrs", "Dr", "Atty", "Engr", "Prof", "Mx"].map(
-                                  (title) => (
-                                    <SelectItem key={title} value={title}>
-                                      {title}
-                                    </SelectItem>
-                                  ),
-                                )}
+                                {COE_TITLES.map((title) => (
+                                  <SelectItem key={title} value={title}>
+                                    {title}
+                                  </SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
                           </div>
@@ -698,45 +674,7 @@ function CoeRequestPage() {
                                 <SelectValue placeholder="Select department" />
                               </SelectTrigger>
                               <SelectContent>
-                                {[
-                                  "Admission Office",
-                                  "College of Law",
-                                  "Basic Education Library",
-                                  "Customs Administration",
-                                  "Bookstore",
-                                  "Center forCreer and Alumni Services",
-                                  "CCS",
-                                  "CCTV Office",
-                                  "Clinic",
-                                  "College Library & SHS Library",
-                                  "Finance",
-                                  "General Education & COED",
-                                  "LOA Care Center (Guidance & Testing)",
-                                  "HRM - CTHM Faculty",
-                                  "HRM - Stockroom / TESDA Custodian",
-                                  "Human Resource Dept.",
-                                  "Inches & Pixels",
-                                  "Quality Assurance Office",
-                                  "ITM",
-                                  "VCAT / Monitoring Office",
-                                  "Office of Academic Affairs",
-                                  "Office of Studies Affairs & Services",
-                                  "Prefect Discipline Office (beD)",
-                                  "PFMO",
-                                  "Principal's Office DepEd",
-                                  "Purchasing Office",
-                                  "Property Office",
-                                  "Registrar",
-                                  "REM Department",
-                                  "CRID (Research Department)",
-                                  "Security",
-                                  "Sounds and Lights DVA Gym",
-                                  "Tesda - Assesment",
-                                  "Technology Department (TESDA",
-                                  "Warehouse",
-                                  "Office of the President",
-                                  "Senior Highschool Faculty",
-                                ].map((item) => (
+                                {COE_DEPARTMENTS.map((item) => (
                                   <SelectItem key={item} value={item}>
                                     {item}
                                   </SelectItem>
@@ -766,12 +704,7 @@ function CoeRequestPage() {
                               onValueChange={setEmploymentStatus}
                               className="mt-2 grid gap-2 sm:grid-cols-2"
                             >
-                              {[
-                                "Full-time / Regular",
-                                "Part-time",
-                                "Probationary",
-                                "Contractual / Contract of Service",
-                              ].map((status, index) => (
+                              {COE_EMPLOYMENT_STATUSES.map((status, index) => (
                                 <label
                                   key={status}
                                   htmlFor={`employment-status-${index}`}
@@ -804,7 +737,7 @@ function CoeRequestPage() {
                         <div className="coe-documents">
                           <h3 className="coe-documents-title">Documents needed</h3>
                           <div className="coe-document-grid">
-                            {DESCRIPTION_OPTIONS.map((option) => (
+                            {COE_DESCRIPTION_OPTIONS.map((option) => (
                               <label
                                 key={option}
                                 className="coe-document"
@@ -820,7 +753,7 @@ function CoeRequestPage() {
                                     )
                                   }
                                 />
-                                {DESCRIPTION_TEXT_OPTIONS.has(option) ? (
+                                {COE_DESCRIPTION_TEXT_OPTIONS.has(option) ? (
                                   <span className="flex min-w-0 flex-1 items-center gap-1 text-sm">
                                     <span className="shrink-0">{option}</span>
                                     <Input
@@ -845,7 +778,7 @@ function CoeRequestPage() {
                               </label>
                             ))}
                           </div>
-                          {descriptionOptions.includes(DESCRIPTION_OTHER) && (
+                          {descriptionOptions.includes(COE_DESCRIPTION_OTHER) && (
                             <Input
                               id="custom-description"
                               className="mt-3"
@@ -868,12 +801,11 @@ function CoeRequestPage() {
                           />
                         </div>
                       </div>
-                    </section>
+                    </Section>
                   </div>
                 ) : (
                   <div className="space-y-5">
-                    <section className="coe-section">
-                      <h2 className="coe-section-title">Third-party employment verification</h2>
+                    <Section title="Third-party employment verification">
                       <p className="coe-section-description">
                         Details of the company requesting verification.
                       </p>
@@ -943,13 +875,11 @@ function CoeRequestPage() {
                                 <SelectValue placeholder="Select title" />
                               </SelectTrigger>
                               <SelectContent>
-                                {["Mr", "Ms", "Mrs", "Dr", "Atty", "Engr", "Prof", "Mx"].map(
-                                  (title) => (
-                                    <SelectItem key={title} value={title}>
-                                      {title}
-                                    </SelectItem>
-                                  ),
-                                )}
+                                {COE_TITLES.map((title) => (
+                                  <SelectItem key={title} value={title}>
+                                    {title}
+                                  </SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
                           </div>
@@ -999,7 +929,7 @@ function CoeRequestPage() {
                         <div className="coe-documents">
                           <h3 className="coe-documents-title">Documents needed</h3>
                           <div className="coe-document-grid">
-                            {DESCRIPTION_OPTIONS.map((option) => (
+                            {COE_DESCRIPTION_OPTIONS.map((option) => (
                               <label
                                 key={option}
                                 className="coe-document"
@@ -1015,7 +945,7 @@ function CoeRequestPage() {
                                     )
                                   }
                                 />
-                                {DESCRIPTION_TEXT_OPTIONS.has(option) ? (
+                                {COE_DESCRIPTION_TEXT_OPTIONS.has(option) ? (
                                   <span className="min-w-0 flex-1">
                                     <span className="text-sm">{option}</span>
                                     <Input
@@ -1039,7 +969,7 @@ function CoeRequestPage() {
                               </label>
                             ))}
                           </div>
-                          {descriptionOptions.includes(DESCRIPTION_OTHER) && (
+                          {descriptionOptions.includes(COE_DESCRIPTION_OTHER) && (
                             <Input
                               id="third-party-custom-description"
                               className="mt-3"
@@ -1051,7 +981,7 @@ function CoeRequestPage() {
                           )}
                         </div>
                       </div>
-                    </section>
+                    </Section>
                   </div>
                 )}
               </>
@@ -1059,8 +989,7 @@ function CoeRequestPage() {
 
             {currentStep === 2 && (
               <div className="coe-review">
-                <section className="coe-section coe-summary">
-                  <h2 className="coe-section-title">Review your request</h2>
+                <Section title="Review your request">
                   <p className="coe-section-description">
                     Review the information below before submitting. Use Back if you need to make
                     changes.
@@ -1068,7 +997,7 @@ function CoeRequestPage() {
                   <dl className="coe-summary-grid">
                     <div>
                       <dt className="text-muted-foreground">Request type</dt>
-                      <dd className="font-medium">
+                      <dd className="text-sm font-normal leading-relaxed">
                         {requestorType === "internal"
                           ? "Internal Employee"
                           : "Third-Party Employment Verification"}
@@ -1143,6 +1072,10 @@ function CoeRequestPage() {
                           <dt className="text-muted-foreground">Date hired</dt>
                           <dd className="font-medium">{subjectDob}</dd>
                         </div>
+                        <div>
+                          <dt className="text-muted-foreground">Last day of employment</dt>
+                          <dd className="font-medium">{employmentEndDate}</dd>
+                        </div>
                       </>
                     )}
                     <div className="sm:col-span-2">
@@ -1154,7 +1087,7 @@ function CoeRequestPage() {
                               `${option}${descriptionDetails[option] ? ` ${descriptionDetails[option]}` : ""}`,
                           )
                           .join(", ")}
-                        {customDescription.trim() ? ` — ${customDescription.trim()}` : ""}
+                        {customDescription.trim() ? ` - ${customDescription.trim()}` : ""}
                       </dd>
                     </div>
                     {requestorType === "internal" && (
@@ -1170,14 +1103,13 @@ function CoeRequestPage() {
                       </div>
                     )}
                   </dl>
-                </section>
+                </Section>
 
-                <section className="coe-section">
-                  <h2 className="coe-section-title">Final confirmation</h2>
+                <Section title="Final confirmation">
                   <div className="coe-confirmation">
                     <p>
                       <strong>Processing SLA Notice:</strong> Standard processing time for all
-                      requests is 3 to 5 working days. You will receive an automated notification
+                      requests is 3 working days. You will receive an automated notification
                       once your request has been updated by HRDO.
                     </p>
                     <label className="flex items-start gap-2 rounded-md border p-3">
@@ -1191,7 +1123,7 @@ function CoeRequestPage() {
                       </span>
                     </label>
                   </div>
-                </section>
+                </Section>
 
                 <div className="coe-notice">
                   <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden />
@@ -1232,7 +1164,9 @@ function CoeRequestPage() {
                   Back
                 </Button>
                 {currentStep > 0 && (
-                  <span className="coe-footer-step">Step {currentStep + 1} of 3</span>
+                  <span className="coe-footer-step">
+                    Step {currentStep + 1} of {COE_STEPS.length}
+                  </span>
                 )}
                 <Button
                   type="submit"
@@ -1241,7 +1175,7 @@ function CoeRequestPage() {
                 >
                   {submit.isPending ? (
                     <ButtonLoading label="Submitting…" />
-                  ) : currentStep === 2 ? (
+                  ) : currentStep === lastStep ? (
                     "Submit COE Request"
                   ) : (
                     <>
@@ -1265,8 +1199,8 @@ function CoeRequestPage() {
                 Are you sure you want to submit this Certificate of Employment request?
               </span>
               <span className="block rounded-md bg-amber-50 p-2 text-sm text-amber-900">
-                <strong>Reminder:</strong> This request is{" "}
-                <strong>not automatically granted</strong>. HRDO will review and process it within{" "}
+                <strong>Reminder:</strong> Submission of this request does{" "}
+                <strong>not guarantee</strong>. Automatic approval.{" "}
                 <strong>3 working days</strong> from submission.
               </span>
             </AlertDialogDescription>

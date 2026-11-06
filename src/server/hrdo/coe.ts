@@ -929,20 +929,10 @@ function replaceTextRuns(xml: string, replacements: Record<number, string>) {
   );
 }
 
-export function widenCoeTemplateTextArea(xml: string) {
+export function preserveCoeTemplateLayout(xml: string) {
   const pageMargins = xml.match(/<w:pgMar\b([^>]*)\/>/);
   if (!pageMargins) throw new AppError("The COE template page margins are missing.");
-  if (
-    !/\bw:left="[^"]*"/.test(pageMargins[1] ?? "") ||
-    !/\bw:right="[^"]*"/.test(pageMargins[1] ?? "")
-  ) {
-    throw new AppError("The COE template side margins are missing.");
-  }
-
-  const adjustedMargins = (pageMargins[1] ?? "")
-    .replace(/\bw:left="[^"]*"/, 'w:left="1080"')
-    .replace(/\bw:right="[^"]*"/, 'w:right="1080"');
-  return xml.replace(pageMargins[0], `<w:pgMar${adjustedMargins}/>`);
+  return xml;
 }
 
 export function formatCoeEmploymentDate(value: string) {
@@ -1007,7 +997,7 @@ async function buildCoeTemplate(data: z.infer<typeof templateSchema>) {
   const subjectTitleMatch = request.note.match(/(?:^|\| )Subject title: ([^|\n]+)/i);
   const title = (titleMatch?.[1] || subjectTitleMatch?.[1] || "").trim();
   const titleWithPunctuation = title ? `${title}. ` : "";
-  const replacementXml = widenCoeTemplateTextArea(
+  const replacementXml = preserveCoeTemplateLayout(
     replaceTextRuns(xml, {
       9: title,
       10: title ? ". " : "",
@@ -1072,6 +1062,11 @@ export async function sendCoeTemplate(input: unknown) {
   requireStaff(viewer);
   const data = parseInput(templateSchema, input);
   const { request, fileName, mime, content } = await buildCoeTemplate(data);
+  if (request.copyType === "original") {
+    throw new AppError(
+      "This is a hardcopy-only request. Do not email the Word template; mark the request ready for pickup when the printed copy is prepared.",
+    );
+  }
   if (!request.employeeEmail) {
     throw new AppError("This request has no employee email address to send the template to.");
   }
@@ -1226,7 +1221,12 @@ export async function markCoeReady(input: unknown): Promise<CoeRequest> {
   requireStaff(viewer);
   const data = parseInput(idSchema, input);
 
-  let emailRecipient: { id: string; employee_name: string; employee_email: string } | null = null;
+  let emailRecipient: {
+    id: string;
+    employee_name: string;
+    employee_email: string;
+    copy_type: CoeCopyType;
+  } | null = null;
 
   await withTransaction(async (conn) => {
     const row = await loadRow(data.id, conn, true);
@@ -1234,6 +1234,7 @@ export async function markCoeReady(input: unknown): Promise<CoeRequest> {
       id: row.id,
       employee_name: row.employee_name,
       employee_email: row.employee_email,
+      copy_type: row.copy_type,
     };
     if (row.status === "ready_for_pickup") {
       throw new AppError(
@@ -1274,12 +1275,18 @@ export async function markCoeReady(input: unknown): Promise<CoeRequest> {
   });
 
   if (emailRecipient) {
-    const document = await loadDocumentForEmail(data.id);
+    const document =
+      emailRecipient.copy_type === "both" ? await loadDocumentForEmail(data.id) : undefined;
+    const isHardcopyOnly = emailRecipient.copy_type === "original";
     await notifyEmployeeOfCoeStatus(
       "ready_for_pickup",
       emailRecipient,
-      "Your COE is ready for pickup.",
-      "Please visit the HRDO office and present any required identification when claiming your certificate.",
+      isHardcopyOnly
+        ? "Your hardcopy COE is ready for pickup at HR."
+        : "Your COE is ready for pickup.",
+      isHardcopyOnly
+        ? "Your printed Certificate of Employment is ready for pickup at the HRDO office. Please visit HRDO to claim your hardcopy. No electronic copy is attached because you requested hardcopy only."
+        : "Please visit the HRDO office and present any required identification when claiming your certificate.",
       document
         ? {
             filename: document.fileName,
@@ -1298,8 +1305,12 @@ export async function releaseCoeDocument(input: unknown): Promise<CoeRequest> {
   requireStaff(viewer);
   const data = parseInput(releaseSchema, input);
 
-  let statusEmailRecipient: { id: string; employee_name: string; employee_email: string } | null =
-    null;
+  let statusEmailRecipient: {
+    id: string;
+    employee_name: string;
+    employee_email: string;
+    copy_type: CoeCopyType;
+  } | null = null;
 
   const releaseEmailPayload = await withTransaction(async (conn) => {
     const row = await loadRow(data.id, conn, true);
@@ -1307,6 +1318,7 @@ export async function releaseCoeDocument(input: unknown): Promise<CoeRequest> {
       id: row.id,
       employee_name: row.employee_name,
       employee_email: row.employee_email,
+      copy_type: row.copy_type,
     };
     if (row.status === "released") {
       throw new AppError(
@@ -1332,7 +1344,7 @@ export async function releaseCoeDocument(input: unknown): Promise<CoeRequest> {
       `Printed COE released to ${data.receivedByName}.`,
     );
 
-    const document = await loadDocumentForEmail(data.id);
+    const document = row.copy_type === "both" ? await loadDocumentForEmail(data.id) : undefined;
     const payload: {
       requestId: string;
       recipientName: string;
@@ -1370,7 +1382,8 @@ export async function releaseCoeDocument(input: unknown): Promise<CoeRequest> {
   }
 
   if (statusEmailRecipient) {
-    const document = await loadDocumentForEmail(data.id);
+    const document =
+      statusEmailRecipient.copy_type === "both" ? await loadDocumentForEmail(data.id) : undefined;
     const statusEmailResult = await notifyEmployeeOfCoeStatus(
       "released",
       statusEmailRecipient,

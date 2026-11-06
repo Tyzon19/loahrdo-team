@@ -63,6 +63,12 @@ interface HrdoUserRow extends RowDataPacket {
   lock_minutes?: number | null;
 }
 
+interface RecoveryOtpRow extends RowDataPacket {
+  code_hash: string;
+  expires_at: string;
+  attempts: number;
+}
+
 const loginAttempts = new Map<string, { count: number; resetAt: number }>();
 
 function isLocalEnvironmentIp(ip: string | null | undefined) {
@@ -76,7 +82,7 @@ function isLocalEnvironmentIp(ip: string | null | undefined) {
 }
 
 function checkIpRateLimit(ip: string) {
-  if (isLocalEnvironmentIp(ip) || process.env.NODE_ENV !== "production") {
+  if (isLocalEnvironmentIp(ip) || process.env["NODE_ENV"] !== "production") {
     return;
   }
 
@@ -185,6 +191,7 @@ export async function ensureHrdoGoogleAccount(email: string): Promise<HrdoGoogle
   const linkedUser = linkedUsers[0];
   const localName = normalised
     .split("@")[0]
+    ?? ""
     .replace(/[._-]+/g, " ")
     .trim();
   const name = linkedUser?.name?.trim() || localName || "Institutional User";
@@ -400,7 +407,7 @@ export async function requestHrdoPasswordRecovery(input: unknown): Promise<{ sen
   );
   const user = rows[0];
   if (!user) return { sent: true };
-  const pending = await all<Array<{ seconds_since_sent: number }>>(
+  const pending = await all<Array<RowDataPacket & { seconds_since_sent: number }>>(
     `SELECT TIMESTAMPDIFF(SECOND, last_sent_at, NOW()) AS seconds_since_sent
        FROM hrdo_registration_otps WHERE email = ? LIMIT 1`,
     [user.email],
@@ -443,7 +450,7 @@ export async function resetHrdoPasswordWithRecoveryCode(input: unknown): Promise
     [email],
   );
   const user = users[0];
-  const otps = await all<Array<{ code_hash: string; expires_at: string; attempts: number }>>(
+  const otps = await all<RecoveryOtpRow[]>(
     "SELECT code_hash, expires_at, attempts FROM hrdo_registration_otps WHERE email = ? LIMIT 1",
     [email],
   );

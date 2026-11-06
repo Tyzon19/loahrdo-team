@@ -1,7 +1,7 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { PageHeader, Section, EmptyState } from "@/components/app/PageHeader";
+import { PageHeader } from "@/components/app/PageHeader";
 import { RequestForm } from "@/components/app/RequestForm";
 import { submitRequestFn } from "@/server-functions";
 import { todayISO } from "@/lib/format";
@@ -9,6 +9,11 @@ import type { RequestInput } from "@/lib/types";
 import { SITE } from "@/lib/site";
 
 export const Route = createFileRoute("/_authenticated/requests/new")({
+  beforeLoad: ({ context }) => {
+    if (context.viewer?.role !== "requisitioner") {
+      throw redirect({ to: "/dashboard" });
+    }
+  },
   head: () => ({
     meta: [
       { title: `New Vehicle Request — ${SITE.name}` },
@@ -25,15 +30,6 @@ function NewRequest() {
   const queryClient = useQueryClient();
 
   if (!viewer) return null;
-  if (viewer.role !== "requisitioner") {
-    return (
-      <Section title="Not available">
-        <EmptyState title="Only requisitioners can submit vehicle requests.">
-          Approver and staff accounts review requests from their dashboard.
-        </EmptyState>
-      </Section>
-    );
-  }
 
   const initial: RequestInput = {
     department: viewer.department,
