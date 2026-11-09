@@ -74,6 +74,7 @@ import {
 } from "@/lib/hrdo";
 import { fmtDateTime } from "@/lib/format";
 import { SITE } from "@/lib/site";
+import { SignaturePad, type SignatureValue } from "@/components/app/SignaturePad";
 
 export const Route = createFileRoute("/hrdo/coe_/$id")({
   head: ({ params }) => ({
@@ -118,7 +119,7 @@ const ACTION_SUCCESS: Record<ActionPayload["kind"], string> = {
   verify: "Employee information verified.",
   process: "COE preparation started.",
   correction: "The employee has been asked to correct the request.",
-  upload: "Signed COE uploaded.",
+  upload: "Signed COE uploaded and delivery sent.",
   ready: "Request marked ready for pickup.",
   release: "Document release recorded.",
   reject: "Request rejected.",
@@ -211,7 +212,8 @@ function staffHint(status: CoeStatus) {
     pending: "New request. Verify the employee details, then start processing.",
     under_review: "Verify the employee details against official HR records.",
     correction_requested: "Waiting for the employee to submit the corrected details.",
-    processing: "Prepare the COE, upload the signed document for soft copies, then release it.",
+    processing:
+      "Prepare and sign the COE, then upload it. HRDO will send the soft copy and show the pickup step when needed.",
     awaiting_review: "Filled Word template sent. Resume processing after the requestor reviews it.",
     ready_for_pickup:
       "The printed COE is waiting at the HRDO desk. Record the release when claimed.",
@@ -256,6 +258,7 @@ interface CoeTemplatePayload {
   purpose: string;
   issueDate: string;
   preparedByName: string;
+  signatureImage: string;
   includeCompensation: boolean;
 }
 
@@ -425,6 +428,7 @@ function CoeDetailPage() {
   const [sending, setSending] = useState(false);
   const [preview, setPreview] = useState<CoeTemplatePreview | null>(null);
   const [sentTo, setSentTo] = useState("");
+  const [signature, setSignature] = useState<SignatureValue | null>(null);
   // Only holds what staff typed. Anything not edited falls back to the request's own value.
   const [templateFields, setTemplateFields] = useState<Partial<Record<TemplateKey, string>>>({
     issueDate: todayISO(),
@@ -533,6 +537,7 @@ function CoeDetailPage() {
   const includesCompensation = coeRequestsCompensation(request.note);
   const viewerName = hrdoViewer.name;
   const isOriginalCopy = request.copyType === "original";
+  const isCombinedCopy = request.copyType === "both";
 
   /* ---- action layout: one main button, a few secondary ones, reject as a link ---- */
   const primaryKey = PRIMARY_ORDER.find((key) => actions.includes(key)) ?? null;
@@ -632,7 +637,11 @@ function CoeDetailPage() {
   const missingLabels = requiredKeys
     .filter((key) => !fieldValue(key).trim())
     .map((key) => TEMPLATE_LABELS[key]);
-  const canGenerate = request.status === "processing" && !generating && missingLabels.length === 0;
+  const canGenerate =
+    request.status === "processing" &&
+    !generating &&
+    missingLabels.length === 0 &&
+    Boolean(signature);
 
   const templatePayload = (): CoeTemplatePayload => {
     const v = (key: TemplateKey) => fieldValue(key).trim();
@@ -648,6 +657,7 @@ function CoeDetailPage() {
       purpose: v("purpose"),
       issueDate: v("issueDate"),
       preparedByName: v("preparedByName"),
+      signatureImage: signature?.image ?? "",
       includeCompensation: includesCompensation,
     };
   };
@@ -763,7 +773,11 @@ function CoeDetailPage() {
             {file && (
               <p className="break-words text-xs text-muted-foreground">{file.name} selected.</p>
             )}
-            <p className="text-xs text-muted-foreground">{COE_COPY_TYPE_HINTS[request.copyType]}</p>
+            <p className="text-xs text-muted-foreground">
+              {request.copyType === "both"
+                ? "After upload, HRDO will send one email with the signed soft copy and confirm that the printed hardcopy is ready for pickup."
+                : COE_COPY_TYPE_HINTS[request.copyType]}
+            </p>
           </>
         )}
         {(key === "verify" || key === "process" || key === "mark_ready") && (
@@ -773,7 +787,7 @@ function CoeDetailPage() {
               : key === "process"
                 ? request.status === "awaiting_review"
                   ? "Use this after the requestor has reviewed the filled Word template."
-                  : "After this, fill in the COE template, get it signed, then upload the signed document."
+                  : "After this, sign and fill in the COE template, then generate the final COE."
                 : "The printed, signed COE is now waiting at the HRDO desk."}
           </p>
         )}
@@ -1000,7 +1014,7 @@ function CoeDetailPage() {
               <DialogDescription>
                 {isOriginalCopy
                   ? "This is a hardcopy-only request. Generate the Word file for printing. It will not be emailed."
-                  : "Fill in the details, generate the Word file, then email it to the requestor. If something is wrong, fix the fields and generate it again."}
+                  : "Sign first, fill in the details, generate the final Word COE, then email it to the requestor. The signature will appear above your name."}
               </DialogDescription>
             </DialogHeader>
 
@@ -1107,6 +1121,15 @@ function CoeDetailPage() {
                 </div>
               </fieldset>
 
+              <fieldset className="space-y-3">
+                <legend className="text-sm font-semibold">HRDO signature</legend>
+                <p className="text-xs text-muted-foreground">
+                  Sign after confirming the Prepared by name. Your signature will appear above that
+                  name in the Reviewed and Verified by section.
+                </p>
+                <SignaturePad onChange={setSignature} />
+              </fieldset>
+
               <div className="divide-y rounded-lg border">
                 <div className="space-y-2 p-3">
                   <p className="text-sm font-semibold">1. Generate the Word file</p>
@@ -1122,7 +1145,7 @@ function CoeDetailPage() {
                         ? "Generating…"
                         : preview
                           ? "Generate again"
-                          : "Generate Word file"}
+                          : "Next: Generate final COE"}
                     </Button>
                     {preview && (
                       <span className="flex min-w-0 items-center gap-2 text-sm">
@@ -1151,7 +1174,7 @@ function CoeDetailPage() {
                   </div>
                 ) : (
                   <div className="space-y-2 p-3">
-                    <p className="text-sm font-semibold">2. Email it to the requestor</p>
+                    <p className="text-sm font-semibold">2. Send the final COE to the requestor</p>
                     <Button
                       type="button"
                       disabled={
@@ -1160,13 +1183,15 @@ function CoeDetailPage() {
                       onClick={() => void sendTemplate()}
                     >
                       <Send className="h-4 w-4" aria-hidden />
-                      {sending ? "Sending…" : "Send Word file to requestor"}
+                      {sending ? "Sending…" : "Send final COE"}
                     </Button>
                     <p className="text-xs text-muted-foreground" role="status">
                       {sentTo
                         ? `Sent to ${sentTo}. Generate a new copy before sending again.`
                         : preview
-                          ? "Nothing is emailed until you press Send."
+                          ? isCombinedCopy
+                            ? "One email sends the softcopy and confirms that the hardcopy is ready for pickup."
+                            : "Nothing is emailed until you press Send."
                           : "Generate the file first."}
                     </p>
                   </div>

@@ -176,8 +176,8 @@ describe("COE staff processing actions", () => {
     ).toEqual(["process", "request_correction", "reject"]);
   });
 
-  it("requires the signed PDF for both-copy requests before pickup", () => {
-    expect(coeStaffActions({ ...base, status: "processing", copyType: "both" })).toContain(
+  it("uses the final COE email as the combined-copy delivery step", () => {
+    expect(coeStaffActions({ ...base, status: "processing", copyType: "both" })).not.toContain(
       "upload_document",
     );
     expect(coeStaffActions({ ...base, status: "processing", copyType: "both" })).not.toContain(
@@ -185,7 +185,7 @@ describe("COE staff processing actions", () => {
     );
     expect(
       coeStaffActions({ ...base, status: "processing", copyType: "both", hasDocument: true }),
-    ).toContain("mark_ready");
+    ).not.toContain("mark_ready");
   });
 
   it("offers release only once the printed copy is ready", () => {

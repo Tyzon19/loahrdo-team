@@ -492,14 +492,23 @@ export async function sendCoeReleaseEmail(input: {
     }
 
     const siteUrl = siteUrlForEmail();
-    const subject = input.copyType === "soft" ? "Your COE is ready" : "Your COE request has been approved";
+    const subject =
+      input.copyType === "soft"
+        ? "Your COE is ready"
+        : input.copyType === "both"
+          ? "Your COE soft copy is ready; hardcopy available for pickup"
+          : "Your COE hardcopy is ready for pickup";
+    const deliveryMessage =
+      input.copyType === "soft"
+        ? "A signed copy is attached below for your records."
+        : input.copyType === "both"
+          ? "Your signed soft copy is attached. Your printed hardcopy is also ready for pickup at the HRDO office."
+          : "Your printed, signed hardcopy is ready for pickup at the HRDO office.";
     const text = [
       `Dear ${input.recipientName},`,
       "",
       `Your COE request (${input.requestId}) has been approved by HRDO.`,
-      input.copyType === "soft"
-        ? "A signed copy is attached below for your records."
-        : "The approved COE has been prepared and is ready for collection or release.",
+      deliveryMessage,
       "",
       `View the portal: ${new URL(`/hrdo/coe/${encodeURIComponent(input.requestId)}`, siteUrl.origin).toString()}`,
       "",
@@ -510,11 +519,7 @@ export async function sendCoeReleaseEmail(input: {
       <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
         <p>Dear ${input.recipientName},</p>
         <p>Your COE request (<strong>${input.requestId}</strong>) has been approved by HRDO.</p>
-        <p>${
-          input.copyType === "soft"
-            ? "A signed copy is attached below for your records."
-            : "The approved COE has been prepared and is ready for collection or release."
-        }</p>
+        <p>${deliveryMessage}</p>
         <p><a href="${new URL(`/hrdo/coe/${encodeURIComponent(input.requestId)}`, siteUrl.origin).toString()}">Open your COE request</a></p>
         <p>Thank you,<br/>Lyceum of Alabang HRDO</p>
       </div>

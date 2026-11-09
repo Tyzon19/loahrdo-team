@@ -1,9 +1,7 @@
 /**
  * Shared types, labels and pure helpers for the HRDO Certificate of Employment (COE) system.
  *
- * This is a separate system from the PFMO vehicle reservation and trip ticket app:
- * it has its own accounts, sessions and database tables. The two systems live in
- * one project, but nothing is shared between their sign-ins.
+ * The HRDO COE service has its own accounts, sessions and database tables.
  */
 
 export const HRDO = {
@@ -30,14 +28,15 @@ export const COE_DOCUMENT_MIMES = {
 export type HrdoRole = "employee" | "hrdo_staff" | "hrdo_admin";
 export const HRDO_BOOTSTRAP_ADMIN_EMAIL = "hrdo_admin@lyceumalabang.edu.ph";
 
-export function isHrdoStaffRole(role: HrdoRole | null | undefined): role is "hrdo_staff" | "hrdo_admin" {
+export function isHrdoStaffRole(
+  role: HrdoRole | null | undefined,
+): role is "hrdo_staff" | "hrdo_admin" {
   return role === "hrdo_staff" || role === "hrdo_admin";
 }
 
 export function canManageHrdoAccounts(user: Pick<HrdoViewer, "email" | "role"> | null | undefined) {
   return (
-    user?.role === "hrdo_admin" ||
-    user?.email.trim().toLowerCase() === HRDO_BOOTSTRAP_ADMIN_EMAIL
+    user?.role === "hrdo_admin" || user?.email.trim().toLowerCase() === HRDO_BOOTSTRAP_ADMIN_EMAIL
   );
 }
 
@@ -404,11 +403,7 @@ export function coeStaffActions(request: {
     }
     case "processing": {
       const actions: CoeAction[] = [];
-      if (coeNeedsDocument(request.copyType) && !request.hasDocument) {
-        actions.push("upload_document");
-      }
-      const readyPossible =
-        request.copyType === "original" || (request.copyType === "both" && request.hasDocument);
+      const readyPossible = request.copyType === "original";
       if (readyPossible) actions.push("mark_ready");
       actions.push("request_correction", "reject");
       return actions;

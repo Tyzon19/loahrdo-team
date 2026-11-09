@@ -8,6 +8,7 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { Buffer } from "node:buffer";
 import { z } from "zod";
 import JSZip from "jszip";
 import {
@@ -132,6 +133,10 @@ const templateSchema = z.object({
   purpose: z.string().trim().min(5).max(255),
   issueDate: z.string().trim().min(8).max(40),
   preparedByName: z.string().trim().min(2).max(120),
+  signatureImage: z
+    .string()
+    .regex(/^data:image\/(?:png|jpeg);base64,[A-Za-z0-9+/=]+$/, "Add a valid signature.")
+    .max(1_500_000, "The signature image is too large."),
   includeCompensation: z.boolean().default(false),
 });
 
@@ -928,6 +933,40 @@ function replaceTextRuns(xml: string, replacements: Record<number, string>) {
   );
 }
 
+function addSignatureImage(
+  documentXml: string,
+  relationshipsXml: string,
+  contentTypesXml: string,
+  signatureImage: string,
+) {
+  const match = /^data:image\/(png|jpeg);base64,(.+)$/.exec(signatureImage);
+  if (!match) throw new AppError("Add a valid PNG or JPG signature.");
+  const extension = match[1] === "jpeg" ? "jpg" : "png";
+  const relationshipId = "rId11";
+  const imagePath = `word/media/hrdo-signature.${extension}`;
+  const escapedImagePath = imagePath.replace(/[&<>"']/g, (value) => `&#${value.charCodeAt(0)};`);
+  const relationship = `<Relationship Id="${relationshipId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/hrdo-signature.${extension}"/>`;
+  const contentType = contentTypesXml.includes(`Extension="${extension}"`)
+    ? ""
+    : `<Default Extension="${extension}" ContentType="image/${match[1]}"/>`;
+  const drawing = `<w:p><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="2560000" cy="820000"/><wp:docPr id="11" name="HRDO signature"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="11" name="${escapedImagePath}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${relationshipId}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="2560000" cy="820000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`;
+  const nameParagraph =
+    /<w:p\b[^>]*>(?:(?!<w:p\b)[\s\S])*?MS\. KRISTINE MAE L\. MERDEGIA(?:(?!<\/w:p>)[\s\S])*?<\/w:p>/;
+  if (!nameParagraph.test(documentXml)) {
+    throw new AppError("The COE template signature location could not be found.");
+  }
+  return {
+    documentXml: documentXml.replace(nameParagraph, `${drawing}$&`),
+    relationshipsXml: relationshipsXml.replace(
+      "</Relationships>",
+      `${relationship}</Relationships>`,
+    ),
+    contentTypesXml: contentTypesXml.replace("</Types>", `${contentType}</Types>`),
+    imagePath,
+    image: Buffer.from(match[2], "base64"),
+  };
+}
+
 export function preserveCoeTemplateLayout(xml: string) {
   const pageMargins = xml.match(/<w:pgMar\b([^>]*)\/>/);
   if (!pageMargins) throw new AppError("The COE template page margins are missing.");
@@ -1036,7 +1075,20 @@ async function buildCoeTemplate(data: z.infer<typeof templateSchema>) {
       55: ` ${data.preparedByName}`,
     }),
   );
-  zip.file("word/document.xml", replacementXml);
+  const relationships = await zip.file("word/_rels/document.xml.rels")?.async("string");
+  const contentTypes = await zip.file("[Content_Types].xml")?.async("string");
+  if (!relationships || !contentTypes)
+    throw new AppError("The COE template package is incomplete.");
+  const signature = addSignatureImage(
+    replacementXml,
+    relationships,
+    contentTypes,
+    data.signatureImage,
+  );
+  zip.file("word/document.xml", signature.documentXml);
+  zip.file("word/_rels/document.xml.rels", signature.relationshipsXml);
+  zip.file("[Content_Types].xml", signature.contentTypesXml);
+  zip.file(signature.imagePath, signature.image);
   const output = await zip.generateAsync({ type: "nodebuffer" });
   const fileName = `COE-${request.employeeName.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "") || "request"}.docx`;
   return {
@@ -1047,7 +1099,7 @@ async function buildCoeTemplate(data: z.infer<typeof templateSchema>) {
   };
 }
 
-/** Builds the review copy only. Nothing is emailed until `sendCoeTemplate` is called. */
+/** Builds the final COE file that HRDO sends to the requestor. */
 export async function generateCoeTemplate(input: unknown) {
   const viewer = await requireHrdoViewer();
   requireStaff(viewer);
@@ -1063,7 +1115,7 @@ export async function sendCoeTemplate(input: unknown) {
   const { request, fileName, mime, content } = await buildCoeTemplate(data);
   if (request.copyType === "original") {
     throw new AppError(
-      "This is a hardcopy-only request. Do not email the Word template; mark the request ready for pickup when the printed copy is prepared.",
+      "This is a hardcopy-only request. Download the final COE, print it, then mark the request ready for pickup.",
     );
   }
   if (!request.employeeEmail) {
@@ -1072,7 +1124,7 @@ export async function sendCoeTemplate(input: unknown) {
 
   const softCopyOnly = request.copyType === "soft";
   const emailResult = await notifyEmployeeOfCoeStatus(
-    softCopyOnly ? "released" : "awaiting_review",
+    softCopyOnly ? "released" : "ready_for_pickup",
     {
       id: request.id,
       employee_name: request.employeeName,
@@ -1080,12 +1132,14 @@ export async function sendCoeTemplate(input: unknown) {
     },
     softCopyOnly
       ? "Your COE soft copy has been sent."
-      : "Your filled COE template is ready for review.",
+      : "Your COE soft copy has been sent; your hardcopy is ready for pickup.",
     softCopyOnly
       ? "HRDO has sent your Certificate of Employment soft copy. The request is now complete."
-      : "HRDO has prepared your Certificate of Employment template. Please review the attached Word document and contact HRDO if any information needs correction.",
+      : "HRDO has sent the final signed soft copy. Your printed hardcopy is also ready for pickup at the HRDO office.",
     { filename: fileName, mime, content },
-    softCopyOnly ? "Your Certificate of Employment soft copy" : "Your filled COE template is ready for review",
+    softCopyOnly
+      ? "Your Certificate of Employment soft copy"
+      : "Your final COE is ready; hardcopy available for pickup",
   );
 
   if (!emailResult?.sent) {
@@ -1096,7 +1150,7 @@ export async function sendCoeTemplate(input: unknown) {
 
   await withTransaction(async (conn) => {
     const row = await loadRow(request.id, conn, true);
-    if (row.status === (softCopyOnly ? "released" : "awaiting_review")) return;
+    if (row.status === (softCopyOnly ? "released" : "ready_for_pickup")) return;
     if (row.status !== "processing") {
       throw new AppError(
         "The Word template was emailed, but the request status changed before it could be updated. Refresh the request and contact an administrator if it still shows as processing.",
@@ -1106,13 +1160,15 @@ export async function sendCoeTemplate(input: unknown) {
     await run(
       `UPDATE hrdo_coe_requests
        SET status = ?, released_at = IF(? = 'released', NOW(), released_at),
-           released_by_name = IF(? = 'released', ?, released_by_name), updated_at = NOW()
+           released_by_name = IF(? = 'released', ?, released_by_name),
+           ready_at = IF(? = 'ready_for_pickup', NOW(), ready_at), updated_at = NOW()
        WHERE id = ? AND status = 'processing'`,
       [
-        softCopyOnly ? "released" : "awaiting_review",
-        softCopyOnly ? "released" : "awaiting_review",
-        softCopyOnly ? "released" : "awaiting_review",
+        softCopyOnly ? "released" : "ready_for_pickup",
+        softCopyOnly ? "released" : "ready_for_pickup",
+        softCopyOnly ? "released" : "ready_for_pickup",
         softCopyOnly ? viewer.name : null,
+        softCopyOnly ? "released" : "ready_for_pickup",
         request.id,
       ],
       conn,
@@ -1121,10 +1177,10 @@ export async function sendCoeTemplate(input: unknown) {
       conn,
       request.id,
       viewer,
-      softCopyOnly ? "released" : "template_sent",
+      softCopyOnly ? "released" : "ready_for_pickup",
       softCopyOnly
         ? "COE soft copy sent to the requestor by email; request completed."
-        : "Filled Word template sent to the requestor for review.",
+        : "Final COE soft copy sent by email; printed hardcopy is ready for pickup.",
     );
   });
 
@@ -1221,6 +1277,20 @@ export async function uploadCoeDocument(input: unknown): Promise<CoeRequest> {
         attachment: { filename: data.fileName, mime, content: bytes },
       };
     } else if (row.copy_type === "both") {
+      await run(
+        `UPDATE hrdo_coe_requests
+         SET status = 'ready_for_pickup', ready_at = NOW(), updated_at = NOW()
+         WHERE id = ?`,
+        [data.id],
+        conn,
+      );
+      await addHistory(
+        conn,
+        data.id,
+        viewer,
+        "ready_for_pickup",
+        "Signed soft copy released by email; printed hardcopy is ready for pickup at the HRDO desk.",
+      );
       releaseEmailPayload = {
         requestId: data.id,
         recipientName: row.employee_name,
@@ -1272,7 +1342,7 @@ export async function markCoeReady(input: unknown): Promise<CoeRequest> {
     }
     if (row.copy_type === "both" && !row.has_document) {
       throw new AppError(
-        "Upload the signed COE document before marking this request ready for pickup.",
+        "Upload the signed COE document. A request for both copies is marked ready for pickup automatically after upload.",
       );
     }
     await run(
@@ -1327,7 +1397,7 @@ export async function releaseCoeDocument(input: unknown): Promise<CoeRequest> {
   requireStaff(viewer);
   const data = parseInput(releaseSchema, input);
 
-  const { releaseEmailPayload, statusEmailRecipient } = await withTransaction(async (conn) => {
+  const { statusEmailRecipient } = await withTransaction(async (conn) => {
     const row = await loadRow(data.id, conn, true);
     if (row.status === "released") {
       throw new AppError(
@@ -1353,30 +1423,7 @@ export async function releaseCoeDocument(input: unknown): Promise<CoeRequest> {
       `Printed COE released to ${data.receivedByName}.`,
     );
 
-    const document = row.copy_type === "both" ? await loadDocumentForEmail(data.id) : undefined;
-    const payload: {
-      requestId: string;
-      recipientName: string;
-      recipientEmail: string;
-      employeeName: string;
-      copyType: CoeCopyType;
-      attachment?: { filename: string; mime: string; content: Buffer };
-    } = {
-      requestId: data.id,
-      recipientName: row.employee_name,
-      recipientEmail: row.employee_email,
-      employeeName: row.employee_name,
-      copyType: row.copy_type,
-    };
-    if (document) {
-      payload.attachment = {
-        filename: document.fileName,
-        mime: document.mime,
-        content: document.content,
-      };
-    }
     return {
-      releaseEmailPayload: payload,
       statusEmailRecipient: {
         id: row.id,
         employee_name: row.employee_name,
@@ -1386,30 +1433,17 @@ export async function releaseCoeDocument(input: unknown): Promise<CoeRequest> {
     };
   });
 
-  const emailResult = await sendCoeReleaseEmail(releaseEmailPayload);
-  if (!emailResult.sent) {
-    console.warn(
-      `[coe] Release email failed for ${releaseEmailPayload.requestId}: ${emailResult.message}`,
-    );
-    throw new AppError(
-      `The COE was released in the system, but the employee email could not be sent: ${emailResult.message}`,
-    );
+  // The combined-copy email is sent when the signed document is uploaded.
+  // Do not send it again when the employee later claims the printed copy.
+  if (statusEmailRecipient.copy_type === "both") {
+    return loadRequest(data.id);
   }
 
-  const document =
-    statusEmailRecipient.copy_type === "both" ? await loadDocumentForEmail(data.id) : undefined;
   const statusEmailResult = await notifyEmployeeOfCoeStatus(
     "released",
     statusEmailRecipient,
     "Your COE has been released.",
     "The HRDO staff has confirmed the release and the status is now complete.",
-    document
-      ? {
-          filename: document.fileName,
-          mime: document.mime,
-          content: document.content,
-        }
-      : undefined,
   );
   if (statusEmailResult && !statusEmailResult.sent) {
     throw new AppError(
