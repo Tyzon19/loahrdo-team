@@ -142,9 +142,9 @@ export interface VehicleRequest extends RequestInput {
 
 export interface Vehicle {
   id: string;
+  driverName: string;
   type: string;
   plateNo: string;
-  capacity: number;
   status: "in_service" | "maintenance";
 }
 

@@ -2,13 +2,18 @@ import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { RefreshCw } from "lucide-react";
+import { Pencil, RefreshCw, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader, Section, EmptyState } from "@/components/app/PageHeader";
 import { ButtonLoading, LoadingPanel } from "@/components/app/LoadingPanel";
-import { addVehicleFn, listVehiclesFn } from "@/server-functions";
+import {
+  addVehicleFn,
+  deleteVehicleFn,
+  listVehiclesFn,
+  updateVehicleFn,
+} from "@/server-functions";
 import { unwrap } from "@/lib/api";
 import { canManageVehicles } from "@/lib/access";
 import { fmtRange } from "@/lib/format";
@@ -18,7 +23,7 @@ export const Route = createFileRoute("/_authenticated/vehicles")({
   head: () => ({
     meta: [
       { title: `Vehicles — ${SITE.name}` },
-      { name: "description", content: "School vehicles, capacity and upcoming reservations." },
+      { name: "description", content: "List of drivers, vehicles and upcoming reservations." },
       { name: "robots", content: "noindex, nofollow" },
     ],
   }),
@@ -34,8 +39,16 @@ function Vehicles() {
     queryFn: () => unwrap(listVehiclesFn()),
     enabled: allowed,
   });
-  const [newVehicle, setNewVehicle] = useState({ type: "", plateNo: "", capacity: "" });
+  const [newVehicle, setNewVehicle] = useState({ driverName: "", type: "", plateNo: "" });
   const [busy, setBusy] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [editingVehicle, setEditingVehicle] = useState<{
+    id: string;
+    driverName: string;
+    type: string;
+    plateNo: string;
+  } | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   if (!viewer) return null;
   if (!allowed) {
@@ -53,33 +66,86 @@ function Vehicles() {
   async function addVehicle(event: React.FormEvent) {
     event.preventDefault();
     if (busy) return;
-    const capacity = Number(newVehicle.capacity);
-    if (!newVehicle.type.trim() || !newVehicle.plateNo.trim() || !Number.isInteger(capacity) || capacity < 1) {
-      toast.error("Enter the vehicle type, plate number and a valid capacity.");
+    if (!newVehicle.driverName.trim() || !newVehicle.type.trim() || !newVehicle.plateNo.trim()) {
+      toast.error("Enter the driver's name, vehicle type and plate number.");
       return;
     }
     setBusy(true);
     const result = await addVehicleFn({
-      data: { type: newVehicle.type.trim(), plateNo: newVehicle.plateNo.trim().toUpperCase(), capacity },
+      data: {
+        driverName: newVehicle.driverName.trim(),
+        type: newVehicle.type.trim(),
+        plateNo: newVehicle.plateNo.trim().toUpperCase(),
+      },
     });
     setBusy(false);
     if (!result.ok) {
       toast.error(result.error);
       return;
     }
-    setNewVehicle({ type: "", plateNo: "", capacity: "" });
+    setNewVehicle({ driverName: "", type: "", plateNo: "" });
     toast.success("Vehicle added.");
+    await queryClient.invalidateQueries({ queryKey: ["vehicles"] });
+  }
+
+  async function deleteVehicle(id: string, driverName: string, plateNo: string) {
+    if (viewer.role !== "admin" || deletingId) return;
+    if (
+      !window.confirm(
+        `Delete ${driverName}'s vehicle record (${plateNo})? Existing request history will be preserved.`,
+      )
+    ) {
+      return;
+    }
+    setDeletingId(id);
+    const result = await deleteVehicleFn({ data: { id } });
+    setDeletingId(null);
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success("Vehicle record deleted.");
+    await queryClient.invalidateQueries({ queryKey: ["vehicles"] });
+  }
+
+  async function saveVehicleEdit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!editingVehicle || savingEdit) return;
+    if (
+      !editingVehicle.driverName.trim() ||
+      !editingVehicle.type.trim() ||
+      !editingVehicle.plateNo.trim()
+    ) {
+      toast.error("Enter the driver's name, vehicle type and plate number.");
+      return;
+    }
+    setSavingEdit(true);
+    const result = await updateVehicleFn({
+      data: {
+        id: editingVehicle.id,
+        driverName: editingVehicle.driverName.trim(),
+        type: editingVehicle.type.trim(),
+        plateNo: editingVehicle.plateNo.trim().toUpperCase(),
+      },
+    });
+    setSavingEdit(false);
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    setEditingVehicle(null);
+    toast.success("Vehicle record updated.");
     await queryClient.invalidateQueries({ queryKey: ["vehicles"] });
   }
 
   return (
     <>
       <PageHeader
-        title="Vehicles"
-        description="Availability is based only on reservations recorded in this system. Confirm with the motor pool before dispatch."
+        title="List Drivers and Vehicles"
+        description="Manage assigned drivers, vehicle types and plate numbers."
       />
       <div className="space-y-4">
-        <Section title="Vehicle list">
+        <Section title="Drivers and vehicles">
           {query.isPending ? (
             <LoadingPanel label="Loading vehicles" rows={4} />
           ) : query.isError ? (
@@ -94,11 +160,12 @@ function Vehicles() {
               <table className="w-full table-fixed text-sm">
                 <thead className="border-b bg-muted text-left text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
+                    <th className="px-3 py-2 font-medium">Driver Name</th>
                     <th className="px-3 py-2 font-medium">Vehicle Type</th>
                     <th className="px-3 py-2 font-medium">Plate No.</th>
-                    <th className="px-3 py-2 font-medium">Capacity</th>
                     <th className="px-3 py-2 font-medium">Status</th>
                     <th className="px-3 py-2 font-medium">Upcoming reservations</th>
+                    {viewer.role === "admin" && <th className="px-3 py-2 font-medium">Actions</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -108,9 +175,9 @@ function Vehicles() {
                     );
                     return (
                       <tr key={vehicle.id} className="border-b align-top last:border-0">
+                        <td className="px-3 py-2 font-medium">{vehicle.driverName}</td>
                         <td className="px-3 py-2 font-medium">{vehicle.type}</td>
                         <td className="px-3 py-2 font-medium">{vehicle.plateNo}</td>
-                        <td className="px-3 py-2 font-medium">{vehicle.capacity}</td>
                         <td className="px-3 py-2 font-medium">
                           {vehicle.status === "in_service" ? (
                             "In service"
@@ -118,6 +185,49 @@ function Vehicles() {
                             <span className="text-warning">Under maintenance</span>
                           )}
                         </td>
+                        {viewer.role === "admin" && (
+                          <td className="px-3 py-2">
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={deletingId !== null || editingVehicle !== null}
+                                onClick={() =>
+                                  setEditingVehicle({
+                                    id: vehicle.id,
+                                    driverName: vehicle.driverName,
+                                    type: vehicle.type,
+                                    plateNo: vehicle.plateNo,
+                                  })
+                                }
+                                aria-label={`Edit ${vehicle.driverName} vehicle record`}
+                              >
+                                <Pencil className="h-4 w-4" aria-hidden />
+                                Edit
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="sm"
+                                disabled={deletingId !== null || editingVehicle !== null}
+                                onClick={() =>
+                                  void deleteVehicle(vehicle.id, vehicle.driverName, vehicle.plateNo)
+                                }
+                                aria-label={`Delete ${vehicle.driverName} vehicle record`}
+                              >
+                                {deletingId === vehicle.id ? (
+                                  <ButtonLoading label="Deleting…" />
+                                ) : (
+                                  <>
+                                    <Trash2 className="h-4 w-4" aria-hidden />
+                                    Delete
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </td>
+                        )}
                         <td className="px-3 py-2 font-medium">
                           {reservations.length ? (
                             <ul>
@@ -137,7 +247,7 @@ function Vehicles() {
                   })}
                   {(data?.vehicles.length ?? 0) === 0 && (
                     <tr>
-                      <td colSpan={5} className="font-medium text-center py-6">
+                      <td colSpan={viewer.role === "admin" ? 6 : 5} className="font-medium text-center py-6">
                         No vehicles recorded yet. Add the first vehicle below.
                       </td>
                     </tr>
@@ -148,8 +258,84 @@ function Vehicles() {
           )}
         </Section>
 
+        {viewer.role === "admin" && editingVehicle && (
+          <Section title="Edit vehicle">
+            <form className="grid gap-3 sm:grid-cols-4 sm:items-end" onSubmit={saveVehicleEdit}>
+              <div>
+                <Label htmlFor="edit-vehicle-driver">Driver Name</Label>
+                <Input
+                  id="edit-vehicle-driver"
+                  className="mt-1"
+                  maxLength={120}
+                  value={editingVehicle.driverName}
+                  onChange={(event) =>
+                    setEditingVehicle({ ...editingVehicle, driverName: event.target.value })
+                  }
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-vehicle-type">Vehicle Type</Label>
+                <Input
+                  id="edit-vehicle-type"
+                  className="mt-1"
+                  maxLength={80}
+                  value={editingVehicle.type}
+                  onChange={(event) =>
+                    setEditingVehicle({ ...editingVehicle, type: event.target.value })
+                  }
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-vehicle-plate">Plate No.</Label>
+                <Input
+                  id="edit-vehicle-plate"
+                  className="mt-1"
+                  maxLength={32}
+                  value={editingVehicle.plateNo}
+                  onChange={(event) =>
+                    setEditingVehicle({
+                      ...editingVehicle,
+                      plateNo: event.target.value.toUpperCase(),
+                    })
+                  }
+                  required
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button type="submit" disabled={savingEdit}>
+                  {savingEdit ? <ButtonLoading label="Saving…" /> : "Save changes"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={savingEdit}
+                  onClick={() => setEditingVehicle(null)}
+                >
+                  <X className="h-4 w-4" aria-hidden />
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </Section>
+        )}
+
         <Section title="Add vehicle">
           <form className="grid gap-3 sm:grid-cols-4 sm:items-end" onSubmit={addVehicle}>
+            <div>
+              <Label htmlFor="vehicle-driver">Driver Name</Label>
+              <Input
+                id="vehicle-driver"
+                className="mt-1"
+                maxLength={120}
+                value={newVehicle.driverName}
+                onChange={(event) =>
+                  setNewVehicle({ ...newVehicle, driverName: event.target.value })
+                }
+                required
+              />
+            </div>
             <div>
               <Label htmlFor="vehicle-type">Vehicle Type</Label>
               <Input
@@ -171,19 +357,6 @@ function Vehicles() {
                 onChange={(event) =>
                   setNewVehicle({ ...newVehicle, plateNo: event.target.value.toUpperCase() })
                 }
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="vehicle-capacity">Capacity</Label>
-              <Input
-                id="vehicle-capacity"
-                type="number"
-                min={1}
-                max={200}
-                className="mt-1"
-                value={newVehicle.capacity}
-                onChange={(event) => setNewVehicle({ ...newVehicle, capacity: event.target.value })}
                 required
               />
             </div>

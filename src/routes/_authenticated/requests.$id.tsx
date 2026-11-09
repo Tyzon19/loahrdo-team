@@ -4,6 +4,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BadgeCheck,
   AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
+  CarFront,
   Check,
   CheckCircle2,
   CornerUpLeft,
@@ -12,6 +15,7 @@ import {
   ArrowDownToLine,
   RefreshCw,
   Send,
+  UserRound,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -65,7 +69,7 @@ export const Route = createFileRoute("/_authenticated/requests/$id")({
 });
 
 const ACTION_LABEL: Record<StageKey, string> = {
-  review: "Review, Sign & Forward",
+  review: "Sign & Forward to Director",
   recommend: "Complete Transport Review, Sign & Forward",
   approve: "Approve & Sign",
 };
@@ -385,49 +389,51 @@ function RequestDetailPage() {
 
       <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-4">
-          <Section title="Request details">
-            <dl className="grid gap-4 sm:grid-cols-2">
-              <Field label="Request Number" comfortable>
-                <span className="font-medium">{r.number}</span>
-              </Field>
-              <Field label="Date" comfortable>
-                <span className="font-medium">{fmtDate(r.createdAt)}</span>
-              </Field>
-              <Field label="Requisitioner" comfortable>
-                <span className="font-medium">{r.requisitionerName}</span>
-              </Field>
-              <Field label="Department / Office" comfortable>
-                <span className="font-medium">{r.department}</span>
-              </Field>
-              <Field label="Destination" comfortable>
-                <span className="font-medium">
-                  {r.destinations.length > 1 ? (
-                    <ol className="list-decimal pl-4">
-                      {r.destinations.map((d) => (
-                        <li key={d}>{d}</li>
-                      ))}
-                    </ol>
-                  ) : (
-                    r.destinations[0]
-                  )}
-                </span>
-              </Field>
-              <Field label="No. of Passengers" comfortable>
-                <span className="font-medium">{r.passengers}</span>
-              </Field>
-              <Field label="Date Needed" comfortable>
-                <span className="font-medium">{fmtRange(r.dateStart, r.dateEnd)}</span>
-              </Field>
-              <Field label="Time Needed" comfortable>
-                <span className="font-medium">{fmtTime(r.timeNeeded)}</span>
-              </Field>
-              <div className="sm:col-span-2">
-                <Field label="Purpose of Travel" comfortable>
-                  <span className="font-medium">{r.purpose}</span>
+          {!(myTurn && stage?.key === "review") && (
+            <Section title="Request details">
+              <dl className="grid gap-4 sm:grid-cols-2">
+                <Field label="Request Number" comfortable>
+                  <span className="font-medium">{r.number}</span>
                 </Field>
-              </div>
-            </dl>
-          </Section>
+                <Field label="Date" comfortable>
+                  <span className="font-medium">{fmtDate(r.createdAt)}</span>
+                </Field>
+                <Field label="Requisitioner" comfortable>
+                  <span className="font-medium">{r.requisitionerName}</span>
+                </Field>
+                <Field label="Department / Office" comfortable>
+                  <span className="font-medium">{r.department}</span>
+                </Field>
+                <Field label="Destination" comfortable>
+                  <span className="font-medium">
+                    {r.destinations.length > 1 ? (
+                      <ol className="list-decimal pl-4">
+                        {r.destinations.map((d) => (
+                          <li key={d}>{d}</li>
+                        ))}
+                      </ol>
+                    ) : (
+                      r.destinations[0]
+                    )}
+                  </span>
+                </Field>
+                <Field label="No. of Passengers" comfortable>
+                  <span className="font-medium">{r.passengers}</span>
+                </Field>
+                <Field label="Date Needed" comfortable>
+                  <span className="font-medium">{fmtRange(r.dateStart, r.dateEnd)}</span>
+                </Field>
+                <Field label="Time Needed" comfortable>
+                  <span className="font-medium">{fmtTime(r.timeNeeded)}</span>
+                </Field>
+                <div className="sm:col-span-2">
+                  <Field label="Purpose of Travel" comfortable>
+                    <span className="font-medium">{r.purpose}</span>
+                  </Field>
+                </div>
+              </dl>
+            </Section>
+          )}
 
           <Section title="Review and approval signatures">
             <div className="grid gap-3 sm:grid-cols-3">
@@ -531,6 +537,7 @@ function ActionPanel({
   const [plateNo, setPlateNo] = useState(r.plateNo ?? "");
   const [driverName, setDriverName] = useState(r.dispatch.driverName ?? "");
   const [remarks, setRemarks] = useState("");
+  const [reviewStep, setReviewStep] = useState<"details" | "vehicle">("details");
   const vehicle = detail.vehicles.find((v) => v.id === vehicleId);
   const warnings = useMemo(
     () => vehicleWarnings(vehicle, r, detail.conflictCandidates),
@@ -608,27 +615,27 @@ function ActionPanel({
   }
 
   return (
-    <section className="panel min-w-0 border-primary/40" aria-label="Your action">
+    <section className="panel min-w-0 border-primary/40" aria-label="Action required">
       <div className="border-b bg-info-soft px-4 py-2.5">
         <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-          {stage.label} · Your action is required
+          {stageKey === "review" ? "Transport review" : `${stage.label} · Action required`}
         </p>
       </div>
-      <div className="min-w-0 space-y-4 p-4">
+      <div className="min-w-0 space-y-4 p-4 sm:p-5">
         {isProxySigner ? (
           <p className="rounded-sm border border-primary/30 bg-info-soft p-3 text-sm">
             You are the assigned alternate for the {stage.title}. You may sign or return this
             request using your own account; your name and action will be recorded in the request
             history.
           </p>
-        ) : (
+        ) : detail.assistantNames[stageKey] ? (
           <p className="rounded-sm border p-3 text-sm">
             <strong>Alternate signatory:</strong>{" "}
-            {detail.assistantNames[stageKey] ?? "No alternate is assigned."}
-            {detail.assistantNames[stageKey] &&
-              " If you are unavailable, the assigned alternate signatory must use their own account to complete this stage."}
+            {detail.assistantNames[stageKey]}{" "}
+            If you are unavailable, the assigned alternate signatory must use their own account to
+            complete this stage.
           </p>
-        )}
+        ) : null}
         {stageKey === "approve" && (
           <dl className="grid min-w-0 gap-3 text-sm sm:grid-cols-2">
             <Field label="Requisitioner">
@@ -658,43 +665,121 @@ function ActionPanel({
             to the President.
           </p>
         )}
-        {stageKey === "review" && (
-          <p className="text-sm">
-            Review the request details, record vehicle and driver information, then sign and forward
-            it to the Director for Administration.
-          </p>
+        {stageKey === "review" && reviewStep === "details" && (
+          <div className="min-w-0 space-y-4">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <span className="rounded-full bg-primary px-2.5 py-1 text-xs text-primary-foreground">
+                1
+              </span>
+              <span>Review this request</span>
+              <span className="text-muted-foreground">of 2</span>
+            </div>
+            <div className="text-sm">
+              <span className="text-muted-foreground">Reviewing as</span>{" "}
+              <strong>{viewer.name}</strong>
+            </div>
+            <dl className="grid min-w-0 gap-x-5 gap-y-3 border-y py-3 text-sm sm:grid-cols-2">
+              <div>
+                <dt className="text-xs text-muted-foreground">Requestor</dt>
+                <dd className="font-medium">{r.requisitionerName}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Department</dt>
+                <dd className="font-medium">{r.department}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Destination</dt>
+                <dd className="font-medium">{r.destinations.join("; ")}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Passengers</dt>
+                <dd className="font-medium">{r.passengers}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Date and time</dt>
+                <dd className="font-medium">
+                  {fmtRange(r.dateStart, r.dateEnd)} · {fmtTime(r.timeNeeded)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Purpose</dt>
+                <dd className="font-medium">{r.purpose}</dd>
+              </div>
+            </dl>
+            <Button size="lg" className="w-full sm:w-auto" onClick={() => setReviewStep("vehicle")}>
+              Continue to vehicle selection <ArrowRight className="h-4 w-4" aria-hidden />
+            </Button>
+          </div>
         )}
-        {stageKey === "review" && (
+        {stageKey === "review" && reviewStep === "vehicle" && (
           <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="min-w-0 break-words text-sm sm:col-span-2">
-              Head of Transport Services review by: <strong>{viewer.name}</strong>
+            <div className="flex items-center justify-between gap-3 text-sm sm:col-span-2">
+              <div>
+                <span className="mr-2 rounded-full bg-primary px-2.5 py-1 text-xs text-primary-foreground">
+                  2
+                </span>
+                <strong>Choose a vehicle</strong>
+                <span className="ml-2 text-muted-foreground">of 2</span>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setReviewStep("details")}
+              >
+                <ArrowLeft className="h-4 w-4" aria-hidden /> Back
+              </Button>
             </div>
             <div className="min-w-0 sm:col-span-2">
-              <Label htmlFor="vehicle">Assign vehicle</Label>
-              <Select
-                value={vehicleId}
-                onValueChange={(value) => {
-                  setVehicleId(value);
-                  const selected = detail.vehicles.find((v) => v.id === value);
-                  setVehicleType(selected?.type ?? "");
-                  setPlateNo(selected?.plateNo ?? "");
-                }}
-              >
-                <SelectTrigger id="vehicle" className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">
-                    Not assigned yet — enter manually or leave blank
-                  </SelectItem>
-                  {detail.vehicles.map((v) => (
-                    <SelectItem key={v.id} value={v.id}>
-                      {v.type} · {v.plateNo} · {v.capacity} seats
-                      {v.status === "maintenance" ? " (maintenance)" : ""}
+              <Label htmlFor="vehicle" className="text-sm font-medium">Vehicle</Label>
+              <div className="mt-1 flex items-center gap-3 border-b border-primary px-2 py-1">
+                <CarFront className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+                <Select
+                  value={vehicleId}
+                  onValueChange={(value) => {
+                    setVehicleId(value);
+                    const selected = detail.vehicles.find((v) => v.id === value);
+                    setVehicleType(selected?.type ?? "");
+                    setPlateNo(selected?.plateNo ?? "");
+                    setDriverName(selected?.driverName ?? "");
+                  }}
+                >
+                  <SelectTrigger
+                    id="vehicle"
+                    className="h-9 flex-1 rounded-none border-0 bg-transparent px-0 shadow-none focus:ring-0"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">
+                      Enter vehicle details manually
                     </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    {detail.vehicles.map((v) => (
+                      <SelectItem key={v.id} value={v.id}>
+                        {v.driverName} · {v.type} · {v.plateNo}
+                        {v.status === "maintenance" ? " (maintenance)" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {vehicle && (
+                <div className="mt-3 grid gap-2 border-b pb-3 text-sm sm:grid-cols-3">
+                  <div>
+                    <span className="block text-xs text-muted-foreground">Driver</span>
+                    <strong>{vehicle.driverName}</strong>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-muted-foreground">Vehicle type</span>
+                    <strong>{vehicle.type}</strong>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-muted-foreground">Plate number</span>
+                    <strong>{vehicle.plateNo}</strong>
+                  </div>
+                </div>
+              )}
               {warnings.length > 0 && (
                 <ul className="mt-2 space-y-1 rounded-sm border border-warning/40 bg-warning-soft p-2 text-sm">
                   {warnings.map((warning) => (
@@ -712,43 +797,60 @@ function ActionPanel({
                 </p>
               )}
             </div>
-            <div className="min-w-0">
-              <Label htmlFor="vehicle-type">Vehicle Type</Label>
-              <Input
-                id="vehicle-type"
-                className="mt-1"
-                value={vehicleType}
-                readOnly={Boolean(vehicle)}
-                onChange={(event) => setVehicleType(event.target.value)}
-              />
-            </div>
-            <div className="min-w-0">
-              <Label htmlFor="plate-no">Plate No.</Label>
-              <Input
-                id="plate-no"
-                className="mt-1"
-                value={plateNo}
-                readOnly={Boolean(vehicle)}
-                onChange={(event) => setPlateNo(event.target.value)}
-              />
-            </div>
-            <div className="min-w-0">
-              <Label htmlFor="assigned-driver">Assigned Driver</Label>
-              <Input
-                id="assigned-driver"
-                className="mt-1"
-                maxLength={120}
-                value={driverName}
-                onChange={(event) => setDriverName(event.target.value)}
-                placeholder="Enter the assigned driver's name"
-              />
-            </div>
+            {!vehicle && (
+              <>
+                <div className="sm:col-span-2">
+                  <p className="text-sm font-medium">Enter vehicle details</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Use this only when the vehicle is not on the registered list.
+                  </p>
+                </div>
+                <div className="min-w-0">
+                  <Label htmlFor="vehicle-type">Vehicle type</Label>
+                  <div className="mt-1 flex items-center gap-3 border-b border-primary px-2">
+                    <CarFront className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+                    <Input
+                      id="vehicle-type"
+                      className="h-10 rounded-none border-0 px-0 shadow-none focus-visible:ring-0"
+                      value={vehicleType}
+                      onChange={(event) => setVehicleType(event.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="min-w-0">
+                  <Label htmlFor="plate-no">Plate number</Label>
+                  <div className="mt-1 flex items-center gap-3 border-b border-primary px-2">
+                    <CarFront className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+                    <Input
+                      id="plate-no"
+                      className="h-10 rounded-none border-0 px-0 shadow-none focus-visible:ring-0"
+                      value={plateNo}
+                      onChange={(event) => setPlateNo(event.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="min-w-0">
+                  <Label htmlFor="assigned-driver">Driver</Label>
+                  <div className="mt-1 flex items-center gap-3 border-b border-primary px-2">
+                    <UserRound className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+                    <Input
+                      id="assigned-driver"
+                      className="h-10 rounded-none border-0 px-0 shadow-none focus-visible:ring-0"
+                      maxLength={120}
+                      value={driverName}
+                      onChange={(event) => setDriverName(event.target.value)}
+                      placeholder="Enter driver's name"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
             <div className="min-w-0 sm:col-span-2">
-              <Label htmlFor="remarks">Review Remarks (optional)</Label>
+              <Label htmlFor="remarks">Notes for the next approver (optional)</Label>
               <Textarea
                 id="remarks"
                 rows={2}
-                className="mt-1"
+                className="mt-1 rounded-none border-0 border-b border-primary px-2 shadow-none focus-visible:ring-0"
                 value={remarks}
                 onChange={(event) => setRemarks(event.target.value)}
               />
@@ -756,10 +858,11 @@ function ActionPanel({
           </div>
         )}
 
-        <div className="flex flex-col gap-2 border-t pt-4 sm:flex-row">
+        {stageKey !== "review" || reviewStep === "vehicle" ? (
+          <div className="flex flex-col gap-2 border-t pt-4 sm:flex-row">
           <Button
             size="lg"
-            className="w-full whitespace-normal leading-snug sm:w-auto sm:min-w-56"
+            className="w-full whitespace-normal leading-snug sm:w-auto sm:min-w-64"
             onClick={() => setApproveOpen(true)}
           >
             <CheckCircle2 className="h-4 w-4" aria-hidden /> {ACTION_LABEL[stageKey]}
@@ -773,7 +876,8 @@ function ActionPanel({
             <CornerUpLeft className="h-4 w-4" aria-hidden />{" "}
             {stageKey === "approve" ? "Reject & Return" : "Reject & Return to Requisitioner"}
           </Button>
-        </div>
+          </div>
+        ) : null}
         <p className="flex min-w-0 items-start gap-1.5 break-words text-xs text-muted-foreground">
           <Mail className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
           The next approver receives an in-app notification and an email delivery attempt. Any email

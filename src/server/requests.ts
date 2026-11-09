@@ -26,6 +26,7 @@ import {
 import {
   approveSchema,
   destinationSearchSchema,
+  deleteVehicleSchema,
   rejectSchema,
   requestFilterSchema,
   requestIdSchema,
@@ -34,6 +35,7 @@ import {
   sendTripTicketSchema,
   todayISO,
   updatePendingRequestSchema,
+  updateVehicleSchema,
   vehicleSchema,
 } from "@/lib/validation";
 import {
@@ -613,7 +615,7 @@ export async function approveRequest(
     let vehicle: Vehicle | undefined;
     if (data.vehicleId) {
       const vehicleRows = await all<VehicleDbRow[]>(
-        "SELECT id, type, plate_no, capacity, status FROM vehicles WHERE id = ? LIMIT 1",
+        "SELECT id, driver_name, type, plate_no, status FROM vehicles WHERE id = ? LIMIT 1",
         [data.vehicleId],
         conn,
       );
@@ -625,9 +627,9 @@ export async function approveRequest(
       }
       vehicle = {
         id: row.id,
+        driverName: row.driver_name,
         type: row.type,
         plateNo: row.plate_no,
-        capacity: row.capacity,
         status: row.status,
       };
     }
@@ -1071,9 +1073,9 @@ export async function addVehicle(input: unknown): Promise<Vehicle> {
   const id = randomUUID();
   try {
     await run(
-      `INSERT INTO vehicles (id, type, plate_no, capacity, status)
+      `INSERT INTO vehicles (id, driver_name, type, plate_no, status)
        VALUES (?, ?, ?, ?, 'in_service')`,
-      [id, data.type, data.plateNo, data.capacity],
+      [id, data.driverName, data.type, data.plateNo],
     );
   } catch (error) {
     if (isDuplicateKey(error)) {
@@ -1085,11 +1087,58 @@ export async function addVehicle(input: unknown): Promise<Vehicle> {
   }
   return {
     id,
+    driverName: data.driverName,
     type: data.type,
     plateNo: data.plateNo,
-    capacity: data.capacity,
     status: "in_service",
   };
+}
+
+export async function deleteVehicle(input: unknown) {
+  const viewer = await requireViewer();
+  if (viewer.role !== "admin") {
+    throw new AppError("Only administrators can delete vehicles.");
+  }
+  const { id } = parseInput(deleteVehicleSchema, input);
+
+  await withTransaction(async (conn) => {
+    await run("UPDATE requests SET vehicle_id = NULL WHERE vehicle_id = ?", [id], conn);
+    const result = await run("DELETE FROM vehicles WHERE id = ?", [id], conn);
+    if (!result.affectedRows) {
+      throw new AppError("That vehicle could not be found.");
+    }
+  });
+
+  return { id };
+}
+
+export async function updateVehicle(input: unknown) {
+  const viewer = await requireViewer();
+  if (viewer.role !== "admin") {
+    throw new AppError("Only administrators can edit vehicles.");
+  }
+  const data = parseInput(updateVehicleSchema, input);
+
+  try {
+    const result = await run(
+      `UPDATE vehicles
+       SET driver_name = ?, type = ?, plate_no = ?
+       WHERE id = ?`,
+      [data.driverName, data.type, data.plateNo, data.id],
+    );
+    if (!result.affectedRows) {
+      throw new AppError("That vehicle could not be found.");
+    }
+  } catch (error) {
+    if (isDuplicateKey(error)) {
+      throw new AppError("A vehicle with that plate number already exists.", {
+        plateNo: "This plate number is already recorded.",
+      });
+    }
+    throw error;
+  }
+
+  return { id: data.id };
 }
 
 /* ------------------------------- Stats ------------------------------- */

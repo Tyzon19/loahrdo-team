@@ -101,6 +101,7 @@ try {
   await conn.query(
     "ALTER TABLE hrdo_coe_history MODIFY actor_role ENUM('employee','hrdo_staff','hrdo_admin','system') NOT NULL",
   );
+  await conn.query("ALTER TABLE vehicles MODIFY capacity INT NOT NULL DEFAULT 1");
   const [coeDocumentMimeColumn] = await conn.query(
     `SELECT CHARACTER_MAXIMUM_LENGTH AS maxLength
      FROM information_schema.COLUMNS
@@ -124,6 +125,7 @@ try {
      ENUM('action_review','action_recommend','action_approve','returned','approved_requester','approved_transport','trip_ticket_reminder') NOT NULL`,
   );
   for (const [table, column, definition] of [
+    ["vehicles", "driver_name", "VARCHAR(120) NOT NULL DEFAULT '' AFTER id"],
     ["users", "phone_number", "VARCHAR(32) NULL"],
     ["hrdo_users", "is_external", "TINYINT(1) NOT NULL DEFAULT 0 AFTER role"],
     ["notifications", "email_status", "ENUM('pending','sent','failed') NULL"],

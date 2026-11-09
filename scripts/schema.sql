@@ -49,9 +49,10 @@ CREATE TABLE IF NOT EXISTS registration_otps (
 
 CREATE TABLE IF NOT EXISTS vehicles (
   id CHAR(36) NOT NULL,
+  driver_name VARCHAR(120) NOT NULL,
   type VARCHAR(80) NOT NULL,
   plate_no VARCHAR(32) NOT NULL,
-  capacity INT NOT NULL,
+  capacity INT NOT NULL DEFAULT 1,
   status ENUM('in_service','maintenance') NOT NULL DEFAULT 'in_service',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),

@@ -193,6 +193,7 @@ export const updatePendingRequestSchema = z.object({
 });
 
 export const vehicleSchema = z.object({
+  driverName: z.string().trim().min(2, "Enter the driver's name.").max(120),
   type: z.string().trim().min(2, "Enter the vehicle type.").max(80),
   plateNo: z
     .string()
@@ -201,7 +202,14 @@ export const vehicleSchema = z.object({
     .min(2, "Enter the plate number.")
     .max(32)
     .regex(/^[A-Z0-9 -]+$/, "Plate numbers may use letters, digits, spaces and hyphens only."),
-  capacity: z.number().int("Enter a whole number.").min(1, "Capacity must be at least 1.").max(200),
+});
+
+export const deleteVehicleSchema = z.object({
+  id: requestIdSchema,
+});
+
+export const updateVehicleSchema = vehicleSchema.extend({
+  id: requestIdSchema,
 });
 
 export const signatoryAssistantsSchema = z.object({

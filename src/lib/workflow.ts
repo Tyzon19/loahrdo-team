@@ -526,8 +526,6 @@ export function vehicleWarnings(
 ): string[] {
   if (!v) return [];
   const w: string[] = [];
-  if (v.capacity < r.passengers)
-    w.push(`Capacity is ${v.capacity}, but ${r.passengers} passengers are requested.`);
   if (v.status === "maintenance") w.push("This vehicle is marked as under maintenance.");
   const c = vehicleConflicts(v.id, r, all);
   if (c.length) w.push(`Overlapping reservation: ${c.map((x) => x.number).join(", ")}.`);

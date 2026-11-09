@@ -114,9 +114,9 @@ export interface NotificationDbRow extends RowDataPacket {
 
 export interface VehicleDbRow extends RowDataPacket {
   id: string;
+  driver_name: string;
   type: string;
   plate_no: string;
-  capacity: number;
   status: "in_service" | "maintenance";
 }
 
@@ -257,15 +257,15 @@ export async function loadDoc(db: Db): Promise<DocConfig> {
 export async function loadVehicles(db: Db): Promise<Vehicle[]> {
   return (
     await all<VehicleDbRow[]>(
-      "SELECT id, type, plate_no, capacity, status FROM vehicles ORDER BY type, plate_no",
+      "SELECT id, driver_name, type, plate_no, status FROM vehicles ORDER BY driver_name, type, plate_no",
       [],
       db,
     )
   ).map((row) => ({
     id: row.id,
+    driverName: row.driver_name,
     type: row.type,
     plateNo: row.plate_no,
-    capacity: row.capacity,
     status: row.status,
   }));
 }

@@ -333,6 +333,18 @@ export const addVehicleFn = createServerFn({ method: "POST" })
     runSafely(async () => (await import("./server/requests")).addVehicle(data)),
   );
 
+export const deleteVehicleFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/requests")).deleteVehicle(data)),
+  );
+
+export const updateVehicleFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/requests")).updateVehicle(data)),
+  );
+
 export const listNotificationsFn = createServerFn({ method: "GET" }).handler(async () =>
   runSafely(async () => (await import("./server/notifications")).listNotifications()),
 );
