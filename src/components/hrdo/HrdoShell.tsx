@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -72,6 +72,12 @@ function isActive(item: NavItem, path: string) {
   return (item.alsoStartsWith ?? []).some((prefix) => path.startsWith(prefix));
 }
 
+function useHydrated() {
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
+  return hydrated;
+}
+
 function SideNav({
   user,
   items,
@@ -82,6 +88,7 @@ function SideNav({
   onNavigate?: () => void;
 }) {
   const path = useRouterState({ select: (router) => router.location.pathname });
+  const hydrated = useHydrated();
   return (
     <nav
       className="flex h-full flex-col bg-sidebar text-sidebar-foreground"
@@ -103,7 +110,7 @@ function SideNav({
       </div>
       <ul className="flex-1 py-2">
         {items.map((item) => {
-          const active = isActive(item, path);
+          const active = hydrated && isActive(item, path);
           return (
             <li key={item.to}>
               <Link
@@ -134,6 +141,7 @@ function SideNav({
 
 function MobileNav({ items, onNavigate }: { items: NavItem[]; onNavigate?: () => void }) {
   const path = useRouterState({ select: (router) => router.location.pathname });
+  const hydrated = useHydrated();
   return (
     <nav
       className="no-print fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 px-2 pt-2 shadow-[0_-8px_24px_-18px_rgba(15,23,42,0.45)] backdrop-blur supports-[backdrop-filter]:bg-background/85 md:hidden"
@@ -142,7 +150,7 @@ function MobileNav({ items, onNavigate }: { items: NavItem[]; onNavigate?: () =>
     >
       <ul className="mx-auto grid w-full max-w-lg grid-flow-col auto-cols-fr gap-1">
         {items.map((item) => {
-          const active = isActive(item, path);
+          const active = hydrated && isActive(item, path);
           return (
             <li key={item.to} className="min-w-0">
               <Link

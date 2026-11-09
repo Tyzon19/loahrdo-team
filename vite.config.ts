@@ -7,11 +7,13 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
-  server: {
-    watch: {
-      // Ignore generated Nitro/Vite output to avoid Windows file-watcher lock errors
-      // when files inside .output/public are opened or rebuilt.
-      ignored: ["**/.output/**", "**/.nitro/**"],
+  vite: {
+    server: {
+      watch: {
+        // Ignore generated Nitro/Vite output to avoid Windows file-watcher lock errors
+        // when files inside .output/public are opened or rebuilt.
+        ignored: ["**/.output/**", "**/.nitro/**"],
+      },
     },
   },
   tanstackStart: {

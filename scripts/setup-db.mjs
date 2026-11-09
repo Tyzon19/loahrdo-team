@@ -313,6 +313,7 @@ try {
     ["released_at", "DATETIME NULL AFTER ready_at"],
     ["released_by_name", "VARCHAR(120) NULL AFTER released_at"],
     ["received_by_name", "VARCHAR(120) NULL AFTER released_by_name"],
+    ["email_thread_id", "VARCHAR(255) NULL AFTER received_by_name"],
   ]) {
     if (coeColumns.size && !coeColumns.has(column)) {
       await conn.query(`ALTER TABLE hrdo_coe_requests ADD COLUMN \`${column}\` ${definition}`);

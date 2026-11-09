@@ -308,6 +308,7 @@ CREATE TABLE IF NOT EXISTS hrdo_coe_requests (
   released_at DATETIME NULL,
   released_by_name VARCHAR(120) NULL,
   received_by_name VARCHAR(120) NULL,
+  email_thread_id VARCHAR(255) NULL,
   processed_by_id CHAR(36) NULL,
   processed_by_name VARCHAR(120) NULL,
   requested_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

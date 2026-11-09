@@ -1,5 +1,5 @@
 import { useDeferredValue, useState } from "react";
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { RefreshCw } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -33,9 +33,6 @@ import { SITE } from "@/lib/site";
 const PAGE = 15;
 
 export const Route = createFileRoute("/hrdo/requests")({
-  beforeLoad: () => {
-    throw redirect({ to: "/hrdo/dashboard" });
-  },
   head: () => ({
     meta: [
       { title: `COE Requests — ${SITE.name}` },

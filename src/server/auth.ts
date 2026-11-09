@@ -76,7 +76,7 @@ function isLocalEnvironmentIp(ip: string | null | undefined) {
 }
 
 function checkIpRateLimit(ip: string) {
-  if (isLocalEnvironmentIp(ip) || process.env.NODE_ENV !== "production") {
+  if (isLocalEnvironmentIp(ip) || process.env["NODE_ENV"] !== "production") {
     return;
   }
 
@@ -173,7 +173,7 @@ export async function ensureGoogleRequisitionerAccount(
 
   const localName = normalised
     .split("@")[0]
-    .replace(/[._-]+/g, " ")
+    ?.replace(/[._-]+/g, " ")
     .trim();
   const name = localName || "Institutional User";
   const id = randomUUID();
@@ -402,7 +402,9 @@ export async function resetPasswordWithRecoveryCode(input: unknown): Promise<{ r
   ]);
   const user = userRows[0];
   if (!user) throw new AppError("The recovery code is invalid or expired.");
-  const otpRows = await all<Array<{ code_hash: string; expires_at: string; attempts: number }>>(
+  const otpRows = await all<
+    Array<RowDataPacket & { code_hash: string; expires_at: string; attempts: number }>
+  >(
     "SELECT code_hash, expires_at, attempts FROM registration_otps WHERE email = ? LIMIT 1",
     [email],
   );

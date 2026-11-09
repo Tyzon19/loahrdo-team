@@ -142,8 +142,7 @@ export function parseStoredDescription(raw: string) {
   }
 
   const parts = raw.split(", ").map((part) => part.trim()).filter(Boolean);
-  for (let index = 0; index < parts.length; index += 1) {
-    let part = parts[index];
+  for (const [index, part] of parts.entries()) {
     const option = [...COE_DESCRIPTION_OPTIONS]
       .sort((a, b) => b.length - a.length)
       .find((item) => part === item || part.startsWith(`${item} `) || part.startsWith(`${item} - `));

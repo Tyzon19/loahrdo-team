@@ -164,11 +164,11 @@ function LoginPage() {
             </Link>
           </p>
           <p className="mt-3 text-sm text-muted-foreground">
-            Prefer email registration?{" "}
+            Don't have an account?{" "}
             <Link
-              to="/register"
-              search={email.trim() ? { email: email.trim() } : undefined}
-              className="font-semibold text-primary hover:underline"
+            to="/register"
+            search={email.trim() ? { email: email.trim() } : {}}
+            className="font-semibold text-primary hover:underline"
             >
               Continue with email.
             </Link>

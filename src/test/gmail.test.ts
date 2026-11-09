@@ -169,6 +169,39 @@ describe("Gmail workflow delivery", () => {
     expect(html).toContain("&lt;script&gt;invalid reason&lt;/script&gt;");
     expect(html).not.toContain("<script>");
     expect(html).toContain("This is an automated notification. Please do not reply to this email.");
+    expect(sentMime).not.toContain("image/png");
+    expect(sentMime).not.toContain("loa-loading.png");
+  });
+
+  it("adds a root message id for the first COE status email", async () => {
+    let sentMime = "";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = String(input);
+        if (url === "https://oauth2.googleapis.com/token") {
+          return Response.json({ access_token: "mock-access-token" });
+        }
+        if (url === "https://gmail.googleapis.com/gmail/v1/users/me/messages/send") {
+          const body = JSON.parse(String(init?.body)) as { raw: string };
+          sentMime = Buffer.from(body.raw, "base64url").toString("utf8");
+          return Response.json({});
+        }
+        throw new Error(`Unexpected email request: ${url}`);
+      }),
+    );
+
+    await sendCoeStatusEmail({
+      recipientName: "Mark Turingan",
+      recipientEmail: "mark@example.edu",
+      requestId: "coe-request-root",
+      status: "under_review",
+      title: "Your COE request is under review.",
+      message: "HRDO has verified your employee information.",
+    });
+
+    expect(sentMime).toContain("Message-ID: <coe-coe-request-root@loa.local>");
+    expect(sentMime).not.toContain("In-Reply-To:");
   });
 
   it("reports missing approved sender configuration before attempting delivery", async () => {

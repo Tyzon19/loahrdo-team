@@ -28,15 +28,15 @@ type LoginSearch = {
 
 export const Route = createFileRoute("/login")({
   validateSearch: (search: Record<string, unknown>): LoginSearch => {
-    const target = search.redirect;
-    const issue = search.error;
+    const target = search["redirect"];
+    const issue = search["error"];
+    const reset = search["reset"] === "success" ? "success" : undefined;
     return {
-      redirect:
-        typeof target === "string" && target.startsWith("/") && !target.startsWith("//")
-          ? target
-          : undefined,
-      error: typeof issue === "string" && /^google_[a-z_]+$/.test(issue) ? issue : undefined,
-      reset: search.reset === "success" ? "success" : undefined,
+      ...(typeof target === "string" && target.startsWith("/") && !target.startsWith("//")
+        ? { redirect: target }
+        : {}),
+      ...(typeof issue === "string" && /^google_[a-z_]+$/.test(issue) ? { error: issue } : {}),
+      ...(reset ? { reset } : {}),
     };
   },
   beforeLoad: ({ context }) => {

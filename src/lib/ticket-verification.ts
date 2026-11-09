@@ -61,24 +61,24 @@ export function readTicketVerificationToken(
 
   try {
     const claims = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as unknown;
+    if (typeof claims !== "object" || claims === null) return null;
+    const requestId = "requestId" in claims ? claims.requestId : undefined;
+    const approvedAt = "approvedAt" in claims ? claims.approvedAt : undefined;
+    const ticketDigest = "ticketDigest" in claims ? claims.ticketDigest : undefined;
     if (
-      typeof claims !== "object" ||
-      claims === null ||
-      !("requestId" in claims) ||
-      !("approvedAt" in claims) ||
-      typeof claims.requestId !== "string" ||
-      !/^[0-9a-f-]{36}$/i.test(claims.requestId) ||
-      typeof claims.approvedAt !== "string" ||
-      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(claims.approvedAt) ||
-      typeof claims.ticketDigest !== "string" ||
-      !/^[a-f0-9]{64}$/.test(claims.ticketDigest)
+      typeof requestId !== "string" ||
+      !/^[0-9a-f-]{36}$/i.test(requestId) ||
+      typeof approvedAt !== "string" ||
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(approvedAt) ||
+      typeof ticketDigest !== "string" ||
+      !/^[a-f0-9]{64}$/.test(ticketDigest)
     ) {
       return null;
     }
     return {
-      requestId: claims.requestId,
-      approvedAt: claims.approvedAt,
-      ticketDigest: claims.ticketDigest,
+      requestId,
+      approvedAt,
+      ticketDigest,
     };
   } catch {
     return null;

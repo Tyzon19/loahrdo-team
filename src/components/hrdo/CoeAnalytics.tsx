@@ -29,7 +29,7 @@ const STATUS_COLORS = [
 const statusChartConfig = Object.fromEntries(
   Object.entries(COE_STATUS_LABELS).map(([status, label], index) => [
     status,
-    { label, color: STATUS_COLORS[index % STATUS_COLORS.length] },
+    { label, color: STATUS_COLORS[index % STATUS_COLORS.length] ?? "var(--color-primary)" },
   ]),
 ) satisfies ChartConfig;
 

@@ -209,6 +209,7 @@ interface CoeRow extends RowDataPacket {
   released_at_ms: number | string | null;
   released_by_name: string | null;
   received_by_name: string | null;
+  email_thread_id: string | null;
   has_document: number | null;
   document_file_name: string | null;
 }
@@ -282,7 +283,7 @@ function mapHistory(row: CoeHistoryRow): CoeHistoryEntry {
 const SELECT_COLUMNS = `c.id, c.employee_id, c.employee_name, c.employee_email, c.employee_number,
                         c.department, c.purpose, c.note, c.copy_type, c.status, c.remarks,
                         c.correction_message, c.processed_by_name, c.verified_at, c.verified_by_name,
-                        c.released_by_name, c.received_by_name,
+                        c.released_by_name, c.received_by_name, c.email_thread_id,
                         UNIX_TIMESTAMP(c.requested_at) AS requested_at_ms,
                         UNIX_TIMESTAMP(c.deadline_at) AS deadline_at_ms,
                         UNIX_TIMESTAMP(c.updated_at) AS updated_at_ms,
@@ -308,11 +309,13 @@ async function notifyEmployeeOfCoeStatus(
 ) {
   if (!request.employee_email) return undefined;
 
+  const row = await loadRow(request.id);
   const emailResult = await sendCoeStatusEmail({
     recipientName: request.employee_name || "Employee",
     recipientEmail: request.employee_email,
     requestId: request.id,
     status,
+    ...(row.email_thread_id ? { threadId: row.email_thread_id } : {}),
     title,
     message,
     ...(attachment ? { attachment } : {}),
@@ -321,6 +324,12 @@ async function notifyEmployeeOfCoeStatus(
 
   if (!emailResult.sent) {
     console.warn(`[coe] COE status email for ${request.id} failed: ${emailResult.message}`);
+  }
+  if (emailResult.threadId) {
+    await run("UPDATE hrdo_coe_requests SET email_thread_id = ? WHERE id = ?", [
+      emailResult.threadId,
+      request.id,
+    ]);
   }
 
   return emailResult;
@@ -479,21 +488,6 @@ export async function submitCoeRequest(input: unknown): Promise<CoeRequest> {
     );
     await addHistory(conn, id, viewer, "submitted", "Certificate of Employment request submitted.");
   });
-
-  const emailResult = await sendCoeStatusEmail({
-    recipientName: data.employeeName,
-    recipientEmail: data.employeeEmail,
-    requestId: id,
-    status: "pending",
-    title: "Your COE request has been submitted",
-    message:
-      "We have received your Certificate of Employment request. It is now pending HRDO review. You will receive an email when its status changes.",
-  });
-  if (!emailResult.sent) {
-    console.warn(
-      `[coe] Request confirmation for ${id} to ${data.employeeEmail} failed: ${emailResult.message}`,
-    );
-  }
 
   return loadRequest(id);
 }
@@ -1076,17 +1070,22 @@ export async function sendCoeTemplate(input: unknown) {
     throw new AppError("This request has no employee email address to send the template to.");
   }
 
+  const softCopyOnly = request.copyType === "soft";
   const emailResult = await notifyEmployeeOfCoeStatus(
-    "awaiting_review",
+    softCopyOnly ? "released" : "awaiting_review",
     {
       id: request.id,
       employee_name: request.employeeName,
       employee_email: request.employeeEmail,
     },
-    "Your filled COE template is ready for review.",
-    "HRDO has prepared your Certificate of Employment template. Please review the attached Word document and contact HRDO if any information needs correction.",
+    softCopyOnly
+      ? "Your COE soft copy has been sent."
+      : "Your filled COE template is ready for review.",
+    softCopyOnly
+      ? "HRDO has sent your Certificate of Employment soft copy. The request is now complete."
+      : "HRDO has prepared your Certificate of Employment template. Please review the attached Word document and contact HRDO if any information needs correction.",
     { filename: fileName, mime, content },
-    "Your filled COE template is ready for review",
+    softCopyOnly ? "Your Certificate of Employment soft copy" : "Your filled COE template is ready for review",
   );
 
   if (!emailResult?.sent) {
@@ -1097,7 +1096,7 @@ export async function sendCoeTemplate(input: unknown) {
 
   await withTransaction(async (conn) => {
     const row = await loadRow(request.id, conn, true);
-    if (row.status === "awaiting_review") return;
+    if (row.status === (softCopyOnly ? "released" : "awaiting_review")) return;
     if (row.status !== "processing") {
       throw new AppError(
         "The Word template was emailed, but the request status changed before it could be updated. Refresh the request and contact an administrator if it still shows as processing.",
@@ -1106,17 +1105,26 @@ export async function sendCoeTemplate(input: unknown) {
 
     await run(
       `UPDATE hrdo_coe_requests
-       SET status = 'awaiting_review', updated_at = NOW()
+       SET status = ?, released_at = IF(? = 'released', NOW(), released_at),
+           released_by_name = IF(? = 'released', ?, released_by_name), updated_at = NOW()
        WHERE id = ? AND status = 'processing'`,
-      [request.id],
+      [
+        softCopyOnly ? "released" : "awaiting_review",
+        softCopyOnly ? "released" : "awaiting_review",
+        softCopyOnly ? "released" : "awaiting_review",
+        softCopyOnly ? viewer.name : null,
+        request.id,
+      ],
       conn,
     );
     await addHistory(
       conn,
       request.id,
       viewer,
-      "template_sent",
-      "Filled Word template sent to the requestor for review.",
+      softCopyOnly ? "released" : "template_sent",
+      softCopyOnly
+        ? "COE soft copy sent to the requestor by email; request completed."
+        : "Filled Word template sent to the requestor for review.",
     );
   });
 
@@ -1148,6 +1156,7 @@ export async function uploadCoeDocument(input: unknown): Promise<CoeRequest> {
     requestId: string;
     recipientName: string;
     recipientEmail: string;
+    employeeName: string;
     copyType: CoeCopyType;
     attachment?: { filename: string; mime: string; content: Buffer };
   } | null = null;
@@ -1207,6 +1216,7 @@ export async function uploadCoeDocument(input: unknown): Promise<CoeRequest> {
         requestId: data.id,
         recipientName: row.employee_name,
         recipientEmail: row.employee_email,
+        employeeName: row.employee_name,
         copyType: row.copy_type,
         attachment: { filename: data.fileName, mime, content: bytes },
       };
@@ -1215,6 +1225,7 @@ export async function uploadCoeDocument(input: unknown): Promise<CoeRequest> {
         requestId: data.id,
         recipientName: row.employee_name,
         recipientEmail: row.employee_email,
+        employeeName: row.employee_name,
         copyType: row.copy_type,
         attachment: { filename: data.fileName, mime, content: bytes },
       };
@@ -1241,21 +1252,8 @@ export async function markCoeReady(input: unknown): Promise<CoeRequest> {
   requireStaff(viewer);
   const data = parseInput(idSchema, input);
 
-  let emailRecipient: {
-    id: string;
-    employee_name: string;
-    employee_email: string;
-    copy_type: CoeCopyType;
-  } | null = null;
-
-  await withTransaction(async (conn) => {
+  const emailRecipient = await withTransaction(async (conn) => {
     const row = await loadRow(data.id, conn, true);
-    emailRecipient = {
-      id: row.id,
-      employee_name: row.employee_name,
-      employee_email: row.employee_email,
-      copy_type: row.copy_type,
-    };
     if (row.status === "ready_for_pickup") {
       throw new AppError(
         `This request is already marked ready for pickup by ${row.processed_by_name || "HRDO staff"}. Duplicate readiness updates are not allowed.`,
@@ -1292,30 +1290,34 @@ export async function markCoeReady(input: unknown): Promise<CoeRequest> {
       "ready_for_pickup",
       "Printed COE is ready for pickup at the HRDO desk.",
     );
+    return {
+      id: row.id,
+      employee_name: row.employee_name,
+      employee_email: row.employee_email,
+      copy_type: row.copy_type,
+    };
   });
 
-  if (emailRecipient) {
-    const document =
-      emailRecipient.copy_type === "both" ? await loadDocumentForEmail(data.id) : undefined;
-    const isHardcopyOnly = emailRecipient.copy_type === "original";
-    await notifyEmployeeOfCoeStatus(
-      "ready_for_pickup",
-      emailRecipient,
-      isHardcopyOnly
-        ? "Your hardcopy COE is ready for pickup at HR."
-        : "Your COE is ready for pickup.",
-      isHardcopyOnly
-        ? "Your printed Certificate of Employment is ready for pickup at the HRDO office. Please visit HRDO to claim your hardcopy. No electronic copy is attached because you requested hardcopy only."
-        : "Please visit the HRDO office and present any required identification when claiming your certificate.",
-      document
-        ? {
-            filename: document.fileName,
-            mime: document.mime,
-            content: document.content,
-          }
-        : undefined,
-    );
-  }
+  const document =
+    emailRecipient.copy_type === "both" ? await loadDocumentForEmail(data.id) : undefined;
+  const isHardcopyOnly = emailRecipient.copy_type === "original";
+  await notifyEmployeeOfCoeStatus(
+    "ready_for_pickup",
+    emailRecipient,
+    isHardcopyOnly
+      ? "Your hardcopy COE is ready for pickup at HR."
+      : "Your COE is ready for pickup.",
+    isHardcopyOnly
+      ? "Your printed Certificate of Employment is ready for pickup at the HRDO office. Please visit HRDO to claim your hardcopy. No electronic copy is attached because you requested hardcopy only."
+      : "Please visit the HRDO office and present any required identification when claiming your certificate.",
+    document
+      ? {
+          filename: document.fileName,
+          mime: document.mime,
+          content: document.content,
+        }
+      : undefined,
+  );
 
   return loadRequest(data.id);
 }
@@ -1325,21 +1327,8 @@ export async function releaseCoeDocument(input: unknown): Promise<CoeRequest> {
   requireStaff(viewer);
   const data = parseInput(releaseSchema, input);
 
-  let statusEmailRecipient: {
-    id: string;
-    employee_name: string;
-    employee_email: string;
-    copy_type: CoeCopyType;
-  } | null = null;
-
-  const releaseEmailPayload = await withTransaction(async (conn) => {
+  const { releaseEmailPayload, statusEmailRecipient } = await withTransaction(async (conn) => {
     const row = await loadRow(data.id, conn, true);
-    statusEmailRecipient = {
-      id: row.id,
-      employee_name: row.employee_name,
-      employee_email: row.employee_email,
-      copy_type: row.copy_type,
-    };
     if (row.status === "released") {
       throw new AppError(
         `This COE has already been released by ${row.released_by_name || "HRDO staff"}. Duplicate release records are not allowed.`,
@@ -1386,42 +1375,46 @@ export async function releaseCoeDocument(input: unknown): Promise<CoeRequest> {
         content: document.content,
       };
     }
-    return payload;
+    return {
+      releaseEmailPayload: payload,
+      statusEmailRecipient: {
+        id: row.id,
+        employee_name: row.employee_name,
+        employee_email: row.employee_email,
+        copy_type: row.copy_type,
+      },
+    };
   });
 
-  if (releaseEmailPayload) {
-    const emailResult = await sendCoeReleaseEmail(releaseEmailPayload);
-    if (!emailResult.sent) {
-      console.warn(
-        `[coe] Release email failed for ${releaseEmailPayload.requestId}: ${emailResult.message}`,
-      );
-      throw new AppError(
-        `The COE was released in the system, but the employee email could not be sent: ${emailResult.message}`,
-      );
-    }
+  const emailResult = await sendCoeReleaseEmail(releaseEmailPayload);
+  if (!emailResult.sent) {
+    console.warn(
+      `[coe] Release email failed for ${releaseEmailPayload.requestId}: ${emailResult.message}`,
+    );
+    throw new AppError(
+      `The COE was released in the system, but the employee email could not be sent: ${emailResult.message}`,
+    );
   }
 
-  if (statusEmailRecipient) {
-    const document =
-      statusEmailRecipient.copy_type === "both" ? await loadDocumentForEmail(data.id) : undefined;
-    const statusEmailResult = await notifyEmployeeOfCoeStatus(
-      "released",
-      statusEmailRecipient,
-      "Your COE has been released.",
-      "The HRDO staff has confirmed the release and the status is now complete.",
-      document
-        ? {
-            filename: document.fileName,
-            mime: document.mime,
-            content: document.content,
-          }
-        : undefined,
+  const document =
+    statusEmailRecipient.copy_type === "both" ? await loadDocumentForEmail(data.id) : undefined;
+  const statusEmailResult = await notifyEmployeeOfCoeStatus(
+    "released",
+    statusEmailRecipient,
+    "Your COE has been released.",
+    "The HRDO staff has confirmed the release and the status is now complete.",
+    document
+      ? {
+          filename: document.fileName,
+          mime: document.mime,
+          content: document.content,
+        }
+      : undefined,
+  );
+  if (statusEmailResult && !statusEmailResult.sent) {
+    throw new AppError(
+      `The COE was released, but the status email could not be delivered: ${statusEmailResult.message}`,
     );
-    if (statusEmailResult && !statusEmailResult.sent) {
-      throw new AppError(
-        `The COE was released, but the status email could not be delivered: ${statusEmailResult.message}`,
-      );
-    }
   }
 
   return loadRequest(data.id);

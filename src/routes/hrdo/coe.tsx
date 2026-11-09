@@ -85,6 +85,16 @@ const COE_STEPS = [
   },
 ] as const;
 
+const COE_DESCRIPTION_HINTS: Record<(typeof COE_DESCRIPTION_OPTIONS)[number], string> = {
+  "Certificate of Employment": "Standard proof of current or past employment.",
+  "Letter of": "Add the specific letter or request name.",
+  "Affidavit of": "Add the subject of the affidavit.",
+  "With compensation review": "Include compensation details for review.",
+  "Service Record": "Include the employee service history.",
+  "Form of": "Add the name of the required form.",
+  Others: "Include another document detail not listed above.",
+};
+
 function localDateValue(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -697,7 +707,7 @@ function CoeRequestPage() {
                           <div>
                             <Label htmlFor="department">Department / College / Office</Label>
                             <Select
-                              value={department || undefined}
+                              value={department}
                               onValueChange={(value) => {
                                 setDepartment(value);
                                 if (value !== "Other") setCustomDepartment("");
@@ -938,57 +948,66 @@ function CoeRequestPage() {
                 </p>
                 <div className="coe-documents">
                   <div className="coe-document-grid">
-                    {COE_DESCRIPTION_OPTIONS.map((option) => (
-                      <label
-                        key={option}
-                        className="coe-document"
-                        data-selected={descriptionOptions.includes(option)}
-                      >
-                        <Checkbox
-                          checked={descriptionOptions.includes(option)}
-                          onCheckedChange={(checked) =>
-                            setDescriptionOptions((current) =>
-                              checked
-                                ? [...current, option]
-                                : current.filter((value) => value !== option),
-                            )
-                          }
-                        />
-                        {COE_DESCRIPTION_TEXT_OPTIONS.has(option) ? (
-                          <span className="min-w-0 flex-1">
-                            <span className="text-sm">{option}</span>
-                            <Input
-                              aria-label={`${option} details`}
-                              className="mt-1 h-8"
-                              value={descriptionDetails[option] ?? ""}
-                              onChange={(event) =>
-                                setDescriptionDetails((current) => ({
-                                  ...current,
-                                  [option]: event.target.value,
-                                }))
-                              }
-                              placeholder="Specify"
-                              maxLength={255}
-                              disabled={!descriptionOptions.includes(option)}
-                              onClick={(event) => event.stopPropagation()}
-                            />
-                          </span>
-                        ) : (
-                          <span className="text-sm">{option}</span>
-                        )}
-                      </label>
-                    ))}
+                    {COE_DESCRIPTION_OPTIONS.map((option, index) => {
+                      const selected = descriptionOptions.includes(option);
+                      const optionId = `coe-document-${index}`;
+                      const detailId = `${optionId}-details`;
+                      return (
+                        <div key={option} className="coe-document" data-selected={selected}>
+                          <Checkbox
+                            id={optionId}
+                            checked={descriptionOptions.includes(option)}
+                            onCheckedChange={(checked) =>
+                              setDescriptionOptions((current) =>
+                                checked
+                                  ? [...current, option]
+                                  : current.filter((value) => value !== option),
+                              )
+                            }
+                          />
+                          <div className="coe-document-copy">
+                            <label className="coe-document-label" htmlFor={optionId}>
+                              {option}
+                            </label>
+                            <span className="coe-document-hint">
+                              {COE_DESCRIPTION_HINTS[option]}
+                            </span>
+                            {COE_DESCRIPTION_TEXT_OPTIONS.has(option) && (
+                              <div className="coe-document-detail">
+                                <label htmlFor={detailId}>Details for {option}</label>
+                                <Input
+                                  id={detailId}
+                                  value={descriptionDetails[option] ?? ""}
+                                  onChange={(event) =>
+                                    setDescriptionDetails((current) => ({
+                                      ...current,
+                                      [option]: event.target.value,
+                                    }))
+                                  }
+                                  placeholder="Enter details"
+                                  maxLength={255}
+                                  disabled={!selected}
+                                />
+                              </div>
+                            )}
+                            {option === COE_DESCRIPTION_OTHER && (
+                              <div className="coe-document-detail">
+                                <label htmlFor="custom-description">Other document details</label>
+                                <Input
+                                  id="custom-description"
+                                  value={customDescription}
+                                  onChange={(event) => setCustomDescription(event.target.value)}
+                                  placeholder="Enter details"
+                                  maxLength={255}
+                                  disabled={!selected}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                  {descriptionOptions.includes(COE_DESCRIPTION_OTHER) && (
-                    <Input
-                      id="custom-description"
-                      className="mt-3"
-                      value={customDescription}
-                      onChange={(event) => setCustomDescription(event.target.value)}
-                      placeholder="Specify other description"
-                      maxLength={255}
-                    />
-                  )}
                 </div>
               </Section>
             )}

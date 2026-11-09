@@ -1,4 +1,8 @@
-# Certificate of Employment
+# Lyceum of Alabang HRDO Certificate of Employment System
+
+## System ownership
+
+This system is owned, developed, and operated by the Human Resources and Development Office (HRDO) of Lyceum of Alabang. It is an HRDO service for employee Certificate of Employment requests and processing.
 
 ## Project overview
 
@@ -23,6 +27,6 @@ For hardcopy-only requests, HRDO records the release for pickup. If a soft copy 
 
 - **Employee:** submits a request, responds to correction requests, and tracks its status.
 - **HRDO staff:** reviews and verifies details, prepares or uploads the certificate, and records readiness and release.
-- **System administrator:** creates the first HRDO administrator from the main application’s Profile page under **HRDO processors**. An HRDO administrator can then create processor accounts from `/hrdo/profile`. Each account uses an institutional email, signs in through `/hrdo/login`, and must change its temporary password at first sign-in.
+- **HRDO system administrator:** creates the first HRDO administrator from the main application’s Profile page under **HRDO processors**. An HRDO administrator can then create processor accounts from `/hrdo/profile`. Each account uses an institutional email, signs in through `/hrdo/login`, and must change its temporary password at first sign-in.
 
-The HRDO service has its own employee and staff accounts, sessions, and database tables. Its sign-in is separate from the vehicle reservation and trip-ticket system, even though both services are part of this project.
+The HRDO service has its own employee and staff accounts, sessions, and database tables. Its sign-in is separate from other application services. HRDO is the business owner and operational owner of this COE system.

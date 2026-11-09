@@ -22,6 +22,7 @@ export type EmailDeliveryResult =
       sent: true;
       delivered: number;
       failed: 0;
+      threadId?: string;
       recipientResults?: EmailRecipientResult[] | undefined;
     }
   | {
@@ -29,6 +30,7 @@ export type EmailDeliveryResult =
       delivered: number;
       failed: number;
       message: string;
+      threadId?: string;
       recipientResults?: EmailRecipientResult[] | undefined;
     };
 
@@ -42,6 +44,17 @@ export interface EmailRecipientResult {
   notificationId: string;
   sent: boolean;
   message?: string | undefined;
+}
+
+interface EmailThreadHeaders {
+  messageId: string;
+  inReplyTo?: string;
+  references?: string;
+}
+
+interface SentMessageResult {
+  id?: string;
+  threadId?: string;
 }
 
 function base64(value: string | Buffer): string {
@@ -162,20 +175,52 @@ function createMimeMessage(
   subject: string,
   text: string,
   html: string,
-  logo: Buffer,
+  logo: Buffer | undefined,
   ticketImage?: Buffer,
   ticketFilename?: string,
   attachments: EmailAttachment[] = [],
+  thread?: EmailThreadHeaders,
 ): string {
   const relatedBoundary = `loa_related_${randomBytes(18).toString("hex")}`;
   const alternativeBoundary = `loa_alt_${randomBytes(18).toString("hex")}`;
   const ticketContentId = ticketImage ? "approved-trip-ticket" : undefined;
+  const threadHeaders = thread
+    ? [
+        `Message-ID: <${thread.messageId}>`,
+        ...(thread.inReplyTo ? [`In-Reply-To: <${thread.inReplyTo}>`] : []),
+        ...(thread.references ? [`References: <${thread.references}>`] : []),
+      ]
+    : [];
+
+  if (!attachments.length && !logo && !ticketImage) {
+    return [
+      `To: ${recipient}`,
+      `Subject: ${encodedHeader(subject)}`,
+      "MIME-Version: 1.0",
+      ...threadHeaders,
+      `Content-Type: multipart/alternative; boundary="${alternativeBoundary}"`,
+      "",
+      `--${alternativeBoundary}`,
+      'Content-Type: text/plain; charset="UTF-8"',
+      "Content-Transfer-Encoding: base64",
+      "",
+      base64(text),
+      `--${alternativeBoundary}`,
+      'Content-Type: text/html; charset="UTF-8"',
+      "Content-Transfer-Encoding: base64",
+      "",
+      base64(html),
+      `--${alternativeBoundary}--`,
+      "",
+    ].join("\r\n");
+  }
 
   if (!attachments.length) {
     const parts = [
       `To: ${recipient}`,
       `Subject: ${encodedHeader(subject)}`,
       "MIME-Version: 1.0",
+      ...threadHeaders,
       `Content-Type: multipart/related; boundary="${relatedBoundary}"`,
       "",
       `--${relatedBoundary}`,
@@ -192,14 +237,19 @@ function createMimeMessage(
       "",
       base64(html),
       `--${alternativeBoundary}--`,
-      `--${relatedBoundary}`,
-      'Content-Type: image/png; name="loa-loading.png"',
-      "Content-Transfer-Encoding: base64",
-      `Content-ID: <${LOGO_CONTENT_ID}>`,
-      'Content-Disposition: inline; filename="loa-loading.png"',
-      "",
-      base64(logo),
     ];
+
+    if (logo) {
+      parts.push(
+        `--${relatedBoundary}`,
+        'Content-Type: image/png; name="loa-loading.png"',
+        "Content-Transfer-Encoding: base64",
+        `Content-ID: <${LOGO_CONTENT_ID}>`,
+        'Content-Disposition: inline; filename="loa-loading.png"',
+        "",
+        base64(logo),
+      );
+    }
 
     if (ticketImage && ticketFilename && ticketContentId) {
       parts.push(
@@ -222,6 +272,7 @@ function createMimeMessage(
     `To: ${recipient}`,
     `Subject: ${encodedHeader(subject)}`,
     "MIME-Version: 1.0",
+    ...threadHeaders,
     `Content-Type: multipart/mixed; boundary="${mixedBoundary}"`,
     "",
     `--${mixedBoundary}`,
@@ -255,7 +306,11 @@ function createMimeMessage(
   return parts.join("\r\n");
 }
 
-async function sendMimeMessage(token: string, mime: string): Promise<void> {
+async function sendMimeMessage(
+  token: string,
+  mime: string,
+  threadId?: string,
+): Promise<SentMessageResult> {
   let response: Response;
   try {
     response = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
@@ -264,7 +319,10 @@ async function sendMimeMessage(token: string, mime: string): Promise<void> {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ raw: base64Url(mime) }),
+      body: JSON.stringify({
+        raw: base64Url(mime),
+        ...(threadId ? { threadId } : {}),
+      }),
       signal: AbortSignal.timeout(15_000),
     });
   } catch (error) {
@@ -282,6 +340,7 @@ async function sendMimeMessage(token: string, mime: string): Promise<void> {
     }
     throw new AppError("Gmail rejected the message. Check the sender authorization and recipient.");
   }
+  return (await response.json()) as SentMessageResult;
 }
 
 async function createNotificationMime(
@@ -462,13 +521,12 @@ export async function sendCoeReleaseEmail(input: {
     `;
 
     const token = await accessToken();
-    const logo = await readFile(join(process.cwd(), "public", "loa-loading.png"));
     const mime = createMimeMessage(
       input.recipientEmail,
       subject,
       text,
       html,
-      logo,
+      undefined,
       undefined,
       undefined,
       input.attachment ? [input.attachment] : [],
@@ -508,6 +566,7 @@ export async function sendCoeStatusEmail(input: {
   message: string;
   attachment?: EmailAttachment;
   subject?: string;
+  threadId?: string;
 }): Promise<EmailDeliveryResult> {
   try {
     if (!validEmail(input.recipientEmail)) {
@@ -525,7 +584,16 @@ export async function sendCoeStatusEmail(input: {
       ready_for_pickup: "Your COE is ready for pickup",
       released: "Your COE has been released",
     };
+    const rootMessageId = `coe-${input.requestId}@loa.local`;
     const subject = input.subject || subjectMap[input.status];
+    const thread =
+      input.status === "under_review"
+        ? { messageId: rootMessageId }
+        : {
+            messageId: `coe-${input.requestId}-${randomBytes(8).toString("hex")}@loa.local`,
+            inReplyTo: rootMessageId,
+            references: rootMessageId,
+          };
     const text = [
       `Dear ${input.recipientName},`,
       "",
@@ -558,19 +626,24 @@ export async function sendCoeStatusEmail(input: {
     `;
 
     const token = await accessToken();
-    const logo = await readFile(join(process.cwd(), "public", "loa-loading.png"));
     const mime = createMimeMessage(
       input.recipientEmail,
       subject,
       text,
       html,
-      logo,
+      undefined,
       undefined,
       undefined,
       input.attachment ? [input.attachment] : [],
+      thread,
     );
-    await sendMimeMessage(token, mime);
-    return { sent: true, delivered: 1, failed: 0 };
+    const sentMessage = await sendMimeMessage(token, mime, input.threadId);
+    return {
+      sent: true,
+      delivered: 1,
+      failed: 0,
+      ...(sentMessage.threadId ? { threadId: sentMessage.threadId } : {}),
+    };
   } catch (error) {
     console.error(
       `[email] COE status email failed: ${error instanceof AppError ? error.message : error instanceof Error ? error.name : "unknown"}`,
@@ -640,8 +713,7 @@ export async function sendCoeProcessorNotification(input: {
     `;
 
     const token = await accessToken();
-    const logo = await readFile(join(process.cwd(), "public", "loa-loading.png"));
-    const mime = createMimeMessage(input.recipientEmail, subject, text, html, logo);
+    const mime = createMimeMessage(input.recipientEmail, subject, text, html, undefined);
     await sendMimeMessage(token, mime);
     return { sent: true, delivered: 1, failed: 0 };
   } catch (error) {

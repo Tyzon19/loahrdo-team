@@ -107,19 +107,24 @@ function numberUnderThousandToWords(value: number): string {
   const words: string[] = [];
   let remainder = value;
   if (remainder >= 100) {
-    words.push(`${NUMBER_WORDS[Math.floor(remainder / 100)]} Hundred`);
+    const word = NUMBER_WORDS[Math.floor(remainder / 100)];
+    if (word) words.push(`${word} Hundred`);
     remainder %= 100;
   }
   if (remainder >= 20) {
-    words.push(TENS_WORDS[Math.floor(remainder / 10)]);
+    const word = TENS_WORDS[Math.floor(remainder / 10)];
+    if (word) words.push(word);
     remainder %= 10;
   }
-  if (remainder > 0) words.push(NUMBER_WORDS[remainder]);
+  if (remainder > 0) {
+    const word = NUMBER_WORDS[remainder];
+    if (word) words.push(word);
+  }
   return words.join(" ");
 }
 
 function integerToWords(value: number): string {
-  if (value === 0) return NUMBER_WORDS[0];
+  if (value === 0) return NUMBER_WORDS[0] ?? "Zero";
   const groups: string[] = [];
   let remainder = value;
   let scale = 0;
@@ -127,7 +132,7 @@ function integerToWords(value: number): string {
     const group = remainder % 1000;
     if (group > 0) {
       groups.unshift(
-        [numberUnderThousandToWords(group), NUMBER_SCALES[scale]].filter(Boolean).join(" "),
+        [numberUnderThousandToWords(group), NUMBER_SCALES[scale] ?? ""].filter(Boolean).join(" "),
       );
     }
     remainder = Math.floor(remainder / 1000);

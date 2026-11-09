@@ -1,4 +1,4 @@
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
@@ -38,11 +38,6 @@ import type { EmailMessage } from "@/lib/types";
 import { FACEBOOK_URL, LOGO_URL } from "@/components/AuthLayout";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
-  beforeLoad: ({ context }) => {
-    if (context.viewer?.role === "requisitioner") {
-      throw redirect({ to: "/requests/new" });
-    }
-  },
   head: () => ({
     meta: [
       { title: "LOA HRDO Desk | Lyceum of Alabang" },

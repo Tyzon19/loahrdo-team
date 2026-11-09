@@ -50,7 +50,7 @@ export function HrdoProcessorSettings({ canCreateAdmin = false }: { canCreateAdm
         email,
         role,
         emailSent: emailDelivery.sent,
-        ...(emailDelivery.message ? { emailMessage: emailDelivery.message } : {}),
+        ...(!emailDelivery.sent ? { emailMessage: emailDelivery.message } : {}),
         ...(temporaryPassword ? { temporaryPassword } : {}),
       });
       setForm({ name: "", email: "", department: "", isHrdoAdmin: false });

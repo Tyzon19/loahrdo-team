@@ -1040,11 +1040,11 @@ function CoeDetailPage() {
                     id="department"
                     label={TEMPLATE_LABELS.department}
                     value={fieldValue("department")}
-                    placeholder={
-                      isThirdPartyVerifier
-                        ? "Enter the former employee's department / office"
-                        : undefined
-                    }
+                    {...(isThirdPartyVerifier
+                      ? {
+                          placeholder: "Enter the former employee's department / office",
+                        }
+                      : {})}
                     onChange={(v) => setField("department", v)}
                   />
                   <TemplateField

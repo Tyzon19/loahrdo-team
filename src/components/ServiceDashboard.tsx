@@ -79,6 +79,17 @@ export function ServiceDashboard({
     }
   }
 
+  async function handleSignOut() {
+    if (!onSignOut || signingOut) return;
+    setSigningOut(true);
+    try {
+      await onSignOut();
+    } catch {
+      toast.error("We couldn't sign you out. Please try again.");
+      setSigningOut(false);
+    }
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-muted/40">
       {signingOut && <LoadingScreen label="Signing out" mode="overlay" immediate />}
@@ -214,7 +225,6 @@ export function ServiceDashboard({
           )}
         </div>
       </main>
-
       <footer className="bg-primary text-primary-foreground">
         <div className="mx-auto grid max-w-6xl gap-6 px-4 py-10 text-xs font-semibold uppercase tracking-wide sm:px-6 md:grid-cols-3 md:items-center">
           <div className="flex items-center gap-3">
@@ -255,11 +265,11 @@ export function ServiceDashboard({
         <p className="border-t border-primary-foreground/15 py-4 text-center text-xs opacity-70">
           © 2026 Lyceum of Alabang HRDO. All rights reserved.
         </p>
+
       </footer>
     </div>
   );
 }
-
 function ServiceCardContents({ service, icon: Icon }: { service: Service; icon: LucideIcon }) {
   return (
     <>
