@@ -48,6 +48,7 @@ export interface HrdoViewer {
   role: HrdoRole;
   department: string;
   mustChangePassword: boolean;
+  isExternal: boolean;
 }
 
 export type CoeCopyType = "soft" | "original" | "both";

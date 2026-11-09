@@ -2003,28 +2003,32 @@
 
 .coe-request-type {
   display: flex;
-  min-height: 5.25rem;
+  min-height: 6rem;
   align-items: flex-start;
   gap: 0.7rem;
-  padding: 0.75rem;
+  padding: 1rem;
   border: 1px solid var(--coe-border);
-  border-radius: var(--radius);
+  border-radius: 0.75rem;
   background: var(--coe-surface);
   transition:
     border-color 120ms ease,
-    background-color 120ms ease;
+    background-color 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease;
 }
 
 .coe-request-type:hover,
 .coe-delivery-label:hover {
   border-color: var(--coe-primary);
+  box-shadow: 0 5px 16px rgb(15 23 42 / 7%);
+  transform: translateY(-1px);
 }
 
 .coe-request-type:has([data-state="checked"]),
 .coe-delivery-option:has([data-state="checked"]) .coe-delivery-label {
   border-color: var(--coe-primary);
   background: color-mix(in srgb, var(--coe-primary) 5%, var(--coe-surface));
-  box-shadow: inset 3px 0 var(--coe-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--coe-primary) 12%, transparent);
 }
 
 .coe-request-type:has(:focus-visible),
@@ -2197,7 +2201,12 @@
 
 .coe-request .coe-button {
   min-height: 2.25rem;
-  border-radius: var(--radius);
+  min-width: 8rem;
+  border-radius: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
 }
 
 .coe-request .coe-button-next {
@@ -2369,11 +2378,55 @@
 
 /* Keep the COE request form compact, calm, and consistently aligned. */
 .coe-request {
-  padding: 0.25rem 0 0.75rem;
+  min-height: 100svh;
+  padding: clamp(1.25rem, 3vw, 2.5rem) 1rem;
+  background: var(--background);
 }
 
 .coe-main {
-  width: min(100%, 64rem);
+  width: min(100%, 56rem);
+  padding-bottom: 2rem;
+}
+
+.coe-form-intro {
+  margin-bottom: 0.75rem;
+  padding: 0.5rem 0.25rem 0.75rem;
+  text-align: center;
+}
+
+.coe-form-logos {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 0.55rem;
+}
+
+.coe-form-logos img {
+  width: 2.5rem;
+  height: 2.5rem;
+  object-fit: contain;
+}
+
+.coe-form-logos img + img {
+  width: 2.25rem;
+  height: 2.25rem;
+}
+
+.coe-form-intro h1 {
+  margin: 0;
+  color: var(--foreground);
+  font-size: clamp(1.35rem, 3vw, 1.65rem);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.coe-form-intro p {
+  max-width: 42rem;
+  margin: 0.3rem auto 0;
+  color: var(--muted-foreground);
+  font-size: 0.85rem;
+  line-height: 1.5;
 }
 
 .coe-main > .mb-5 {
@@ -2382,8 +2435,8 @@
 }
 
 .coe-main > .mb-5 h1 {
-  font-size: 1.2rem;
-  letter-spacing: -0.01em;
+  font-size: clamp(1.35rem, 3vw, 1.75rem);
+  letter-spacing: -0.025em;
 }
 
 .coe-steps {
@@ -2414,7 +2467,11 @@
 }
 
 .coe-section {
-  padding: 0.9rem 1rem;
+  padding: clamp(1rem, 3vw, 1.5rem);
+  border: 1px solid var(--border);
+  border-radius: 0.875rem;
+  background: var(--card);
+  box-shadow: 0 8px 24px rgb(15 23 42 / 5%);
 }
 
 .coe-section-description {
@@ -2434,9 +2491,29 @@
 .coe-request input:not([type="checkbox"]):not([type="radio"]),
 .coe-request textarea,
 .coe-request [role="combobox"] {
-  min-height: 2.35rem;
-  margin-top: 0.3rem;
-  padding: 0.5rem 0.7rem;
+  min-height: 2.75rem;
+  margin-top: 0.35rem;
+  border-color: transparent;
+  border-bottom-color: var(--primary);
+  border-radius: 0;
+  background: transparent;
+  padding: 0.55rem 0.2rem;
+  box-shadow: none;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    background-color 150ms ease;
+}
+
+.coe-request input:not([type="checkbox"]):not([type="radio"]):focus,
+.coe-request textarea:focus,
+.coe-request [role="combobox"]:focus-visible {
+  border-color: transparent;
+  border-bottom-color: var(--primary);
+  border-bottom-width: 2px;
+  background: color-mix(in srgb, var(--primary) 3%, transparent);
+  box-shadow: 0 3px 0 color-mix(in srgb, var(--primary) 12%, transparent);
+  outline: none;
 }
 
 .coe-request-types {
@@ -2445,8 +2522,8 @@
 }
 
 .coe-request-type {
-  min-height: 4.5rem;
-  padding: 0.65rem 0.75rem;
+  min-height: 6rem;
+  padding: 1rem;
 }
 
 .coe-deliveries {
@@ -2518,7 +2595,7 @@
 
 @media (max-width: 640px) {
   .coe-request {
-    padding-top: 0.5rem;
+    padding-top: 1rem;
   }
 
   .coe-success-wrap {
@@ -2552,10 +2629,10 @@
   }
 
   .coe-main > .mb-5 h1 {
-    font-size: 1.1rem;
+    font-size: 1.35rem;
   }
 
   .coe-section {
-    padding: 0.8rem;
+    padding: 1rem;
   }
 }

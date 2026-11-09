@@ -17,6 +17,13 @@ export const Route = createFileRoute("/hrdo")({
         search: { redirect: location.pathname },
       });
     }
+    if (
+      context.hrdoViewer.isExternal &&
+      location.pathname !== "/hrdo/coe" &&
+      !location.pathname.startsWith("/hrdo/coe/")
+    ) {
+      throw redirect({ to: "/hrdo/coe" });
+    }
     if (context.hrdoViewer.mustChangePassword && location.pathname !== "/hrdo/change-password") {
       throw redirect({ to: "/hrdo/change-password" });
     }

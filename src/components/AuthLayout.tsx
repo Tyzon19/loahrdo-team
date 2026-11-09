@@ -10,15 +10,25 @@ export function AuthLayout({
   children,
   back = false,
   backTo = "/login",
+  centered = false,
+  showImage = true,
 }: {
   title: string;
   children: ReactNode;
   back?: boolean;
   backTo?: "/login" | "/hrdo/login";
+  centered?: boolean;
+  showImage?: boolean;
 }) {
   return (
-    <div className="auth-layout flex min-h-screen bg-background">
-      <aside className="flex w-full flex-col justify-center overflow-y-auto px-4 py-10 sm:px-9 md:w-[480px] md:shrink-0">
+    <div
+      className={`auth-layout flex min-h-screen bg-background ${centered ? "justify-center" : ""}`}
+    >
+      <aside
+        className={`flex w-full flex-col justify-center overflow-y-auto px-4 py-10 sm:px-9 ${
+          centered ? "md:w-[560px]" : "md:w-[480px] md:shrink-0"
+        }`}
+      >
         {back && (
           <Link
             to={backTo}
@@ -68,15 +78,17 @@ export function AuthLayout({
           </div>
         </div>
       </aside>
-      <div className="relative hidden flex-1 md:block">
-        <img
-          src="/lyceum-building.png.png"
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover grayscale"
-        />
-        <div className="absolute inset-0 bg-overlay mix-blend-multiply" />
-        <div className="absolute inset-0 bg-overlay/40" />
-      </div>
+      {showImage && (
+        <div className="relative hidden flex-1 md:block">
+          <img
+            src="/lyceum-building.png.png"
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover grayscale"
+          />
+          <div className="absolute inset-0 bg-overlay mix-blend-multiply" />
+          <div className="absolute inset-0 bg-overlay/40" />
+        </div>
+      )}
     </div>
   );
 }

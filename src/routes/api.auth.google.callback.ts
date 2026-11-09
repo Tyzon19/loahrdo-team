@@ -77,8 +77,8 @@ async function googleJson<T>(
   }
 }
 
-function failure(code: string, cookies: string[], mode: "requisitioner" | "hrdo") {
-  const destination = mode === "hrdo" ? "/hrdo/login" : "/login";
+function failure(code: string, cookies: string[], mode: "requisitioner" | "hrdo" | "external") {
+  const destination = mode === "hrdo" ? "/hrdo/login" : mode === "external" ? "/coe" : "/login";
   return redirect(`${destination}?error=${encodeURIComponent(code)}`, cookies);
 }
 
@@ -96,7 +96,7 @@ export const Route = createFileRoute("/api/auth/google/callback")({
         }
 
         const mode = (cookieValue(request, GOOGLE_MODE_COOKIE) ?? "requisitioner") as
-          "requisitioner" | "hrdo";
+          "requisitioner" | "hrdo" | "external";
         const cleared = [
           clearedSignInCookie(GOOGLE_STATE_COOKIE, secure),
           clearedSignInCookie(GOOGLE_VERIFIER_COOKIE, secure),
@@ -162,14 +162,16 @@ export const Route = createFileRoute("/api/auth/google/callback")({
 
           const email = normaliseEmail(identity.email);
 
-          if (mode === "hrdo") {
-            const accountProblem = googleAccountProblem(email, null);
-            if (accountProblem) return failure(accountProblem, cleared, mode);
+          if (mode === "hrdo" || mode === "external") {
+            if (mode === "hrdo") {
+              const accountProblem = googleAccountProblem(email, null);
+              if (accountProblem) return failure(accountProblem, cleared, mode);
+            }
 
             const [{ ensureHrdoGoogleAccount, hrdoCreateSession }, { encryptedCookieRequired }] =
               await Promise.all([import("@/server/hrdo/auth"), import("@/server/env")]);
 
-            const account = await ensureHrdoGoogleAccount(email);
+            const account = await ensureHrdoGoogleAccount(email, mode === "external");
             if (
               account.role !== "employee" &&
               account.role !== "hrdo_staff" &&
@@ -183,7 +185,7 @@ export const Route = createFileRoute("/api/auth/google/callback")({
               encryptedCookieRequired() || secure ? "; Secure" : ""
             }`;
 
-            let nextTarget = "/hrdo/dashboard";
+            let nextTarget = mode === "external" ? "/hrdo/coe" : "/hrdo/dashboard";
             try {
               nextTarget =
                 decodeURIComponent(cookieValue(request, GOOGLE_NEXT_COOKIE) ?? "") || nextTarget;

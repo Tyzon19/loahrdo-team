@@ -8,10 +8,12 @@ export const GOOGLE_VERIFIER_COOKIE = "loa_google_verifier";
 export const GOOGLE_NEXT_COOKIE = "loa_google_next";
 export const GOOGLE_MODE_COOKIE = "loa_google_mode";
 
-export type GoogleSignInMode = "requisitioner" | "hrdo";
+export type GoogleSignInMode = "requisitioner" | "hrdo" | "external";
 
 export function googleSignInMode(requestUrl: URL): GoogleSignInMode {
-  return requestUrl.searchParams.get("mode") === "hrdo" ? "hrdo" : "requisitioner";
+  const mode = requestUrl.searchParams.get("mode");
+  if (mode === "hrdo" || mode === "external") return mode;
+  return "requisitioner";
 }
 
 export function googleSignInCredentials() {

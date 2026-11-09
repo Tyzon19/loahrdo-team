@@ -35,7 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PageHeader, Section } from "@/components/app/PageHeader";
+import { Section } from "@/components/app/PageHeader";
 import { ButtonLoading, LoadingScreen } from "@/components/app/LoadingPanel";
 import { submitCoeRequestFn } from "@/server-functions";
 import { unwrap } from "@/lib/api";
@@ -85,6 +85,10 @@ const COE_STEPS = [
   },
 ] as const;
 
+type CoeSearch = {
+  requestor?: "internal" | "third_party";
+};
+
 const COE_DESCRIPTION_HINTS: Record<(typeof COE_DESCRIPTION_OPTIONS)[number], string> = {
   "Certificate of Employment": "Standard proof of current or past employment.",
   "Letter of": "Add the specific letter or request name.",
@@ -114,6 +118,10 @@ function addWorkingDays(start: Date, count: number) {
 }
 
 export const Route = createFileRoute("/hrdo/coe")({
+  validateSearch: (search: Record<string, unknown>): CoeSearch => {
+    const requestor = search["requestor"];
+    return requestor === "internal" || requestor === "third_party" ? { requestor } : {};
+  },
   beforeLoad: ({ context }) => {
     if (context.hrdoViewer?.role === "hrdo_staff" || context.hrdoViewer?.role === "hrdo_admin") {
       throw redirect({ to: "/hrdo/requests" });
@@ -130,10 +138,17 @@ export const Route = createFileRoute("/hrdo/coe")({
 });
 
 function CoeRequestPage() {
+  const search = Route.useSearch();
   const { hrdoViewer } = Route.useRouteContext();
   const viewerEmail = hrdoViewer?.email ?? "";
+  const requestor =
+    search.requestor === "internal" || search.requestor === "third_party" ? search.requestor : null;
+  const typeLocked = requestor === "internal" || !hrdoViewer?.isExternal;
+  const initialRequestor = requestor ?? (hrdoViewer?.isExternal ? null : "internal");
   const queryClient = useQueryClient();
-  const [requestorType, setRequestorType] = useState<"internal" | "third_party" | null>(null);
+  const [requestorType, setRequestorType] = useState<"internal" | "third_party" | null>(
+    initialRequestor,
+  );
   const [purpose, setPurpose] = useState("");
   const [descriptionOptions, setDescriptionOptions] = useState<string[]>([]);
   const [descriptionDetails, setDescriptionDetails] = useState<Record<string, string>>({});
@@ -163,7 +178,7 @@ function CoeRequestPage() {
   const [employmentEndDate, setEmploymentEndDate] = useState("");
   const [privacyChecked, setPrivacyChecked] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [currentStep, setCurrentStep] = useState(0);
+  const [currentStep, setCurrentStep] = useState(typeLocked ? 1 : 0);
   const [submissionSummary, setSubmissionSummary] = useState<{
     email: string;
     copyType: CoeCopyType;
@@ -220,6 +235,7 @@ function CoeRequestPage() {
               )}`,
             ].join(" | "),
       ]
+
         .filter(Boolean)
         .join("\n");
 
@@ -315,7 +331,8 @@ function CoeRequestPage() {
             </p>
             {submissionSummary.copyType !== "soft" && (
               <p className="coe-success-message">
-                You will receive an email when your hardcopy is ready for pickup at <strong>HUMAN RESOURCE DEVELOPMENT OFFICE.</strong>
+                You will receive an email when your hardcopy is ready for pickup at{" "}
+                <strong>HUMAN RESOURCE DEVELOPMENT OFFICE.</strong>
               </p>
             )}
             <p className="coe-success-reference">
@@ -374,9 +391,13 @@ function CoeRequestPage() {
         if (employeeName.lastName.trim().length < 2) return "Enter your last name.";
         if (
           !employeeEmail.trim() ||
-          !/^[^\s@]+@lyceumalabang\.edu\.ph$/i.test(employeeEmail.trim())
+          (hrdoViewer?.isExternal
+            ? !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(employeeEmail.trim())
+            : !/^[^\s@]+@lyceumalabang\.edu\.ph$/i.test(employeeEmail.trim()))
         ) {
-          return "Use your official email: name@lyceumalabang.edu.ph";
+          return hrdoViewer?.isExternal
+            ? "Enter a valid personal email address."
+            : "Use your official email: name@lyceumalabang.edu.ph";
         }
         if (employeeNumber.trim() && employeeNumber.trim().length < 3) {
           return "Employee ID must be 3 or more characters if provided.";
@@ -455,11 +476,23 @@ function CoeRequestPage() {
       )}
       <div className="coe-request">
         <main className="coe-main">
-          <PageHeader title="Certificate of Employment" description={currentBatch.blurb} />
+          <div className="coe-form-intro">
+            <div className="coe-form-logos" aria-label="Lyceum of Alabang and HRDO">
+              <img src="/loa-logo.png" alt="Lyceum of Alabang logo" />
+              <img src="/HRDO%20LOGO.png" alt="Human Resources Development Office logo" />
+            </div>
+            <h1>Certificate of Employment</h1>
+            <p>{currentBatch.blurb}</p>
+          </div>
           <ol className="coe-steps" aria-label="Request progress">
             {COE_STEPS.map((step, index) => {
+              const isLockedType = typeLocked && index === 0;
               const state =
-                index === currentStep ? "active" : index < currentStep ? "done" : "upcoming";
+                isLockedType || index < currentStep
+                  ? "done"
+                  : index === currentStep
+                    ? "active"
+                    : "upcoming";
               return (
                 <li key={step.key} className="coe-step" data-state={state}>
                   <div className="coe-step-content">
@@ -764,7 +797,6 @@ function CoeRequestPage() {
                             </RadioGroup>
                           </div>
                         </div>
-
                       </div>
                     </Section>
                   </div>
@@ -890,7 +922,6 @@ function CoeRequestPage() {
                             </p>
                           </div>
                         </div>
-
                       </div>
                     </Section>
                   </div>
@@ -900,7 +931,9 @@ function CoeRequestPage() {
 
             {currentStep === 3 && (
               <Section
-                title={requestorType === "third_party" ? "Purpose of verification" : "Purpose of use"}
+                title={
+                  requestorType === "third_party" ? "Purpose of verification" : "Purpose of use"
+                }
               >
                 <p className="coe-section-description">
                   {requestorType === "third_party"
@@ -910,7 +943,9 @@ function CoeRequestPage() {
                 <div className="space-y-4">
                   <div>
                     <Label htmlFor="purpose">
-                      {requestorType === "third_party" ? "Purpose of verification" : "Purpose of use"}
+                      {requestorType === "third_party"
+                        ? "Purpose of verification"
+                        : "Purpose of use"}
                     </Label>
                     <Textarea
                       id="purpose"
@@ -1117,7 +1152,9 @@ function CoeRequestPage() {
                     </div>
                     <div className="sm:col-span-2">
                       <dt className="text-muted-foreground">
-                        {requestorType === "third_party" ? "Purpose of verification" : "Purpose of use"}
+                        {requestorType === "third_party"
+                          ? "Purpose of verification"
+                          : "Purpose of use"}
                       </dt>
                       <dd className="whitespace-pre-line font-medium">{purpose}</dd>
                     </div>
@@ -1134,8 +1171,8 @@ function CoeRequestPage() {
                   <div className="coe-confirmation">
                     <p>
                       <strong>Processing SLA Notice:</strong> Standard processing time for all
-                      requests is 3 working days. You will receive an automated notification
-                      once your request has been updated by HRDO.
+                      requests is 3 working days. You will receive an automated notification once
+                      your request has been updated by HRDO.
                     </p>
                     <label className="flex items-start gap-2 rounded-md border p-3">
                       <Checkbox
@@ -1182,7 +1219,9 @@ function CoeRequestPage() {
                   type="button"
                   variant="outline"
                   className="coe-button coe-button-back"
-                  disabled={currentStep === 0 || submit.isPending}
+                  disabled={
+                    currentStep === 0 || (typeLocked && currentStep === 1) || submit.isPending
+                  }
                   onClick={() => setCurrentStep((step) => Math.max(0, step - 1))}
                 >
                   <ArrowLeft aria-hidden />
@@ -1229,8 +1268,8 @@ function CoeRequestPage() {
               </span>
               <span className="block rounded-md bg-amber-50 p-2 text-sm text-amber-900">
                 <strong>Reminder:</strong> Submission of this request does{" "}
-                <strong>not guarantee</strong>. Automatic approval.{" "}
-                <strong>3 working days</strong> from submission.
+                <strong>not guarantee</strong>. Automatic approval. <strong>3 working days</strong>{" "}
+                from submission.
               </span>
             </AlertDialogDescription>
           </AlertDialogHeader>

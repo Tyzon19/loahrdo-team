@@ -41,10 +41,14 @@ export const Route = createFileRoute("/hrdo/login")({
       reset: search["reset"] === "success" ? "success" : undefined,
     };
   },
-  beforeLoad: ({ context }) => {
+  beforeLoad: ({ context, search }) => {
     if (context.hrdoViewer) {
       throw routerRedirect({
-        to: context.hrdoViewer.mustChangePassword ? "/hrdo/change-password" : "/hrdo/dashboard",
+        to: context.hrdoViewer.mustChangePassword
+          ? "/hrdo/change-password"
+          : search.redirect && search.redirect !== "/hrdo/login"
+            ? search.redirect
+            : "/hrdo/dashboard",
       });
     }
   },
@@ -143,7 +147,6 @@ function LoginPage() {
             required
           />
           <FakeCaptcha />
-          
 
           <Link
             to="/hrdo/forgot-password"
@@ -166,9 +169,9 @@ function LoginPage() {
           <p className="mt-3 text-sm text-muted-foreground">
             Don't have an account?{" "}
             <Link
-            to="/register"
-            search={email.trim() ? { email: email.trim() } : {}}
-            className="font-semibold text-primary hover:underline"
+              to="/register"
+              search={email.trim() ? { email: email.trim() } : {}}
+              className="font-semibold text-primary hover:underline"
             >
               Continue with email.
             </Link>

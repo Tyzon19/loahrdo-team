@@ -57,6 +57,7 @@ interface HrdoUserRow extends RowDataPacket {
   email: string;
   password_hash: string;
   role: HrdoRole;
+  is_external?: number;
   department: string;
   must_change_password: number;
   is_locked?: number;
@@ -111,6 +112,7 @@ function mapViewer(row: HrdoUserRow): HrdoViewer {
     role: row.role,
     department: row.department,
     mustChangePassword: Boolean(row.must_change_password),
+    isExternal: Boolean(row.is_external),
   };
 }
 
@@ -152,7 +154,7 @@ export async function hrdoGoogleSignInAccount(
   email: string,
 ): Promise<HrdoGoogleSignInAccount | null> {
   const rows = await all<HrdoUserRow[]>(
-    "SELECT id, name, email, password_hash, role, department, must_change_password FROM hrdo_users WHERE email = ? LIMIT 1",
+    "SELECT id, name, email, password_hash, role, is_external, department, must_change_password FROM hrdo_users WHERE email = ? LIMIT 1",
     [normaliseEmail(email)],
   );
   const row = rows[0];
@@ -161,7 +163,10 @@ export async function hrdoGoogleSignInAccount(
     : null;
 }
 
-export async function ensureHrdoGoogleAccount(email: string): Promise<HrdoGoogleSignInAccount> {
+export async function ensureHrdoGoogleAccount(
+  email: string,
+  allowExternal = false,
+): Promise<HrdoGoogleSignInAccount> {
   const normalised = normaliseEmail(email);
   const existing = await hrdoGoogleSignInAccount(normalised);
   if (existing) {
@@ -180,7 +185,7 @@ export async function ensureHrdoGoogleAccount(email: string): Promise<HrdoGoogle
     return existing;
   }
 
-  if (!institutionalEmailAllowed(normalised)) {
+  if (!allowExternal && !institutionalEmailAllowed(normalised)) {
     throw new AppError("Use your official Lyceum of Alabang email address.");
   }
 
@@ -189,18 +194,15 @@ export async function ensureHrdoGoogleAccount(email: string): Promise<HrdoGoogle
     [normalised],
   );
   const linkedUser = linkedUsers[0];
-  const localName = normalised
-    .split("@")[0]
-    ?? ""
-    .replace(/[._-]+/g, " ")
-    .trim();
+  const localName = (normalised.split("@")[0] ?? "").replace(/[._-]+/g, " ").trim();
   const name = linkedUser?.name?.trim() || localName || "Institutional User";
   const department = linkedUser?.department?.trim() || "General";
   const id = randomUUID();
   await run(
-    `INSERT INTO hrdo_users (id, name, email, password_hash, role, department, must_change_password)
-     VALUES (?, ?, ?, ?, 'employee', ?, 0)`,
-    [id, name, normalised, DUMMY_HASH, department],
+    `INSERT INTO hrdo_users
+       (id, name, email, password_hash, role, is_external, department, must_change_password)
+     VALUES (?, ?, ?, ?, 'employee', ?, ?, 0)`,
+    [id, name, normalised, DUMMY_HASH, allowExternal ? 1 : 0, department],
   );
 
   return { id, role: "employee", mustChangePassword: false };
@@ -237,7 +239,7 @@ export async function hrdoViewer(): Promise<HrdoViewer | null> {
   }
   const hash = sha256(token);
   const rows = await all<HrdoUserRow[]>(
-    `SELECT u.id, u.name, u.email, u.role, u.department, u.must_change_password
+    `SELECT u.id, u.name, u.email, u.role, u.is_external, u.department, u.must_change_password
      FROM hrdo_sessions s
      JOIN hrdo_users u ON u.id = s.user_id
      WHERE s.token_hash = ? AND s.expires_at > NOW()
@@ -275,7 +277,7 @@ export async function hrdoLogin(input: unknown): Promise<{ mustChangePassword: b
   checkIpRateLimit(getRequestIP() ?? "unknown");
 
   const rows = await all<HrdoUserRow[]>(
-    `SELECT id, name, email, password_hash, role, department, must_change_password,
+    `SELECT id, name, email, password_hash, role, is_external, department, must_change_password,
             (locked_until IS NOT NULL AND locked_until > NOW()) AS is_locked,
             TIMESTAMPDIFF(MINUTE, NOW(), locked_until) AS lock_minutes
      FROM hrdo_users WHERE email = ? LIMIT 1`,
@@ -341,7 +343,7 @@ export async function hrdoLogin(input: unknown): Promise<{ mustChangePassword: b
       ],
     );
     const linkedRows = await all<HrdoUserRow[]>(
-      `SELECT id, name, email, password_hash, role, department, must_change_password,
+      `SELECT id, name, email, password_hash, role, is_external, department, must_change_password,
               0 AS is_locked, NULL AS lock_minutes
        FROM hrdo_users WHERE id = ? LIMIT 1`,
       [requisitioner.id],

@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
+import { Route as CoeRouteImport } from './routes/coe'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as HrdoRouteImport } from './routes/hrdo'
 import { Route as LoginRouteImport } from './routes/login'
@@ -54,6 +55,11 @@ const IndexRoute = IndexRouteImport.update({
 } as any)
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CoeRoute = CoeRouteImport.update({
+  id: '/coe',
+  path: '/coe',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
@@ -240,6 +246,7 @@ const ApiAuthGoogleCallbackRoute = ApiAuthGoogleCallbackRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/coe': typeof CoeRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/hrdo': typeof HrdoRouteWithChildren
   '/login': typeof LoginRoute
@@ -278,6 +285,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/coe': typeof CoeRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/hrdo': typeof HrdoRouteWithChildren
   '/login': typeof LoginRoute
@@ -318,6 +326,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
+  '/coe': typeof CoeRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/hrdo': typeof HrdoRouteWithChildren
   '/login': typeof LoginRoute
@@ -358,6 +367,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/coe'
     | '/forgot-password'
     | '/hrdo'
     | '/login'
@@ -396,6 +406,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/coe'
     | '/forgot-password'
     | '/hrdo'
     | '/login'
@@ -435,6 +446,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_authenticated'
+    | '/coe'
     | '/forgot-password'
     | '/hrdo'
     | '/login'
@@ -475,6 +487,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
+  CoeRoute: typeof CoeRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   HrdoRoute: typeof HrdoRouteWithChildren
   LoginRoute: typeof LoginRoute
@@ -503,6 +516,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/coe': {
+      id: '/coe'
+      path: '/coe'
+      fullPath: '/coe'
+      preLoaderRoute: typeof CoeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/forgot-password': {
@@ -830,6 +850,7 @@ const ApiAuthGoogleRouteWithChildren = ApiAuthGoogleRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
+  CoeRoute: CoeRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
   HrdoRoute: HrdoRouteWithChildren,
   LoginRoute: LoginRoute,

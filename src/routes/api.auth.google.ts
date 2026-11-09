@@ -27,9 +27,14 @@ export const Route = createFileRoute("/api/auth/google")({
     handlers: {
       GET: async ({ request }) => {
         const requestUrl = new URL(request.url);
+        const mode = googleSignInMode(requestUrl);
         const { clientId, clientSecret } = googleSignInCredentials();
         if (!clientId || !clientSecret) {
-          return redirect("/login?error=google_unavailable");
+          return redirect(
+            mode === "external"
+              ? "/coe?error=google_unavailable"
+              : "/login?error=google_unavailable",
+          );
         }
 
         const redirectUri = googleSignInRedirectUri(requestUrl);
@@ -37,10 +42,13 @@ export const Route = createFileRoute("/api/auth/google")({
         try {
           secure = new URL(redirectUri).protocol === "https:";
         } catch {
-          return redirect("/login?error=google_unavailable");
+          return redirect(
+            mode === "external"
+              ? "/coe?error=google_unavailable"
+              : "/login?error=google_unavailable",
+          );
         }
 
-        const mode = googleSignInMode(requestUrl);
         const state = randomBytes(32).toString("base64url");
         const verifier = randomBytes(32).toString("base64url");
         const challenge = createHash("sha256").update(verifier).digest("base64url");

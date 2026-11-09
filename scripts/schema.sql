@@ -252,6 +252,7 @@ CREATE TABLE IF NOT EXISTS hrdo_users (
   email VARCHAR(190) NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
   role ENUM('employee','hrdo_staff','hrdo_admin') NOT NULL DEFAULT 'employee',
+  is_external TINYINT(1) NOT NULL DEFAULT 0,
   department VARCHAR(190) NOT NULL DEFAULT '',
   must_change_password TINYINT(1) NOT NULL DEFAULT 0,
   failed_attempts INT NOT NULL DEFAULT 0,

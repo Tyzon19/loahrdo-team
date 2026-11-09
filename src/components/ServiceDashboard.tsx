@@ -23,7 +23,7 @@ type Service = {
   desc: string;
   icon: LucideIcon;
   tag: string;
-  to?: "/requests/new" | "/hrdo/coe";
+  to?: "/requests/new" | "/coe";
 };
 
 const SERVICES: Service[] = [
@@ -39,7 +39,7 @@ const SERVICES: Service[] = [
     desc: "Request your Certificate of Employment.",
     icon: FileBadge,
     tag: "Documents",
-    to: "/hrdo/coe",
+    to: "/coe",
   },
   {
     title: "Permission Slip",

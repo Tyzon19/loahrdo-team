@@ -125,6 +125,7 @@ try {
   );
   for (const [table, column, definition] of [
     ["users", "phone_number", "VARCHAR(32) NULL"],
+    ["hrdo_users", "is_external", "TINYINT(1) NOT NULL DEFAULT 0 AFTER role"],
     ["notifications", "email_status", "ENUM('pending','sent','failed') NULL"],
     ["notifications", "email_error", "VARCHAR(500) NULL"],
   ]) {
