@@ -10,7 +10,6 @@ const TONE: Record<string, string> = {
   closed: "border-border bg-muted/60 text-muted-foreground",
 };
 
-/** Shows the three-day processing deadline and how close it is. */
 export function CoeDeadlineBadge({
   deadlineAt,
   status,

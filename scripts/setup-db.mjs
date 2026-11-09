@@ -350,6 +350,57 @@ try {
       "ALTER TABLE registration_otps ADD COLUMN send_nonce CHAR(36) NOT NULL DEFAULT '' AFTER code_hash",
     );
   }
+  for (const [table, index, definition] of [
+    ["requests", "requests_status_date_idx", "(status, date_start, submitted_at)"],
+    ["requests", "requests_date_submitted_idx", "(date_start, submitted_at)"],
+    ["hrdo_coe_requests", "hrdo_coe_requested_idx", "(requested_at, status)"],
+  ]) {
+    const [indexRows] = await conn.query(
+      `SELECT COUNT(*) AS count
+       FROM information_schema.STATISTICS
+       WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND INDEX_NAME = ?`,
+      [dbName, table, index],
+    );
+    if (Number(indexRows[0]?.count ?? 0) === 0) {
+      await conn.query(`ALTER TABLE \`${table}\` ADD INDEX \`${index}\` ${definition}`);
+    }
+  }
+  for (const [table, column, definition] of [
+    ["request_history", "actor_id", "CHAR(36) NULL AFTER attempt"],
+    ["request_returns", "by_id", "CHAR(36) NULL AFTER stage"],
+  ]) {
+    const [columnRows] = await conn.query(
+      `SELECT COUNT(*) AS count
+       FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+      [dbName, table, column],
+    );
+    if (Number(columnRows[0]?.count ?? 0) === 0) {
+      await conn.query(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${definition}`);
+    }
+  }
+  for (const [table, constraint, definition] of [
+    [
+      "request_history",
+      "request_history_actor_fk",
+      "FOREIGN KEY (actor_id) REFERENCES users (id) ON DELETE SET NULL",
+    ],
+    [
+      "request_returns",
+      "request_returns_actor_fk",
+      "FOREIGN KEY (by_id) REFERENCES users (id) ON DELETE SET NULL",
+    ],
+  ]) {
+    const [constraintRows] = await conn.query(
+      `SELECT COUNT(*) AS count
+       FROM information_schema.TABLE_CONSTRAINTS
+       WHERE CONSTRAINT_SCHEMA = ? AND TABLE_NAME = ? AND CONSTRAINT_NAME = ?`,
+      [dbName, table, constraint],
+    );
+    if (Number(constraintRows[0]?.count ?? 0) === 0) {
+      await conn.query(`ALTER TABLE \`${table}\` ADD CONSTRAINT \`${constraint}\` ${definition}`);
+    }
+  }
 } catch (error) {
   console.error("Database setup failed:", error?.code || "unknown error");
   console.error(
@@ -367,6 +418,11 @@ const envContent = [
   `DB_NAME=${dbName}`,
   `DB_USER=${dbUser}`,
   `DB_PASSWORD=${dbPassword}`,
+  `DB_CONNECTION_LIMIT=${existing.DB_CONNECTION_LIMIT || "5"}`,
+  `DB_MAX_IDLE=${existing.DB_MAX_IDLE || "5"}`,
+  `DB_IDLE_TIMEOUT_MS=${existing.DB_IDLE_TIMEOUT_MS || "30000"}`,
+  `DB_QUEUE_LIMIT=${existing.DB_QUEUE_LIMIT || "20"}`,
+  `DB_SLOW_QUERY_MS=${existing.DB_SLOW_QUERY_MS || "1000"}`,
   `TICKET_VERIFICATION_SECRET=${ticketVerificationSecret}`,
   `SITE_URL=${existing.SITE_URL || "http://localhost:8080"}`,
   `ALLOWED_EMAIL_DOMAINS=${existing.ALLOWED_EMAIL_DOMAINS || "loa.edu.ph,lyceumalabang.edu.ph"}`,

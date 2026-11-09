@@ -1,7 +1,15 @@
 import type { Pool, PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { serverEnv, serverEnvOptional } from "./env";
 
-const DB_CONNECTION_LIMIT = 5;
+function boundedEnvInteger(name: string, fallback: number, min: number, max: number) {
+  const raw = serverEnvOptional(name);
+  if (!raw) return fallback;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < min || value > max) {
+    throw new Error(`${name} must be an integer between ${min} and ${max}.`);
+  }
+  return value;
+}
 
 const globalForDb = globalThis as typeof globalThis & {
   __loaDbPoolPromise?: Promise<Pool>;
@@ -41,10 +49,15 @@ export async function getPool(): Promise<Pool> {
         password: serverEnv("DB_PASSWORD"),
         database: serverEnv("DB_NAME"),
         waitForConnections: true,
-        connectionLimit: DB_CONNECTION_LIMIT,
-        maxIdle: DB_CONNECTION_LIMIT,
-        idleTimeout: 30_000,
-        queueLimit: 20,
+        connectionLimit: boundedEnvInteger("DB_CONNECTION_LIMIT", 5, 1, 100),
+        maxIdle: boundedEnvInteger(
+          "DB_MAX_IDLE",
+          boundedEnvInteger("DB_CONNECTION_LIMIT", 5, 1, 100),
+          0,
+          100,
+        ),
+        idleTimeout: boundedEnvInteger("DB_IDLE_TIMEOUT_MS", 30_000, 1_000, 300_000),
+        queueLimit: boundedEnvInteger("DB_QUEUE_LIMIT", 20, 0, 10_000),
         charset: "utf8mb4",
         dateStrings: true,
         enableKeepAlive: true,

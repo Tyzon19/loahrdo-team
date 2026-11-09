@@ -72,6 +72,7 @@ export interface HistoryEvent {
   id: string;
   at: string;
   attempt: number;
+  actorId?: string | undefined;
   actorName: string;
   actorRole: Role;
   type:
@@ -89,6 +90,7 @@ export interface HistoryEvent {
 
 export interface ReturnInfo {
   stage: StageKey;
+  byId?: string | undefined;
   byName: string;
   byRole: Role;
   reason: string;

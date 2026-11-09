@@ -130,6 +130,7 @@ function ev(
     id: ctx.newId(),
     at: ctx.now,
     attempt: r.attempt,
+    actorId: actor.id,
     actorName: actor.name,
     actorRole: actor.role,
     type,
@@ -404,6 +405,7 @@ export function rejectStage(
     history: [...r.history],
     lastReturn: {
       stage: stage.key,
+      byId: actor.id,
       byName: actor.name,
       byRole: actor.role,
       reason: why,

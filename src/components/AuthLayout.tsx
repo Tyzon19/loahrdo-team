@@ -18,7 +18,7 @@ export function AuthLayout({
 }) {
   return (
     <div className="auth-layout flex min-h-screen bg-background">
-      <aside className="flex w-full flex-col justify-center overflow-y-auto px-9 py-10 md:w-[480px] md:shrink-0">
+      <aside className="flex w-full flex-col justify-center overflow-y-auto px-4 py-10 sm:px-9 md:w-[480px] md:shrink-0">
         {back && (
           <Link
             to={backTo}
@@ -61,7 +61,7 @@ export function AuthLayout({
               target="_blank"
               rel="noreferrer"
               aria-label="Follow us on Facebook"
-              className="text-primary transition-colors hover:text-primary/80"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center text-primary transition-colors hover:text-primary/80"
             >
               <Facebook className="h-5 w-5" />
             </a>
@@ -99,7 +99,7 @@ export function Field({ icon: Icon, type, ...props }: FieldProps) {
         <button
           type="button"
           onClick={() => setShow((current) => !current)}
-          className="text-muted-foreground"
+          className="inline-flex min-h-11 min-w-11 items-center justify-center text-muted-foreground"
           aria-label={show ? "Hide password" : "Show password"}
         >
           {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -122,7 +122,7 @@ export function SubmitButton({
     <button
       type="submit"
       disabled={disabled}
-      className="flex w-full items-center justify-center gap-2 rounded-md bg-primary py-2 text-sm font-medium uppercase text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
+      className="flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-primary py-2 text-sm font-medium uppercase text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
     >
       <Icon className="h-4 w-4" />
       {children}
@@ -143,7 +143,7 @@ export function SubmitButtonWithSpinner({
     <button
       type="submit"
       disabled={busy}
-      className="flex w-full items-center justify-center gap-2 rounded-md bg-primary py-2 text-sm font-medium uppercase text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
+      className="flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-primary py-2 text-sm font-medium uppercase text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
     >
       <Icon className="h-4 w-4" />
       {children}
@@ -154,7 +154,7 @@ export function SubmitButtonWithSpinner({
 export function FakeCaptcha() {
   const [checked, setChecked] = useState(false);
   return (
-    <div className="mx-auto my-2 flex w-[302px] items-center justify-between rounded-sm border border-border bg-muted px-3 py-4 shadow-sm">
+    <div className="mx-auto my-2 flex w-full max-w-[302px] items-center justify-between rounded-sm border border-border bg-muted px-3 py-4 shadow-sm">
       <label className="flex cursor-pointer items-center gap-3 text-sm text-foreground">
         <input
           type="checkbox"
@@ -183,7 +183,7 @@ export function GoogleButton({ href, label }: { href: string; label: string }) {
   return (
     <a
       href={href}
-      className="flex w-full items-center justify-center gap-3 rounded-md border border-border bg-background py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+      className="flex min-h-11 w-full items-center justify-center gap-3 rounded-md border border-border bg-background py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
     >
       <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
         <path

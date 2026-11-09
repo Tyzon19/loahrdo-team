@@ -85,12 +85,13 @@ async function insertHistory(conn: PoolConnection, requestId: string, events: Hi
   for (const event of events) {
     await run(
       `INSERT INTO request_history
-        (id, request_id, attempt, actor_name, actor_role, type, message, reason, happened_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, request_id, attempt, actor_id, actor_name, actor_role, type, message, reason, happened_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         event.id,
         requestId,
         event.attempt,
+        event.actorId ?? null,
         event.actorName,
         event.actorRole,
         event.type,
@@ -769,12 +770,13 @@ export async function rejectRequest(
 
     const lastReturn = updated.lastReturn as ReturnInfo;
     await run(
-      `INSERT INTO request_returns (id, request_id, stage, by_name, by_role, reason, attempt, returned_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO request_returns (id, request_id, stage, by_id, by_name, by_role, reason, attempt, returned_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         randomUUID(),
         updated.id,
         lastReturn.stage,
+        lastReturn.byId ?? viewer.id,
         lastReturn.byName,
         lastReturn.byRole,
         lastReturn.reason,

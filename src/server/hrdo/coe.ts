@@ -1130,12 +1130,10 @@ export async function sendCoeTemplate(input: unknown) {
       employee_name: request.employeeName,
       employee_email: request.employeeEmail,
     },
-    softCopyOnly
-      ? "Your COE soft copy has been sent."
-      : "Your COE soft copy has been sent; your hardcopy is ready for pickup.",
+    softCopyOnly ? "Your COE soft copy has been sent." : "Your COE is ready.",
     softCopyOnly
       ? "HRDO has sent your Certificate of Employment soft copy. The request is now complete."
-      : "HRDO has sent the final signed soft copy. Your printed hardcopy is also ready for pickup at the HRDO office.",
+      : "The soft copy is attached to this email. You may claim the hardcopy at the HRDO office.",
     { filename: fileName, mime, content },
     softCopyOnly
       ? "Your Certificate of Employment soft copy"
@@ -1185,6 +1183,123 @@ export async function sendCoeTemplate(input: unknown) {
   });
 
   return { recipientEmail: request.employeeEmail };
+}
+
+export async function uploadCoeManualDelivery(input: unknown): Promise<CoeRequest> {
+  const viewer = await requireHrdoViewer();
+  requireStaff(viewer);
+  if (!(input instanceof FormData)) {
+    throw new AppError("Choose the COE file to send manually.");
+  }
+  const uploadedFile = input.get("file");
+  if (
+    !(uploadedFile instanceof Blob) ||
+    !("name" in uploadedFile) ||
+    typeof uploadedFile.name !== "string"
+  ) {
+    throw new AppError("Choose the COE file to send manually.");
+  }
+  const data = parseInput(uploadSchema, {
+    id: input.get("id"),
+    fileName: uploadedFile.name,
+  });
+  const bytes = Buffer.from(await uploadedFile.arrayBuffer());
+  const { mime } = await validateCoeDocumentUpload(data.fileName, bytes);
+  const request = await loadRow(data.id);
+
+  if (request.status !== "processing") {
+    throw new AppError("This request is no longer waiting for delivery.");
+  }
+  if (request.copy_type === "original") {
+    throw new AppError(
+      "This hardcopy-only request does not need a Gmail attachment. Mark it ready for pickup after printing.",
+    );
+  }
+  if (!request.employee_email) {
+    throw new AppError("This request has no employee email address for Gmail delivery.");
+  }
+
+  const softCopyOnly = request.copy_type === "soft";
+  const emailResult = await notifyEmployeeOfCoeStatus(
+    softCopyOnly ? "released" : "ready_for_pickup",
+    {
+      id: request.id,
+      employee_name: request.employee_name,
+      employee_email: request.employee_email,
+    },
+    softCopyOnly ? "Your COE soft copy has been sent." : "Your COE is ready.",
+    softCopyOnly
+      ? "HRDO has sent your Certificate of Employment soft copy."
+      : "The soft copy is attached to this email. You may claim the hardcopy at the HRDO office.",
+    { filename: data.fileName, mime, content: bytes },
+    softCopyOnly
+      ? "Your Certificate of Employment soft copy"
+      : "Your final COE is ready; hardcopy available for pickup",
+  );
+
+  if (!emailResult?.sent) {
+    throw new AppError(
+      `The uploaded COE could not be emailed to ${request.employee_email}. ${emailResult?.message ?? "Contact the system administrator."}`,
+    );
+  }
+
+  await withTransaction(async (conn) => {
+    const row = await loadRow(data.id, conn, true);
+    if (row.status !== "processing") {
+      throw new AppError(
+        "The COE was emailed, but the request status changed before it could be updated. Refresh the request and verify its status.",
+      );
+    }
+    const nextStatus = softCopyOnly ? "released" : "ready_for_pickup";
+    await run(
+      `INSERT INTO hrdo_coe_documents
+         (request_id, file_name, mime, size_bytes, content, uploaded_by_id, uploaded_by_name)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         file_name = VALUES(file_name), mime = VALUES(mime), size_bytes = VALUES(size_bytes),
+         content = VALUES(content), uploaded_by_id = VALUES(uploaded_by_id),
+         uploaded_by_name = VALUES(uploaded_by_name), uploaded_at = NOW()`,
+      [data.id, data.fileName, mime, bytes.length, bytes, viewer.id, viewer.name],
+      conn,
+    );
+    await run(
+      `UPDATE hrdo_coe_requests
+       SET status = ?, released_at = IF(? = 'released', NOW(), released_at),
+           released_by_name = IF(? = 'released', ?, released_by_name),
+           ready_at = IF(? = 'ready_for_pickup', NOW(), ready_at),
+           processed_by_id = ?, processed_by_name = ?, updated_at = NOW()
+       WHERE id = ? AND status = 'processing'`,
+      [
+        nextStatus,
+        nextStatus,
+        nextStatus,
+        nextStatus === "released" ? viewer.name : null,
+        nextStatus,
+        viewer.id,
+        viewer.name,
+        data.id,
+      ],
+      conn,
+    );
+    await addHistory(
+      conn,
+      data.id,
+      viewer,
+      "document_uploaded",
+      `COE file uploaded and sent via Gmail (${data.fileName}).`,
+    );
+    await addHistory(
+      conn,
+      data.id,
+      viewer,
+      nextStatus,
+      nextStatus === "released"
+        ? "Final COE sent via Gmail; request completed."
+        : "Final COE sent via Gmail; printed hardcopy is ready for pickup.",
+    );
+  });
+
+  return loadRequest(data.id);
 }
 
 export async function uploadCoeDocument(input: unknown): Promise<CoeRequest> {

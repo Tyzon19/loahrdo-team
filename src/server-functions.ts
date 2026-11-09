@@ -38,7 +38,9 @@ export const requestHrdoPasswordRecoveryFn = createServerFn({ method: "POST" })
 export const resetHrdoPasswordWithRecoveryCodeFn = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) =>
-    runSafely(async () => (await import("./server/hrdo/auth")).resetHrdoPasswordWithRecoveryCode(data)),
+    runSafely(async () =>
+      (await import("./server/hrdo/auth")).resetHrdoPasswordWithRecoveryCode(data),
+    ),
   );
 
 export const requestRegistrationOtpFn = createServerFn({ method: "POST" })
@@ -175,6 +177,12 @@ export const sendCoeTemplateFn = createServerFn({ method: "POST" })
     runSafely(async () => (await import("./server/hrdo/coe")).sendCoeTemplate(data)),
   );
 
+export const uploadCoeManualDeliveryFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/hrdo/coe")).uploadCoeManualDelivery(data)),
+  );
+
 export const markCoeReadyFn = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) =>
@@ -302,9 +310,7 @@ export const getHrdoCoeAnalyticsFn = createServerFn({ method: "GET" }).handler(a
 export const createHrdoProcessorAccountFn = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) =>
-    runSafely(async () =>
-      (await import("./server/hrdo/admin")).createHrdoProcessorAccount(data),
-    ),
+    runSafely(async () => (await import("./server/hrdo/admin")).createHrdoProcessorAccount(data)),
   );
 
 export const resetUserPasswordFn = createServerFn({ method: "POST" })

@@ -42,6 +42,7 @@ import {
   getCoeRequestFn,
   generateCoeTemplateFn,
   markCoeReadyFn,
+  uploadCoeManualDeliveryFn,
   rejectCoeRequestFn,
   releaseCoeDocumentFn,
   requestCoeCorrectionFn,
@@ -428,6 +429,7 @@ function CoeDetailPage() {
   const [sending, setSending] = useState(false);
   const [preview, setPreview] = useState<CoeTemplatePreview | null>(null);
   const [sentTo, setSentTo] = useState("");
+  const [manualFile, setManualFile] = useState<File | null>(null);
   const [signature, setSignature] = useState<SignatureValue | null>(null);
   // Only holds what staff typed. Anything not edited falls back to the request's own value.
   const [templateFields, setTemplateFields] = useState<Partial<Record<TemplateKey, string>>>({
@@ -682,6 +684,28 @@ function CoeDetailPage() {
   const downloadPreview = () => {
     if (!preview) return;
     saveBase64File(preview.fileName, preview.mime, preview.base64);
+  };
+
+  const confirmManualDelivery = async () => {
+    if (!manualFile) {
+      toast.error("Choose the actual COE file you will send manually.");
+      return;
+    }
+    setSending(true);
+    try {
+      const data = new FormData();
+      data.set("id", id);
+      data.set("file", manualFile, manualFile.name);
+      await unwrap(uploadCoeManualDeliveryFn({ data }));
+      setTemplateOpen(false);
+      setManualFile(null);
+      toast.success("Uploaded COE sent via Gmail and delivery recorded.");
+      await queryClient.invalidateQueries({ queryKey: ["coe"] });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "We couldn't record manual delivery.");
+    } finally {
+      setSending(false);
+    }
   };
 
   const sendTemplate = async () => {
@@ -1175,19 +1199,59 @@ function CoeDetailPage() {
                 ) : (
                   <div className="space-y-2 p-3">
                     <p className="text-sm font-semibold">2. Send the final COE to the requestor</p>
-                    <Button
-                      type="button"
-                      disabled={
-                        request.status !== "processing" || !preview || sending || generating
-                      }
-                      onClick={() => void sendTemplate()}
-                    >
-                      <Send className="h-4 w-4" aria-hidden />
-                      {sending ? "Sending…" : "Send final COE"}
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        disabled={
+                          request.status !== "processing" || !preview || sending || generating
+                        }
+                        onClick={() => void sendTemplate()}
+                      >
+                        <Send className="h-4 w-4" aria-hidden />
+                        {sending ? "Sending…" : "Send via Gmail"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={request.status !== "processing" || sending || generating}
+                        onClick={() =>
+                          document.getElementById("manual-coe-file")?.scrollIntoView({
+                            behavior: "smooth",
+                            block: "center",
+                          })
+                        }
+                      >
+                        <Upload className="h-4 w-4" aria-hidden />
+                        Upload file and send via Gmail
+                      </Button>
+                    </div>
+                    <div className="space-y-2 rounded-md border border-dashed p-3">
+                      <Label htmlFor="manual-coe-file">COE file for manual sending</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Upload the exact PDF or Word file to attach to the Gmail message. The
+                        request is completed only after Gmail confirms delivery.
+                      </p>
+                      <Input
+                        id="manual-coe-file"
+                        type="file"
+                        accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        onChange={(event) => setManualFile(event.target.files?.[0] ?? null)}
+                      />
+                      {manualFile && (
+                        <p className="text-xs text-muted-foreground">{manualFile.name} selected.</p>
+                      )}
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={!manualFile || sending}
+                        onClick={() => void confirmManualDelivery()}
+                      >
+                        {sending ? "Sending…" : "Upload and send via Gmail"}
+                      </Button>
+                    </div>
                     <p className="text-xs text-muted-foreground" role="status">
                       {sentTo
-                        ? `Sent to ${sentTo}. Generate a new copy before sending again.`
+                        ? `Sent to ${sentTo}.`
                         : preview
                           ? isCombinedCopy
                             ? "One email sends the softcopy and confirms that the hardcopy is ready for pickup."

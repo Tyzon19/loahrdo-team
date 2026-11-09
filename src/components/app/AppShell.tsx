@@ -147,7 +147,7 @@ function SideNav({
                 to={item.to}
                 onClick={onNavigate}
                 className={cn(
-                  "flex items-center gap-2.5 border-l-4 px-4 py-2 text-sm transition-colors",
+                  "flex min-h-11 items-center gap-2.5 border-l-4 px-4 py-2 text-sm transition-colors",
                   active
                     ? "border-sidebar-primary bg-sidebar-accent font-medium text-sidebar-accent-foreground"
                     : "border-transparent hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",

@@ -89,6 +89,8 @@ CREATE TABLE IF NOT EXISTS requests (
   UNIQUE KEY requests_number_uq (number),
   KEY requests_requisitioner_idx (requisitioner_id, submitted_at),
   KEY requests_status_idx (status),
+  KEY requests_status_date_idx (status, date_start, submitted_at),
+  KEY requests_date_submitted_idx (date_start, submitted_at),
   KEY requests_vehicle_idx (vehicle_id),
   CONSTRAINT requests_requisitioner_fk FOREIGN KEY (requisitioner_id) REFERENCES users (id) ON DELETE RESTRICT,
   CONSTRAINT requests_vehicle_fk FOREIGN KEY (vehicle_id) REFERENCES vehicles (id) ON DELETE SET NULL,
@@ -130,6 +132,7 @@ CREATE TABLE IF NOT EXISTS request_history (
   id CHAR(36) NOT NULL,
   request_id CHAR(36) NOT NULL,
   attempt INT NOT NULL,
+  actor_id CHAR(36) NULL,
   actor_name VARCHAR(120) NOT NULL,
   actor_role ENUM('requisitioner','transport_head','director','president','transport_staff','assistant','guard','driver','admin') NOT NULL,
   type ENUM('submitted','updated','signed','returned','resubmitted','approved','dispatch','completed') NOT NULL,
@@ -138,13 +141,15 @@ CREATE TABLE IF NOT EXISTS request_history (
   happened_at DATETIME NOT NULL,
   PRIMARY KEY (id),
   KEY request_history_request_idx (request_id, happened_at),
-  CONSTRAINT request_history_request_fk FOREIGN KEY (request_id) REFERENCES requests (id) ON DELETE CASCADE
+  CONSTRAINT request_history_request_fk FOREIGN KEY (request_id) REFERENCES requests (id) ON DELETE CASCADE,
+  CONSTRAINT request_history_actor_fk FOREIGN KEY (actor_id) REFERENCES users (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS request_returns (
   id CHAR(36) NOT NULL,
   request_id CHAR(36) NOT NULL,
   stage ENUM('review','recommend','approve') NOT NULL,
+  by_id CHAR(36) NULL,
   by_name VARCHAR(120) NOT NULL,
   by_role ENUM('requisitioner','transport_head','director','president','transport_staff','assistant','guard','driver','admin') NOT NULL,
   reason TEXT NOT NULL,
@@ -152,7 +157,8 @@ CREATE TABLE IF NOT EXISTS request_returns (
   returned_at DATETIME NOT NULL,
   PRIMARY KEY (id),
   KEY request_returns_request_idx (request_id, returned_at),
-  CONSTRAINT request_returns_request_fk FOREIGN KEY (request_id) REFERENCES requests (id) ON DELETE CASCADE
+  CONSTRAINT request_returns_request_fk FOREIGN KEY (request_id) REFERENCES requests (id) ON DELETE CASCADE,
+  CONSTRAINT request_returns_actor_fk FOREIGN KEY (by_id) REFERENCES users (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS dispatch_records (
@@ -316,6 +322,7 @@ CREATE TABLE IF NOT EXISTS hrdo_coe_requests (
   PRIMARY KEY (id),
   KEY hrdo_coe_employee_idx (employee_id, requested_at),
   KEY hrdo_coe_status_idx (status),
+  KEY hrdo_coe_requested_idx (requested_at, status),
   KEY hrdo_coe_deadline_idx (deadline_at),
   CONSTRAINT hrdo_coe_employee_fk FOREIGN KEY (employee_id) REFERENCES hrdo_users (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

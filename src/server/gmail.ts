@@ -504,6 +504,8 @@ export async function sendCoeReleaseEmail(input: {
         : input.copyType === "both"
           ? "Your signed soft copy is attached. Your printed hardcopy is also ready for pickup at the HRDO office."
           : "Your printed, signed hardcopy is ready for pickup at the HRDO office.";
+    const recipientNameHtml = escapeHtml(input.recipientName);
+    const requestIdHtml = escapeHtml(input.requestId);
     const text = [
       `Dear ${input.recipientName},`,
       "",
@@ -514,14 +516,18 @@ export async function sendCoeReleaseEmail(input: {
       "",
       "Thank you,",
       "Lyceum of Alabang HRDO",
+      "",
+      "For any concern, please message us on Facebook:",
+      "https://www.facebook.com/lyceumhrdo",
     ].join("\n");
     const html = `
       <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
-        <p>Dear ${input.recipientName},</p>
-        <p>Your COE request (<strong>${input.requestId}</strong>) has been approved by HRDO.</p>
+        <p>Dear ${recipientNameHtml},</p>
+        <p>Your COE request (<strong>${requestIdHtml}</strong>) has been approved by HRDO.</p>
         <p>${deliveryMessage}</p>
         <p><a href="${new URL(`/hrdo/coe/${encodeURIComponent(input.requestId)}`, siteUrl.origin).toString()}">Open your COE request</a></p>
         <p>Thank you,<br/>Lyceum of Alabang HRDO</p>
+        <p>For any concern, please message us on Facebook: <a href="https://www.facebook.com/lyceumhrdo">https://www.facebook.com/lyceumhrdo</a></p>
       </div>
     `;
 
@@ -599,6 +605,9 @@ export async function sendCoeStatusEmail(input: {
             inReplyTo: rootMessageId,
             references: rootMessageId,
           };
+    const recipientNameHtml = escapeHtml(input.recipientName);
+    const requestIdHtml = escapeHtml(input.requestId);
+    const titleHtml = escapeHtml(input.title);
     const text = [
       `Dear ${input.recipientName},`,
       "",
@@ -620,12 +629,13 @@ export async function sendCoeStatusEmail(input: {
         : `<p>${safeMessage}</p>`;
     const html = `
       <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
-        <p>Dear ${input.recipientName},</p>
-        <p><strong>Update for your COE request (${input.requestId})</strong></p>
-        <p>${input.title}</p>
+        <p>Dear ${recipientNameHtml},</p>
+        <p><strong>Update for your COE request (${requestIdHtml})</strong></p>
+        <p>${titleHtml}</p>
         ${messageHtml}
         <p><a href="${new URL(`/hrdo/coe/${encodeURIComponent(input.requestId)}`, siteUrl.origin).toString()}">Open your COE request</a></p>
         <p>Thank you,<br/>Lyceum of Alabang HRDO</p>
+        <p>For any concern, please message us on Facebook: <a href="https://www.facebook.com/lyceumhrdo">https://www.facebook.com/lyceumhrdo</a></p>
         <p style="margin:20px 0 0;color:#ff3333;font-size:13px;font-weight:700;line-height:1.6;">This is an automated notification. Please do not reply to this email.</p>
       </div>
     `;
@@ -684,6 +694,12 @@ export async function sendCoeProcessorNotification(input: {
       `/hrdo/coe/${encodeURIComponent(input.requestId)}`,
       siteUrl.origin,
     ).toString();
+    const recipientNameHtml = escapeHtml(input.recipientName || "HRDO Processor");
+    const requesterNameHtml = escapeHtml(input.requesterName);
+    const requesterEmailHtml = escapeHtml(input.requesterEmail);
+    const departmentHtml = escapeHtml(input.department);
+    const purposeHtml = escapeHtml(input.purpose);
+    const requestIdHtml = escapeHtml(input.requestId);
     const subject = `New COE request from ${input.requesterName}`;
     const text = [
       `Dear ${input.recipientName || "HRDO Processor"},`,
@@ -703,14 +719,14 @@ export async function sendCoeProcessorNotification(input: {
     ].join("\n");
     const html = `
       <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
-        <p>Dear ${input.recipientName || "HRDO Processor"},</p>
+        <p>Dear ${recipientNameHtml},</p>
         <p>A new Certificate of Employment request is waiting for HRDO processing.</p>
         <p>
-          <strong>Requester:</strong> ${input.requesterName}<br />
-          <strong>Requester email:</strong> ${input.requesterEmail}<br />
-          <strong>Department:</strong> ${input.department}<br />
-          <strong>Purpose:</strong> ${input.purpose}<br />
-          <strong>Request ID:</strong> ${input.requestId}
+          <strong>Requester:</strong> ${requesterNameHtml}<br />
+          <strong>Requester email:</strong> ${requesterEmailHtml}<br />
+          <strong>Department:</strong> ${departmentHtml}<br />
+          <strong>Purpose:</strong> ${purposeHtml}<br />
+          <strong>Request ID:</strong> ${requestIdHtml}
         </p>
         <p><a href="${requestUrl}">Review the COE request</a></p>
         <p>Thank you,<br />LOA HRDO DESK TEAM</p>

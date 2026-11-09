@@ -36,11 +36,7 @@ export interface RequestDbRow extends RowDataPacket {
   submitted_at: string;
 }
 
-export interface DestinationDbRow extends RowDataPacket {
-  
-}
-
-
+export interface DestinationDbRow extends RowDataPacket {}
 export interface UserDbRow extends RowDataPacket {
   id: string;
   name: string;
@@ -66,6 +62,7 @@ export interface SignatureDbRow extends RowDataPacket {
 export interface HistoryDbRow extends RowDataPacket {
   id: string;
   attempt: number;
+  actor_id: string | null;
   actor_name: string;
   actor_role: Role;
   type: HistoryEvent["type"];
@@ -76,6 +73,7 @@ export interface HistoryDbRow extends RowDataPacket {
 
 export interface ReturnDbRow extends RowDataPacket {
   stage: StageKey;
+  by_id: string | null;
   by_name: string;
   by_role: Role;
   reason: string;
@@ -301,13 +299,13 @@ export async function loadRequest(
     db,
   );
   const history = await all<HistoryDbRow[]>(
-    `SELECT id, attempt, actor_name, actor_role, type, message, reason, happened_at
+    `SELECT id, attempt, actor_id, actor_name, actor_role, type, message, reason, happened_at
      FROM request_history WHERE request_id = ? ORDER BY happened_at, id`,
     [id],
     db,
   );
   const returns = await all<ReturnDbRow[]>(
-    `SELECT stage, by_name, by_role, reason, attempt, returned_at
+    `SELECT stage, by_id, by_name, by_role, reason, attempt, returned_at
      FROM request_returns WHERE request_id = ? ORDER BY returned_at DESC LIMIT 1`,
     [id],
     db,
@@ -360,6 +358,7 @@ export async function loadRequest(
       id: h.id,
       at: isoTimestamp(h.happened_at) ?? "",
       attempt: h.attempt,
+      ...(h.actor_id ? { actorId: h.actor_id } : {}),
       actorName: h.actor_name,
       actorRole: h.actor_role,
       type: h.type,
@@ -369,6 +368,7 @@ export async function loadRequest(
     lastReturn: lastReturn
       ? {
           stage: lastReturn.stage,
+          ...(lastReturn.by_id ? { byId: lastReturn.by_id } : {}),
           byName: lastReturn.by_name,
           byRole: lastReturn.by_role,
           reason: lastReturn.reason,
