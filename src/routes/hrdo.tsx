@@ -27,6 +27,9 @@ export const Route = createFileRoute("/hrdo")({
     if (context.hrdoViewer.mustChangePassword && location.pathname !== "/hrdo/change-password") {
       throw redirect({ to: "/hrdo/change-password" });
     }
+    if (!context.hrdoViewer.isExternal && location.pathname === "/hrdo") {
+      throw redirect({ to: "/hrdo/dashboard" });
+    }
   },
   component: HrdoLayout,
 });

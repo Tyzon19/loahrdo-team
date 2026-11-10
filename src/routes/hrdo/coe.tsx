@@ -48,6 +48,8 @@ import {
   COE_DESCRIPTION_OTHER,
   COE_DESCRIPTION_TEXT_OPTIONS,
   COE_EMPLOYMENT_STATUSES,
+  COE_PURPOSE_OPTIONS,
+  COE_PURPOSE_OTHER,
   COE_TITLES,
   formatStoredDescription,
 } from "@/lib/coe-form";
@@ -143,13 +145,16 @@ function CoeRequestPage() {
   const viewerEmail = hrdoViewer?.email ?? "";
   const requestor =
     search.requestor === "internal" || search.requestor === "third_party" ? search.requestor : null;
-  const typeLocked = requestor === "internal" || !hrdoViewer?.isExternal;
-  const initialRequestor = requestor ?? (hrdoViewer?.isExternal ? null : "internal");
+  const typeLocked = Boolean(hrdoViewer);
+  const initialRequestor = hrdoViewer?.isExternal
+    ? "third_party"
+    : (requestor ?? "internal");
   const queryClient = useQueryClient();
   const [requestorType, setRequestorType] = useState<"internal" | "third_party" | null>(
     initialRequestor,
   );
   const [purpose, setPurpose] = useState("");
+  const [customPurpose, setCustomPurpose] = useState("");
   const [descriptionOptions, setDescriptionOptions] = useState<string[]>([]);
   const [descriptionDetails, setDescriptionDetails] = useState<Record<string, string>>({});
   const [customDescription, setCustomDescription] = useState("");
@@ -172,7 +177,9 @@ function CoeRequestPage() {
   const [verifierName, setVerifierName] = useState("");
   const [verifierEmail, setVerifierEmail] = useState("");
   const [verifierContact, setVerifierContact] = useState("");
-  const [subjectName, setSubjectName] = useState("");
+  const [subjectFirstName, setSubjectFirstName] = useState("");
+  const [subjectMiddleName, setSubjectMiddleName] = useState("");
+  const [subjectLastName, setSubjectLastName] = useState("");
   const [subjectTitle, setSubjectTitle] = useState("");
   const [subjectDob, setSubjectDob] = useState("");
   const [employmentEndDate, setEmploymentEndDate] = useState("");
@@ -187,6 +194,11 @@ function CoeRequestPage() {
   const dateRequested = localDateValue(new Date());
   const minimumDateNeeded = addWorkingDays(new Date(), 3);
   const previewEmployeeName = joinFullName(employeeName);
+  const subjectName = [subjectFirstName, subjectMiddleName, subjectLastName]
+    .map((name) => name.trim())
+    .filter(Boolean)
+    .join(" ");
+  const selectedPurpose = purpose === COE_PURPOSE_OTHER ? customPurpose : purpose;
 
   const submit = useMutation({
     mutationFn: async () => {
@@ -249,17 +261,18 @@ function CoeRequestPage() {
       return unwrap(
         submitCoeRequestFn({
           data: {
+            requestorType,
             purpose:
               requestorType === "third_party"
                 ? "Third-party verification / employment verification"
-                : purpose.trim(),
+                : selectedPurpose.trim(),
             note: combinedNote,
             employeeEmail:
               requestorType === "third_party" ? verifierEmail.trim() : employeeEmail.trim(),
             employeeNumber: employeeNumber.trim(),
             contactNumber: requestorType === "third_party" ? normalizedVerifierContact : "",
             employeeName:
-              requestorType === "third_party" ? subjectName.trim() : joinFullName(employeeName),
+              requestorType === "third_party" ? subjectName : joinFullName(employeeName),
             department: submittedDepartment,
             copyType,
           },
@@ -268,6 +281,7 @@ function CoeRequestPage() {
     },
     onSuccess: async () => {
       setPurpose("");
+      setCustomPurpose("");
       setDescriptionOptions([]);
       setDescriptionDetails({});
       setCustomDescription("");
@@ -290,7 +304,9 @@ function CoeRequestPage() {
       setVerifierName("");
       setVerifierEmail("");
       setVerifierContact("");
-      setSubjectName("");
+      setSubjectFirstName("");
+      setSubjectMiddleName("");
+      setSubjectLastName("");
       setSubjectTitle("");
       setSubjectDob("");
       setEmploymentEndDate("");
@@ -410,12 +426,13 @@ function CoeRequestPage() {
         if (!verifierCompany.trim()) return "Enter the verifying company or agency name.";
         if (!verifierName.trim()) return "Enter the authorized representative name.";
         if (!verifierEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(verifierEmail)) {
-          return "Enter a valid company or work email.";
+          return "Enter a valid email address. A school email is not required for third-party verification.";
         }
         if (!normalizePhilippineMobileNumber(verifierContact)) {
           return "Enter a valid Philippine mobile number (09XXXXXXXXX or +639XXXXXXXXX).";
         }
-        if (!subjectName.trim()) return "Enter the employee name.";
+        if (!subjectFirstName.trim()) return "Enter the former employee's first name.";
+        if (!subjectLastName.trim()) return "Enter the former employee's last name.";
         if (!subjectTitle) return "Select a title for the employee to verify.";
         if (!subjectDob) return "Enter the hiring date.";
         if (subjectDob > dateRequested) return "Date hired cannot be in the future.";
@@ -428,7 +445,7 @@ function CoeRequestPage() {
         }
       }
     }
-    if (key === "purpose" && purpose.trim().length < 5) {
+    if (key === "purpose" && selectedPurpose.trim().length < 5) {
       return requestorType === "third_party"
         ? "Enter the purpose of this employment verification."
         : "Enter the purpose of use.";
@@ -810,63 +827,47 @@ function CoeRequestPage() {
                       <div className="space-y-4">
                         <div className="coe-fields coe-fields-verification">
                           <div>
-                            <Label htmlFor="verifier-company">Employer / Company Name</Label>
+                            <Label htmlFor="subject-first-name">
+                              First Name <span className="text-destructive">*</span>
+                            </Label>
                             <Input
-                              id="verifier-company"
+                              id="subject-first-name"
                               className="mt-1"
-                              value={verifierCompany}
-                              onChange={(event) => setVerifierCompany(event.target.value)}
-                              placeholder="e.g., Accenture HR"
+                              value={subjectFirstName}
+                              onChange={(event) => setSubjectFirstName(event.target.value)}
+                              autoComplete="given-name"
                             />
                           </div>
                           <div>
-                            <Label htmlFor="verifier-name">Authorized representative name</Label>
+                            <Label htmlFor="subject-middle-name">Middle Name</Label>
                             <Input
-                              id="verifier-name"
+                              id="subject-middle-name"
                               className="mt-1"
-                              value={verifierName}
-                              onChange={(event) => setVerifierName(event.target.value)}
+                              value={subjectMiddleName}
+                              onChange={(event) => setSubjectMiddleName(event.target.value)}
+                              autoComplete="additional-name"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="subject-last-name">
+                              Last Name <span className="text-destructive">*</span>
+                            </Label>
+                            <Input
+                              id="subject-last-name"
+                              className="mt-1"
+                              value={subjectLastName}
+                              onChange={(event) => setSubjectLastName(event.target.value)}
+                              autoComplete="family-name"
                             />
                           </div>
                         </div>
 
                         <div className="coe-fields coe-fields-verification">
                           <div>
-                            <Label htmlFor="verifier-email">Company Email / Work Email</Label>
-                            <Input
-                              id="verifier-email"
-                              className="mt-1"
-                              value={verifierEmail}
-                              onChange={(event) => setVerifierEmail(event.target.value)}
-                              type="email"
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="verifier-contact">Contact number</Label>
-                            <Input
-                              id="verifier-contact"
-                              className="mt-1"
-                              type="tel"
-                              inputMode="tel"
-                              autoComplete="tel"
-                              placeholder="Enter your phone number"
-                              maxLength={24}
-                              value={verifierContact}
-                              onChange={(event) => setVerifierContact(event.target.value)}
-                              aria-describedby="verifier-contact-help"
-                            />
-                            <p
-                              id="verifier-contact-help"
-                              className="mt-1 text-xs text-muted-foreground"
-                            >
-                              (e.g., 0921..)
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="coe-fields coe-fields-verification">
-                          <div>
-                            <Label htmlFor="subject-title">Prefix</Label>
+                            <Label htmlFor="subject-title">
+                              Professional title / prefix{" "}
+                              <span className="text-destructive">*</span>
+                            </Label>
                             <Select value={subjectTitle} onValueChange={setSubjectTitle}>
                               <SelectTrigger id="subject-title" className="mt-1">
                                 <SelectValue placeholder="Select title" />
@@ -879,15 +880,6 @@ function CoeRequestPage() {
                                 ))}
                               </SelectContent>
                             </Select>
-                          </div>
-                          <div>
-                            <Label htmlFor="subject-name">Employee Name or Full Name</Label>
-                            <Input
-                              id="subject-name"
-                              className="mt-1"
-                              value={subjectName}
-                              onChange={(event) => setSubjectName(event.target.value)}
-                            />
                           </div>
                           <div>
                             <Label htmlFor="subject-dob">Date Hired</Label>
@@ -922,6 +914,69 @@ function CoeRequestPage() {
                             </p>
                           </div>
                         </div>
+
+                        <div className="coe-fields coe-fields-verification">
+                          <div>
+                            <Label htmlFor="verifier-company">Employer / Company Name</Label>
+                            <Input
+                              id="verifier-company"
+                              className="mt-1"
+                              value={verifierCompany}
+                              onChange={(event) => setVerifierCompany(event.target.value)}
+                              placeholder="e.g., Accenture HR"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="verifier-name">Authorized representative name</Label>
+                            <Input
+                              id="verifier-name"
+                              className="mt-1"
+                              value={verifierName}
+                              onChange={(event) => setVerifierName(event.target.value)}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="coe-fields coe-fields-verification">
+                          <div>
+                            <Label htmlFor="verifier-email">Verifier email address</Label>
+                            <Input
+                              id="verifier-email"
+                              className="mt-1"
+                              value={verifierEmail}
+                              onChange={(event) => setVerifierEmail(event.target.value)}
+                              type="email"
+                              autoComplete="email"
+                              placeholder="company or personal email"
+                            />
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Company, agency, or personal email is accepted. No school email is
+                              required.
+                            </p>
+                          </div>
+                          <div>
+                            <Label htmlFor="verifier-contact">Contact number</Label>
+                            <Input
+                              id="verifier-contact"
+                              className="mt-1"
+                              type="tel"
+                              inputMode="tel"
+                              autoComplete="tel"
+                              placeholder="Enter your phone number"
+                              maxLength={24}
+                              value={verifierContact}
+                              onChange={(event) => setVerifierContact(event.target.value)}
+                              aria-describedby="verifier-contact-help"
+                            />
+                            <p
+                              id="verifier-contact-help"
+                              className="mt-1 text-xs text-muted-foreground"
+                            >
+                              (e.g., 0921..)
+                            </p>
+                          </div>
+                        </div>
+
                       </div>
                     </Section>
                   </div>
@@ -947,19 +1002,52 @@ function CoeRequestPage() {
                         ? "Purpose of verification"
                         : "Purpose of use"}
                     </Label>
-                    <Textarea
-                      id="purpose"
-                      className="mt-1 min-h-24"
-                      value={purpose}
-                      onChange={(event) => setPurpose(event.target.value)}
-                      placeholder={
-                        requestorType === "third_party"
-                          ? "Explain why the employee's work history is being verified"
-                          : "Enter the purpose of use"
-                      }
-                      maxLength={255}
-                      required
-                    />
+                    {requestorType === "third_party" ? (
+                      <Textarea
+                        id="purpose"
+                        className="mt-1 min-h-24"
+                        value={purpose}
+                        onChange={(event) => setPurpose(event.target.value)}
+                        placeholder="Explain why the employee's work history is being verified"
+                        maxLength={255}
+                        required
+                      />
+                    ) : (
+                      <>
+                        <Select
+                          value={purpose}
+                          onValueChange={(value) => {
+                            setPurpose(value);
+                            if (value !== COE_PURPOSE_OTHER) setCustomPurpose("");
+                          }}
+                        >
+                          <SelectTrigger id="purpose" className="mt-1">
+                            <SelectValue placeholder="Select the purpose of use" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {COE_PURPOSE_OPTIONS.map((option) => (
+                              <SelectItem key={option} value={option}>
+                                {option}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {purpose === COE_PURPOSE_OTHER && (
+                          <div className="mt-3">
+                            <Label htmlFor="custom-purpose">Specify the purpose</Label>
+                            <Input
+                              id="custom-purpose"
+                              className="mt-1"
+                              value={customPurpose}
+                              onChange={(event) => setCustomPurpose(event.target.value)}
+                              placeholder="Specify the purpose of use"
+                              maxLength={255}
+                              required
+                            />
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="note">Additional note / special instructions (optional)</Label>
@@ -1156,7 +1244,7 @@ function CoeRequestPage() {
                           ? "Purpose of verification"
                           : "Purpose of use"}
                       </dt>
-                      <dd className="whitespace-pre-line font-medium">{purpose}</dd>
+                      <dd className="whitespace-pre-line font-medium">{selectedPurpose}</dd>
                     </div>
                     {note.trim() && (
                       <div className="sm:col-span-2">

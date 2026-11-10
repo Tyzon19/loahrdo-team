@@ -64,6 +64,11 @@ started only after those checks. Add `http://localhost:8080/api/auth/google/call
 production equivalent) to the OAuth client's authorized redirect URIs, or set
 `GOOGLE_SIGNIN_REDIRECT_URI` to the registered callback. If the consent screen is still in testing
 mode, each requisitioner must also be listed as a test user.
+Former employees and third-party verifiers use the separate COE path at `/coe` and the
+`GOOGLE_EXTERNAL_CLIENT_ID` / `GOOGLE_EXTERNAL_CLIENT_SECRET` OAuth client. Configure that
+client's consent screen as **External** and add the same `/api/auth/google/callback` redirect URI.
+The external flow accepts verified personal Google accounts and does not change the institutional
+domain restriction for vehicle tickets or current-employee sign-in.
 Approver, administrator, and assistant accounts cannot be self-registered. The administrator
 can create named assistant accounts and assign them as alternate signatories from Profile.
 Assistant accounts use a separate Assistant role and do not receive Transport Personnel access.
@@ -81,7 +86,8 @@ Copy values from `.env.example` when setting up a new environment. Never commit 
 | `SITE_URL`                                                                                | Public origin used for canonical links, Open Graph, sitemap                                    |
 | `ALLOWED_EMAIL_DOMAINS`                                                                   | Institutional domains accepted for admin-created accounts                                      |
 | `GA_MEASUREMENT_ID`                                                                       | Optional GA4 ID, loaded only after analytics consent                                           |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `GOOGLE_SENDER_EMAIL` | Gmail sender credentials; the approved personal sender is `markjosephturingan4@gmail.com`      |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `GOOGLE_SENDER_EMAIL` | Institutional sign-in and Gmail sender credentials; the approved personal sender is `markjosephturingan4@gmail.com` |
+| `GOOGLE_EXTERNAL_CLIENT_ID`, `GOOGLE_EXTERNAL_CLIENT_SECRET`                              | Separate Google OAuth client for former employees/verifiers using personal Google accounts     |
 | `GOOGLE_SIGNIN_REDIRECT_URI`                                                              | Optional Google sign-in callback; defaults to the site origin plus `/api/auth/google/callback` |
 
 To connect the sender locally, configure the Google OAuth client ID and secret, add

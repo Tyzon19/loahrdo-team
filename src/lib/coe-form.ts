@@ -14,6 +14,17 @@ export const COE_DESCRIPTION_OPTIONS = [
 
 export const COE_DESCRIPTION_TEXT_OPTIONS = new Set(["Letter of", "Affidavit of", "Form of"]);
 
+export const COE_PURPOSE_OTHER = "Other";
+
+export const COE_PURPOSE_OPTIONS = [
+  "Job Applications",
+  "Loan and Credit Applications",
+  "Visa and Immigration Requirements",
+  "Government Transaction",
+  "Rental Lease Agreements",
+  COE_PURPOSE_OTHER,
+] as const;
+
 export const COE_TITLES = ["Mr", "Ms", "Mrs", "Dr", "Atty", "Engr", "Prof", "Mx"] as const;
 
 export const COE_EMPLOYMENT_STATUSES = [

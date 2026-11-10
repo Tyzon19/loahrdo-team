@@ -16,7 +16,13 @@ export function googleSignInMode(requestUrl: URL): GoogleSignInMode {
   return "requisitioner";
 }
 
-export function googleSignInCredentials() {
+export function googleSignInCredentials(mode: GoogleSignInMode = "requisitioner") {
+  if (mode === "external") {
+    return {
+      clientId: serverEnvOptional("GOOGLE_EXTERNAL_CLIENT_ID"),
+      clientSecret: serverEnvOptional("GOOGLE_EXTERNAL_CLIENT_SECRET"),
+    };
+  }
   return {
     clientId: serverEnvOptional("GOOGLE_CLIENT_ID"),
     clientSecret: serverEnvOptional("GOOGLE_CLIENT_SECRET"),

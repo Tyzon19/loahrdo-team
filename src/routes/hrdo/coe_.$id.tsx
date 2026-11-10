@@ -76,6 +76,10 @@ import {
 import { fmtDateTime } from "@/lib/format";
 import { SITE } from "@/lib/site";
 import { SignaturePad, type SignatureValue } from "@/components/app/SignaturePad";
+import {
+  COE_PURPOSE_OPTIONS,
+  COE_PURPOSE_OTHER,
+} from "@/lib/coe-form";
 
 export const Route = createFileRoute("/hrdo/coe_/$id")({
   head: ({ params }) => ({
@@ -135,24 +139,10 @@ const PRIMARY_ORDER: CoeAction[] = [
   "release",
 ];
 
-const OTHER_PURPOSE_OPTION = "Other (Please Specify)" as const;
-
-const COE_PURPOSE_OPTIONS = [
-  "Bank / Loan Application",
-  "Credit Card Application",
-  "Visa / Immigration",
-  "Travel Requirements",
-  "Employment Verification",
-  "Government Requirements",
-  "Housing / Rental Application",
-  "Personal Records",
-  OTHER_PURPOSE_OPTION,
-] as const;
-
 function normalizePurposeChoice(value: string) {
   return COE_PURPOSE_OPTIONS.includes(value as (typeof COE_PURPOSE_OPTIONS)[number])
     ? value
-    : OTHER_PURPOSE_OPTION;
+    : COE_PURPOSE_OTHER;
 }
 
 /** Splits the stored note into what the employee typed and the system-generated detail line(s). */
@@ -1483,7 +1473,7 @@ function CorrectionForm({ request }: { request: CoeRequest }) {
   const isThirdParty = metadataValues["Requestor type"] === "Third-Party Verifier";
   const [purpose, setPurpose] = useState(() => normalizePurposeChoice(request.purpose));
   const [customPurpose, setCustomPurpose] = useState(() =>
-    normalizePurposeChoice(request.purpose) === OTHER_PURPOSE_OPTION ? request.purpose : "",
+    normalizePurposeChoice(request.purpose) === COE_PURPOSE_OTHER ? request.purpose : "",
   );
   const [note, setNote] = useState(originalNote);
   const [employeeEmail, setEmployeeEmail] = useState(request.employeeEmail);
@@ -1492,7 +1482,7 @@ function CorrectionForm({ request }: { request: CoeRequest }) {
   const [editedMetadata, setEditedMetadata] = useState<Record<string, string>>(metadataValues);
   const [copyType, setCopyType] = useState<CoeCopyType>(request.copyType);
 
-  const selectedPurpose = purpose === OTHER_PURPOSE_OPTION ? customPurpose : purpose;
+  const selectedPurpose = purpose === COE_PURPOSE_OTHER ? customPurpose : purpose;
   const updatedMetadata = metadataFields
     .map(([label, originalValue]) => {
       const value = editedMetadata[label] ?? originalValue;
@@ -1615,9 +1605,9 @@ function CorrectionForm({ request }: { request: CoeRequest }) {
                 ))}
               </SelectContent>
             </Select>
-            {purpose === OTHER_PURPOSE_OPTION && (
+            {purpose === COE_PURPOSE_OTHER && (
               <div className="mt-3">
-                <Label htmlFor="resubmit-custom-purpose">Other (Please Specify)</Label>
+                <Label htmlFor="resubmit-custom-purpose">Specify the purpose</Label>
                 <Input
                   id="resubmit-custom-purpose"
                   className="mt-1 h-8 text-sm"

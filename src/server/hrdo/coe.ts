@@ -32,6 +32,7 @@ import { requireHrdoViewer } from "./auth";
 import { join } from "node:path";
 
 const submitSchema = z.object({
+  requestorType: z.enum(["internal", "third_party"]),
   employeeName: z
     .string()
     .trim()
@@ -469,6 +470,9 @@ export async function validateCoeDocumentUpload(fileName: string, bytes: Buffer)
 export async function submitCoeRequest(input: unknown): Promise<CoeRequest> {
   const viewer = await requireHrdoViewer();
   const data = parseInput(submitSchema, input);
+  if (viewer.isExternal && data.requestorType !== "third_party") {
+    throw new AppError("External accounts can submit third-party COE verifications only.");
+  }
   const id = crypto.randomUUID();
   const department = data.department?.trim() || viewer.department.trim() || "General";
 

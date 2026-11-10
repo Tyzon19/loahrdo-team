@@ -28,7 +28,7 @@ export const Route = createFileRoute("/api/auth/google")({
       GET: async ({ request }) => {
         const requestUrl = new URL(request.url);
         const mode = googleSignInMode(requestUrl);
-        const { clientId, clientSecret } = googleSignInCredentials();
+        const { clientId, clientSecret } = googleSignInCredentials(mode);
         if (!clientId || !clientSecret) {
           return redirect(
             mode === "external"

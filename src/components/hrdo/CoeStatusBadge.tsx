@@ -28,7 +28,6 @@ const MAP: Record<CoeStatus, { icon: typeof Clock; cls: string }> = {
   rejected: { icon: XCircle, cls: "bg-danger-soft text-destructive border-destructive/30" },
 };
 
-
 export function CoeStatusBadge({
   status,
   audience = "requestor",

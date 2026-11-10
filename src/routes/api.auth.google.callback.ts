@@ -120,7 +120,7 @@ export const Route = createFileRoute("/api/auth/google/callback")({
             return failure("google_session", cleared, mode);
           }
 
-          const { clientId, clientSecret } = googleSignInCredentials();
+          const { clientId, clientSecret } = googleSignInCredentials(mode);
           if (!clientId || !clientSecret) return failure("google_unavailable", cleared, mode);
 
           let tokenErrorCode = "google_token";

@@ -4,7 +4,7 @@ import {
   googleSignInErrorMessage,
   safeSignInNext,
 } from "@/lib/google-signin";
-import { googleSignInRedirectUri } from "@/server/google-signin";
+import { googleSignInCredentials, googleSignInRedirectUri } from "@/server/google-signin";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -42,6 +42,24 @@ describe("Google sign-in redirect target", () => {
     expect(safeSignInNext("/bad%0Apath")).toBe("/dashboard");
     expect(safeSignInNext("")).toBe("/dashboard");
     expect(safeSignInNext(undefined)).toBe("/dashboard");
+  });
+
+  describe("Google sign-in credentials", () => {
+    it("uses a separate external OAuth client for former employees and verifiers", () => {
+      vi.stubEnv("GOOGLE_CLIENT_ID", "institutional-client");
+      vi.stubEnv("GOOGLE_CLIENT_SECRET", "institutional-secret");
+      vi.stubEnv("GOOGLE_EXTERNAL_CLIENT_ID", "external-client");
+      vi.stubEnv("GOOGLE_EXTERNAL_CLIENT_SECRET", "external-secret");
+
+      expect(googleSignInCredentials("requisitioner")).toEqual({
+        clientId: "institutional-client",
+        clientSecret: "institutional-secret",
+      });
+      expect(googleSignInCredentials("external")).toEqual({
+        clientId: "external-client",
+        clientSecret: "external-secret",
+      });
+    });
   });
 });
 
