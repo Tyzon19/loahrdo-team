@@ -165,9 +165,8 @@ describe("COE filtering", () => {
 describe("COE staff processing actions", () => {
   const base = { copyType: "original" as const, verifiedAt: "", hasDocument: false };
 
-  it("starts with verification, then processing", () => {
+  it("allows correction or rejection while a new request is being viewed", () => {
     expect(coeStaffActions({ ...base, status: "pending" })).toEqual([
-      "verify",
       "request_correction",
       "reject",
     ]);

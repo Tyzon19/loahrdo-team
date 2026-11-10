@@ -297,10 +297,10 @@ try {
   );
   if (
     coeHistoryTypeColumn.length &&
-    !String(coeHistoryTypeColumn[0]?.columnType ?? "").includes("'template_sent'")
+    !String(coeHistoryTypeColumn[0]?.columnType ?? "").includes("'viewed'")
   ) {
     await conn.query(
-      `ALTER TABLE hrdo_coe_history MODIFY type ENUM('submitted','verified','correction_requested','resubmitted','processing','template_sent','document_uploaded','ready_for_pickup','released','rejected') NOT NULL`,
+      `ALTER TABLE hrdo_coe_history MODIFY type ENUM('submitted','viewed','verified','correction_requested','resubmitted','processing','template_sent','document_uploaded','ready_for_pickup','released','rejected') NOT NULL`,
     );
   }
   for (const [column, definition] of [

@@ -218,52 +218,60 @@ export function SignaturePad({ onChange }: { onChange: (v: SignatureValue | null
   };
   return (
     <div>
-      <div className="mb-2 flex flex-wrap items-center gap-1">
-        <div className="flex gap-1" role="tablist" aria-label="Signature method">
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div
+          className="grid w-full grid-cols-2 gap-1 sm:flex sm:w-auto"
+          role="tablist"
+          aria-label="Signature method"
+          aria-orientation="horizontal"
+        >
           <Button
             type="button"
-            size="sm"
+            size="default"
             variant={mode === "draw" ? "secondary" : "ghost"}
+            className="min-h-11 w-full px-4 text-sm sm:w-auto"
             onClick={() => {
               clear();
               setMode("draw");
             }}
             role="tab"
             aria-selected={mode === "draw"}
+            aria-controls="signature-draw-panel"
           >
-            <PenLine className="h-4 w-4" /> Draw
+            <PenLine className="h-4 w-4" aria-hidden /> Draw signature
           </Button>
           <Button
             type="button"
-            size="sm"
+            size="default"
             variant={mode === "upload" ? "secondary" : "ghost"}
+            className="min-h-11 w-full px-4 text-sm sm:w-auto"
             onClick={() => {
               clear();
               setMode("upload");
             }}
             role="tab"
             aria-selected={mode === "upload"}
+            aria-controls="signature-upload-panel"
           >
-            <Upload className="h-4 w-4" /> Upload image
+            <Upload className="h-4 w-4" aria-hidden /> Upload image
           </Button>
         </div>
         {mode === "draw" && (
           <Button
             type="button"
-            size="sm"
             variant="outline"
-            className="ml-auto sm:hidden"
+            className="min-h-11 w-full sm:w-auto"
             onClick={() => setFullScreenOpen(true)}
           >
             <Maximize2 className="h-4 w-4" aria-hidden />
-            Full screen
+            Open larger signing area
           </Button>
         )}
       </div>
       {mode === "draw" ? (
-        <div>
+        <div id="signature-draw-panel" role="tabpanel" aria-label="Draw signature">
           {drawnPreview ? (
-            <div className="flex h-36 items-center justify-center rounded-sm border border-dashed border-input bg-card p-2">
+            <div className="flex h-56 items-center justify-center rounded-md border-2 border-dashed border-input bg-card p-3 sm:h-64">
               <img
                 src={drawnPreview}
                 alt="Drawn signature preview"
@@ -274,7 +282,7 @@ export function SignaturePad({ onChange }: { onChange: (v: SignatureValue | null
             <canvas
               ref={canvas}
               aria-label="Signature drawing area. Sign with your mouse, finger, or stylus."
-              className="h-36 w-full touch-none rounded-sm border border-dashed border-input bg-card text-foreground"
+              className="h-56 w-full touch-none rounded-md border-2 border-dashed border-input bg-card text-foreground sm:h-64"
               onPointerDown={(e) => {
                 const target = canvas.current;
                 if (!target) return;
@@ -330,7 +338,7 @@ export function SignaturePad({ onChange }: { onChange: (v: SignatureValue | null
           </div>
         </div>
       ) : (
-        <div>
+        <div id="signature-upload-panel" role="tabpanel" aria-label="Upload signature image">
           <label className="block">
             <span className="sr-only">Signature image</span>
             <input

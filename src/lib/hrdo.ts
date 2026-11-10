@@ -237,7 +237,7 @@ export const COE_REQUESTOR_STATUS_LABELS: Record<CoeStatus, string> = {
 /** Shown on the requestor dashboard and request details for each status. */
 export const COE_STATUS_HINTS: Record<CoeStatus, string> = {
   pending: "HRDO has received your request and will review it shortly.",
-  under_review: "HRDO is verifying your information against official HR records.",
+  under_review: "HRDO has viewed your request and will begin processing it shortly.",
   correction_requested:
     "HRDO needs more information. Open the request, read the message and submit the corrected details.",
   processing: "Your Certificate of Employment is being prepared and signed.",
@@ -318,6 +318,7 @@ export interface CoeHistoryEntry {
 
 export type CoeHistoryType =
   | "submitted"
+  | "viewed"
   | "verified"
   | "correction_requested"
   | "resubmitted"
@@ -330,6 +331,7 @@ export type CoeHistoryType =
 
 export const COE_HISTORY_LABELS: Record<CoeHistoryType, string> = {
   submitted: "Request submitted",
+  viewed: "Request viewed by HRDO",
   verified: "Information verified",
   correction_requested: "Correction requested",
   resubmitted: "Corrected details submitted",
@@ -379,7 +381,6 @@ export interface CoeRequest {
 
 /** Staff actions available for a request in its current state. */
 export type CoeAction =
-  | "verify"
   | "process"
   | "request_correction"
   | "upload_document"
@@ -394,13 +395,11 @@ export function coeStaffActions(request: {
   hasDocument: boolean;
 }): CoeAction[] {
   switch (request.status) {
-    case "pending":
     case "under_review": {
-      const actions: CoeAction[] = [];
-      if (!request.verifiedAt) actions.push("verify");
-      else actions.push("process");
-      actions.push("request_correction", "reject");
-      return actions;
+      return ["process", "request_correction", "reject"];
+    }
+    case "pending": {
+      return ["request_correction", "reject"];
     }
     case "processing": {
       const actions: CoeAction[] = [];

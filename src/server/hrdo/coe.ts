@@ -694,6 +694,50 @@ export async function listCoeHistory(): Promise<CoeHistoryRecord[]> {
   }));
 }
 
+export async function markCoeViewed(input: unknown): Promise<CoeRequest> {
+  const viewer = await requireHrdoViewer();
+  requireStaff(viewer);
+  const data = parseInput(idSchema, input);
+
+  let emailRecipient: { id: string; employee_name: string; employee_email: string } | null = null;
+
+  await withTransaction(async (conn) => {
+    const row = await loadRow(data.id, conn, true);
+    if (row.status !== "pending") return;
+
+    emailRecipient = {
+      id: row.id,
+      employee_name: row.employee_name,
+      employee_email: row.employee_email,
+    };
+    await run(
+      `UPDATE hrdo_coe_requests
+       SET status = 'under_review', processed_by_id = ?, processed_by_name = ?, updated_at = NOW()
+       WHERE id = ? AND status = 'pending'`,
+      [viewer.id, viewer.name, data.id],
+      conn,
+    );
+    await addHistory(
+      conn,
+      data.id,
+      viewer,
+      "viewed",
+      "Request viewed by HRDO; requestor was notified that the request is under review.",
+    );
+  });
+
+  if (emailRecipient) {
+    await notifyEmployeeOfCoeStatus(
+      "under_review",
+      emailRecipient,
+      "HRDO has viewed your COE request.",
+      "Your request has been received and viewed by HRDO. It is now under review, and we will notify you if more information is needed.",
+    );
+  }
+
+  return loadRequest(data.id);
+}
+
 export async function verifyCoeRequest(input: unknown): Promise<CoeRequest> {
   const viewer = await requireHrdoViewer();
   requireStaff(viewer);
@@ -765,10 +809,7 @@ export async function startCoeProcessing(input: unknown): Promise<CoeRequest> {
       );
     }
     if (row.status !== "under_review" && row.status !== "awaiting_review") {
-      throw new AppError("Verify the request before starting the COE preparation.");
-    }
-    if (!row.verified_at) {
-      throw new AppError("Verify the employee information before starting the COE preparation.");
+      throw new AppError("This request must be viewed by HRDO before processing can begin.");
     }
     await run(
       `UPDATE hrdo_coe_requests
@@ -1011,9 +1052,6 @@ async function buildCoeTemplate(data: z.infer<typeof templateSchema>) {
   }
   const isThirdPartyVerifier = /(?:^|\| )Requestor type: Third-Party Verifier/i.test(request.note);
   const includeCompensation = coeRequestsCompensation(request.note);
-  if (isThirdPartyVerifier && !data.employmentEndDate) {
-    throw new AppError("Enter the former employee's last day of employment.");
-  }
   if (
     isThirdPartyVerifier &&
     !isCoeEmploymentEndDateOnOrAfterHireDate(data.dateHired, data.employmentEndDate)
@@ -1450,9 +1488,6 @@ export async function markCoeReady(input: unknown): Promise<CoeRequest> {
     }
     if (row.status !== "processing") {
       throw new AppError("Only requests under processing can be marked ready for pickup.");
-    }
-    if (!row.verified_at) {
-      throw new AppError("Verify the employee information before releasing the document.");
     }
     if (row.copy_type === "soft") {
       throw new AppError(

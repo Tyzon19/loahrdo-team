@@ -101,22 +101,49 @@ const COE_DESCRIPTION_HINTS: Record<(typeof COE_DESCRIPTION_OPTIONS)[number], st
   Others: "Include another document detail not listed above.",
 };
 
+const PHILIPPINE_TIME_ZONE = "Asia/Manila";
+
 function localDateValue(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: PHILIPPINE_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function formatPhilippineDate(value: string) {
+  if (!value) return "Not provided";
+  const date = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("en-PH", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(date);
 }
 
 function addWorkingDays(start: Date, count: number) {
-  const date = new Date(start);
+  const startParts = new Intl.DateTimeFormat("en-US", {
+    timeZone: PHILIPPINE_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(start);
+  const values = Object.fromEntries(startParts.map(({ type, value }) => [type, value]));
+  const date = new Date(
+    Date.UTC(Number(values.year), Number(values.month) - 1, Number(values.day)),
+  );
   let remaining = count;
   while (remaining > 0) {
-    date.setDate(date.getDate() + 1);
-    const weekday = date.getDay();
+    date.setUTCDate(date.getUTCDate() + 1);
+    const weekday = date.getUTCDay();
     if (weekday !== 0 && weekday !== 6) remaining -= 1;
   }
-  return localDateValue(date);
+  return date.toISOString().slice(0, 10);
 }
 
 export const Route = createFileRoute("/hrdo/coe")({
@@ -180,9 +207,10 @@ function CoeRequestPage() {
   const [subjectFirstName, setSubjectFirstName] = useState("");
   const [subjectMiddleName, setSubjectMiddleName] = useState("");
   const [subjectLastName, setSubjectLastName] = useState("");
-  const [subjectTitle, setSubjectTitle] = useState("");
+  const [subjectPosition, setSubjectPosition] = useState("");
   const [subjectDob, setSubjectDob] = useState("");
   const [employmentEndDate, setEmploymentEndDate] = useState("");
+  const [currentlyEmployed, setCurrentlyEmployed] = useState(false);
   const [privacyChecked, setPrivacyChecked] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [currentStep, setCurrentStep] = useState(typeLocked ? 1 : 0);
@@ -230,13 +258,13 @@ function CoeRequestPage() {
           : [
               `Requestor type: Third-Party Verifier`,
               `Purpose of verification: ${purpose.trim()}`,
-              `Subject title: ${subjectTitle}`,
+              `Subject position: ${subjectPosition}`,
               `Verifier company: ${verifierCompany || "Not provided"}`,
               `Authorized representative: ${verifierName || "Not provided"}`,
               `Contact number: ${normalizedVerifierContact || "Not provided"}`,
               `Employee to verify: ${subjectName || "Not provided"}`,
               `Date hired: ${subjectDob || "Not provided"}`,
-              `Employment end date: ${employmentEndDate || "Present"}`,
+              `Employment end date: ${currentlyEmployed ? "Present" : employmentEndDate || "Not provided"}`,
               `Date requested: ${dateRequested}`,
               `Date needed: ${dateNeeded}`,
               `Copy/delivery: ${COE_COPY_TYPE_LABELS[copyType]}`,
@@ -307,9 +335,10 @@ function CoeRequestPage() {
       setSubjectFirstName("");
       setSubjectMiddleName("");
       setSubjectLastName("");
-      setSubjectTitle("");
+      setSubjectPosition("");
       setSubjectDob("");
       setEmploymentEndDate("");
+      setCurrentlyEmployed(false);
       setDescriptionOptions([]);
       setDescriptionDetails({});
       setCustomDescription("");
@@ -433,14 +462,14 @@ function CoeRequestPage() {
         }
         if (!subjectFirstName.trim()) return "Enter the former employee's first name.";
         if (!subjectLastName.trim()) return "Enter the former employee's last name.";
-        if (!subjectTitle) return "Select a title for the employee to verify.";
+        if (!subjectPosition.trim()) return "Enter the former employee's job title or position.";
         if (!subjectDob) return "Enter the hiring date.";
         if (subjectDob > dateRequested) return "Date hired cannot be in the future.";
-        if (!employmentEndDate) return "Enter the last day of employment.";
-        if (employmentEndDate < subjectDob) {
+        if (!currentlyEmployed && !employmentEndDate) return "Enter the last day of employment or select Currently employed.";
+        if (!currentlyEmployed && employmentEndDate < subjectDob) {
           return "Last day of employment must be on or after the hiring date.";
         }
-        if (employmentEndDate > dateRequested) {
+        if (!currentlyEmployed && employmentEndDate > dateRequested) {
           return "Last day of employment cannot be in the future.";
         }
       }
@@ -820,163 +849,183 @@ function CoeRequestPage() {
                 ) : (
                   <div className="space-y-4">
                     <Section title="Third-party employment verification">
-                      <p className="coe-section-description">
-                        Details of the company requesting verification.
-                      </p>
-
-                      <div className="space-y-4">
-                        <div className="coe-fields coe-fields-verification">
-                          <div>
-                            <Label htmlFor="subject-first-name">
-                              First Name <span className="text-destructive">*</span>
-                            </Label>
-                            <Input
-                              id="subject-first-name"
-                              className="mt-1"
-                              value={subjectFirstName}
-                              onChange={(event) => setSubjectFirstName(event.target.value)}
-                              autoComplete="given-name"
-                            />
+                      <div className="space-y-3">
+                        <div className="coe-subsection">
+                          <div className="coe-subsection-heading">
+                            <h3>Employee information</h3>
+                            <p>Details of the employee whose employment is being verified.</p>
                           </div>
-                          <div>
-                            <Label htmlFor="subject-middle-name">Middle Name</Label>
-                            <Input
-                              id="subject-middle-name"
-                              className="mt-1"
-                              value={subjectMiddleName}
-                              onChange={(event) => setSubjectMiddleName(event.target.value)}
-                              autoComplete="additional-name"
-                            />
+                          <div className="coe-fields coe-fields-verification">
+                            <div>
+                              <Label htmlFor="subject-first-name">
+                                First Name <span className="text-destructive">*</span>
+                              </Label>
+                              <Input
+                                id="subject-first-name"
+                                className="mt-1"
+                                placeholder="Enter first name"
+                                value={subjectFirstName}
+                                onChange={(event) => setSubjectFirstName(event.target.value)}
+                                autoComplete="given-name"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="subject-middle-name">Middle Name</Label>
+                              <Input
+                                id="subject-middle-name"
+                                className="mt-1"
+                                placeholder="Optional"
+                                value={subjectMiddleName}
+                                onChange={(event) => setSubjectMiddleName(event.target.value)}
+                                autoComplete="additional-name"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="subject-last-name">
+                                Last Name <span className="text-destructive">*</span>
+                              </Label>
+                              <Input
+                                id="subject-last-name"
+                                className="mt-1"
+                                placeholder="Enter last name"
+                                value={subjectLastName}
+                                onChange={(event) => setSubjectLastName(event.target.value)}
+                                autoComplete="family-name"
+                              />
+                            </div>
                           </div>
-                          <div>
-                            <Label htmlFor="subject-last-name">
-                              Last Name <span className="text-destructive">*</span>
-                            </Label>
-                            <Input
-                              id="subject-last-name"
-                              className="mt-1"
-                              value={subjectLastName}
-                              onChange={(event) => setSubjectLastName(event.target.value)}
-                              autoComplete="family-name"
-                            />
+                          <div className="coe-fields coe-fields-verification">
+                            <div>
+                              <Label htmlFor="subject-position">
+                                Job Title / Position <span className="text-destructive">*</span>
+                              </Label>
+                              <Input
+                                id="subject-position"
+                                className="mt-1"
+                                placeholder="e.g., Software Engineer"
+                                value={subjectPosition}
+                                onChange={(event) => setSubjectPosition(event.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="subject-dob">
+                                Date Hired <span className="text-destructive">*</span>
+                              </Label>
+                              <Input
+                                id="subject-dob"
+                                className="mt-1"
+                                type="date"
+                                max={dateRequested}
+                                value={subjectDob}
+                                onChange={(event) => setSubjectDob(event.target.value)}
+                                required
+                              />
+                              <p className="mt-1 text-xs text-muted-foreground">DD/MM/YYYY</p>
+                            </div>
+                            <div>
+                              <Label htmlFor="third-party-employment-end-date">
+                                Last Day of Employment
+                                {!currentlyEmployed && <span className="text-destructive"> *</span>}
+                              </Label>
+                              <Input
+                                id="third-party-employment-end-date"
+                                className="mt-1"
+                                type="date"
+                                min={subjectDob || undefined}
+                                max={dateRequested}
+                                value={employmentEndDate}
+                                onChange={(event) => setEmploymentEndDate(event.target.value)}
+                                disabled={currentlyEmployed || !subjectDob || subjectDob > dateRequested}
+                                required={!currentlyEmployed}
+                              />
+                              <label className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                                <Checkbox
+                                  checked={currentlyEmployed}
+                                  onCheckedChange={(checked) => {
+                                    const isChecked = checked === true;
+                                    setCurrentlyEmployed(isChecked);
+                                    if (isChecked) setEmploymentEndDate("");
+                                  }}
+                                />
+                                Currently employed
+                              </label>
+                            </div>
                           </div>
                         </div>
 
-                        <div className="coe-fields coe-fields-verification">
-                          <div>
-                            <Label htmlFor="subject-title">
-                              Professional title / prefix{" "}
-                              <span className="text-destructive">*</span>
-                            </Label>
-                            <Select value={subjectTitle} onValueChange={setSubjectTitle}>
-                              <SelectTrigger id="subject-title" className="mt-1">
-                                <SelectValue placeholder="Select title" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {COE_TITLES.map((title) => (
-                                  <SelectItem key={title} value={title}>
-                                    {title}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div>
-                            <Label htmlFor="subject-dob">Date Hired</Label>
-                            <Input
-                              id="subject-dob"
-                              className="mt-1"
-                              type="date"
-                              max={dateRequested}
-                              value={subjectDob}
-                              onChange={(event) => setSubjectDob(event.target.value)}
-                              required
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="third-party-employment-end-date">
-                              Last day of employment <span className="text-destructive">*</span>
-                            </Label>
-                            <Input
-                              id="third-party-employment-end-date"
-                              className="mt-1"
-                              type="date"
-                              min={subjectDob || undefined}
-                              max={dateRequested}
-                              value={employmentEndDate}
-                              onChange={(event) => setEmploymentEndDate(event.target.value)}
-                              disabled={!subjectDob || subjectDob > dateRequested}
-                              required
-                            />
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              Set Date Hired first. Choose a date from the hiring date through
-                              today.
+                        <div className="coe-subsection">
+                          <div className="coe-subsection-heading">
+                            <h3>Third-party requester information</h3>
+                            <p>
+                              Details of the company and authorized representative requesting
+                              verification.
                             </p>
                           </div>
-                        </div>
+                          <div className="coe-fields coe-fields-verification coe-fields-verification-pair">
+                            <div>
+                              <Label htmlFor="verifier-company">
+                                Requesting Company / Agency Name <span className="text-destructive">*</span>
+                              </Label>
+                              <Input
+                                id="verifier-company"
+                                className="mt-1"
+                                value={verifierCompany}
+                                onChange={(event) => setVerifierCompany(event.target.value)}
+                                placeholder="e.g., Accenture HR"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="verifier-name">
+                                Authorized Representative Name <span className="text-destructive">*</span>
+                              </Label>
+                              <Input
+                                id="verifier-name"
+                                className="mt-1"
+                                value={verifierName}
+                                onChange={(event) => setVerifierName(event.target.value)}
+                              />
+                            </div>
+                          </div>
 
-                        <div className="coe-fields coe-fields-verification">
-                          <div>
-                            <Label htmlFor="verifier-company">Employer / Company Name</Label>
-                            <Input
-                              id="verifier-company"
-                              className="mt-1"
-                              value={verifierCompany}
-                              onChange={(event) => setVerifierCompany(event.target.value)}
-                              placeholder="e.g., Accenture HR"
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="verifier-name">Authorized representative name</Label>
-                            <Input
-                              id="verifier-name"
-                              className="mt-1"
-                              value={verifierName}
-                              onChange={(event) => setVerifierName(event.target.value)}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="coe-fields coe-fields-verification">
-                          <div>
-                            <Label htmlFor="verifier-email">Verifier email address</Label>
-                            <Input
-                              id="verifier-email"
-                              className="mt-1"
-                              value={verifierEmail}
-                              onChange={(event) => setVerifierEmail(event.target.value)}
-                              type="email"
-                              autoComplete="email"
-                              placeholder="company or personal email"
-                            />
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              Company, agency, or personal email is accepted. No school email is
-                              required.
-                            </p>
-                          </div>
-                          <div>
-                            <Label htmlFor="verifier-contact">Contact number</Label>
-                            <Input
-                              id="verifier-contact"
-                              className="mt-1"
-                              type="tel"
-                              inputMode="tel"
-                              autoComplete="tel"
-                              placeholder="Enter your phone number"
-                              maxLength={24}
-                              value={verifierContact}
-                              onChange={(event) => setVerifierContact(event.target.value)}
-                              aria-describedby="verifier-contact-help"
-                            />
-                            <p
-                              id="verifier-contact-help"
-                              className="mt-1 text-xs text-muted-foreground"
-                            >
-                              (e.g., 0921..)
-                            </p>
+                          <div className="coe-fields coe-fields-verification coe-fields-verification-pair">
+                            <div>
+                              <Label htmlFor="verifier-email">
+                                Official Business Email <span className="text-destructive">*</span>
+                              </Label>
+                              <Input
+                                id="verifier-email"
+                                className="mt-1"
+                                value={verifierEmail}
+                                onChange={(event) => setVerifierEmail(event.target.value)}
+                                type="email"
+                                autoComplete="email"
+                                placeholder="company or personal email"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="verifier-contact">
+                                Contact Number <span className="text-destructive">*</span>
+                              </Label>
+                              <Input
+                                id="verifier-contact"
+                                className="mt-1"
+                                type="tel"
+                                inputMode="tel"
+                                autoComplete="tel"
+                                placeholder="09XXXXXXXXX"
+                                maxLength={24}
+                                value={verifierContact}
+                                onChange={(event) => setVerifierContact(event.target.value)}
+                                aria-describedby="verifier-contact-help"
+                              />
+                              <p
+                                id="verifier-contact-help"
+                                className="mt-1 text-xs text-muted-foreground"
+                              >
+                              </p>
+                            </div>
                           </div>
                         </div>
-
                       </div>
                     </Section>
                   </div>
@@ -1008,7 +1057,6 @@ function CoeRequestPage() {
                         className="mt-1 min-h-24"
                         value={purpose}
                         onChange={(event) => setPurpose(event.target.value)}
-                        placeholder="Explain why the employee's work history is being verified"
                         maxLength={255}
                         required
                       />
@@ -1153,11 +1201,11 @@ function CoeRequestPage() {
                     </div>
                     <div>
                       <dt className="text-muted-foreground">Date needed</dt>
-                      <dd className="font-medium">{dateNeeded}</dd>
+                    <dd className="font-medium">{formatPhilippineDate(dateNeeded)}</dd>
                     </div>
                     <div>
                       <dt className="text-muted-foreground">Date requested</dt>
-                      <dd className="font-medium">{dateRequested}</dd>
+                    <dd className="font-medium">{formatPhilippineDate(dateRequested)}</dd>
                     </div>
                     <div>
                       <dt className="text-muted-foreground">Copy / delivery</dt>
@@ -1213,16 +1261,20 @@ function CoeRequestPage() {
                         <div>
                           <dt className="text-muted-foreground">Employee to verify</dt>
                           <dd className="font-medium">
-                            {subjectTitle}. {subjectName}
+                            {subjectName} · {subjectPosition}
                           </dd>
                         </div>
                         <div>
                           <dt className="text-muted-foreground">Date hired</dt>
-                          <dd className="font-medium">{subjectDob}</dd>
+                          <dd className="font-medium">{formatPhilippineDate(subjectDob)}</dd>
                         </div>
                         <div>
                           <dt className="text-muted-foreground">Last day of employment</dt>
-                          <dd className="font-medium">{employmentEndDate}</dd>
+                          <dd className="font-medium">
+                            {currentlyEmployed
+                              ? "Currently employed"
+                              : formatPhilippineDate(employmentEndDate)}
+                          </dd>
                         </div>
                       </>
                     )}

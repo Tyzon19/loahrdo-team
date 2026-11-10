@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import {
   Check,
@@ -41,6 +42,7 @@ import {
   getCoeDocumentFn,
   getCoeRequestFn,
   generateCoeTemplateFn,
+  markCoeViewedFn,
   markCoeReadyFn,
   uploadCoeManualDeliveryFn,
   rejectCoeRequestFn,
@@ -50,7 +52,6 @@ import {
   sendCoeTemplateFn,
   startCoeProcessingFn,
   uploadCoeDocumentFn,
-  verifyCoeRequestFn,
 } from "@/server-functions";
 import { unwrap } from "@/lib/api";
 import {
@@ -96,7 +97,6 @@ export const Route = createFileRoute("/hrdo/coe_/$id")({
 });
 
 const ACTION_LABELS: Record<CoeAction, string> = {
-  verify: "Verify information",
   process: "Start processing",
   request_correction: "Request correction",
   upload_document: "Upload signed document",
@@ -112,7 +112,6 @@ function actionLabel(key: CoeAction, status: CoeStatus) {
 }
 
 type ActionPayload =
-  | { kind: "verify" }
   | { kind: "process" }
   | { kind: "correction"; message: string }
   | { kind: "reject"; remarks: string }
@@ -121,7 +120,6 @@ type ActionPayload =
   | { kind: "release"; receivedByName: string };
 
 const ACTION_SUCCESS: Record<ActionPayload["kind"], string> = {
-  verify: "Employee information verified.",
   process: "COE preparation started.",
   correction: "The employee has been asked to correct the request.",
   upload: "Signed COE uploaded and delivery sent.",
@@ -132,7 +130,6 @@ const ACTION_SUCCESS: Record<ActionPayload["kind"], string> = {
 
 /** The one action we show as the big primary button, in the order work normally happens. */
 const PRIMARY_ORDER: CoeAction[] = [
-  "verify",
   "process",
   "upload_document",
   "mark_ready",
@@ -200,8 +197,8 @@ function safeWords(amount: string) {
 
 function staffHint(status: CoeStatus) {
   const hints: Record<CoeStatus, string> = {
-    pending: "New request. Verify the employee details, then start processing.",
-    under_review: "Verify the employee details against official HR records.",
+    pending: "Opening this request will notify the requestor that HRDO has viewed it.",
+    under_review: "The requestor has been notified that HRDO viewed the request. Start processing when ready.",
     correction_requested: "Waiting for the employee to submit the corrected details.",
     processing:
       "Prepare and sign the COE, then upload it. HRDO will send the soft copy and show the pickup step when needed.",
@@ -432,11 +429,34 @@ function CoeDetailPage() {
     refetchOnWindowFocus: true,
   });
 
+  const viewedRequestRef = useRef<string | null>(null);
+  const markViewed = useMutation({
+    mutationFn: () => unwrap(markCoeViewedFn({ data: { id } })),
+    onSuccess: async () => {
+      toast.success("Request marked as viewed. The requestor was notified.");
+      await queryClient.invalidateQueries({ queryKey: ["coe"] });
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "We couldn't mark this request as viewed.");
+    },
+  });
+
+  useEffect(() => {
+    if (
+      !isStaff ||
+      query.data?.status !== "pending" ||
+      viewedRequestRef.current === id ||
+      markViewed.isPending
+    ) {
+      return;
+    }
+    viewedRequestRef.current = id;
+    markViewed.mutate();
+  }, [id, isStaff, markViewed, query.data?.status]);
+
   const action = useMutation({
     mutationFn: async (payload: ActionPayload): Promise<CoeRequest> => {
       switch (payload.kind) {
-        case "verify":
-          return unwrap(verifyCoeRequestFn({ data: { id } }));
         case "process":
           return unwrap(startCoeProcessingFn({ data: { id } }));
         case "correction":
@@ -545,8 +565,7 @@ function CoeDetailPage() {
   };
 
   const submitAction = (key: CoeAction) => {
-    if (key === "verify") action.mutate({ kind: "verify" });
-    else if (key === "process") action.mutate({ kind: "process" });
+    if (key === "process") action.mutate({ kind: "process" });
     else if (key === "mark_ready") action.mutate({ kind: "ready" });
     else if (key === "request_correction") {
       if (correction.trim().length < 10) {
@@ -602,7 +621,7 @@ function CoeDetailPage() {
     employeeName: request.employeeName,
     dateHired: requestEmploymentDate(request.note, "Date hired"),
     employmentEndDate: requestEmploymentDate(request.note, "Employment end date"),
-    position: "",
+    position: requestNoteValue(request.note, "Subject position"),
     department: isThirdPartyVerifier
       ? ""
       : requestNoteValue(request.note, "Department") || request.department,
@@ -794,15 +813,13 @@ function CoeDetailPage() {
             </p>
           </>
         )}
-        {(key === "verify" || key === "process" || key === "mark_ready") && (
+        {(key === "process" || key === "mark_ready") && (
           <p className="text-xs text-muted-foreground">
-            {key === "verify"
-              ? "Check the name, Employee ID, department and employment details against HR records first."
-              : key === "process"
-                ? request.status === "awaiting_review"
-                  ? "Use this after the requestor has reviewed the filled Word template."
-                  : "After this, sign and fill in the COE template, then generate the final COE."
-                : "The printed, signed COE is now waiting at the HRDO desk."}
+            {key === "process"
+              ? request.status === "awaiting_review"
+                ? "Use this after the requestor has reviewed the filled Word template."
+                : "After this, sign and fill in the COE template, then generate the final COE."
+              : "The printed, signed COE is now waiting at the HRDO desk."}
           </p>
         )}
         <Button

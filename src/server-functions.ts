@@ -141,6 +141,12 @@ export const verifyCoeRequestFn = createServerFn({ method: "POST" })
     runSafely(async () => (await import("./server/hrdo/coe")).verifyCoeRequest(data)),
   );
 
+export const markCoeViewedFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/hrdo/coe")).markCoeViewed(data)),
+  );
+
 export const startCoeProcessingFn = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) =>

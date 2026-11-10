@@ -347,7 +347,7 @@ CREATE TABLE IF NOT EXISTS hrdo_coe_history (
   request_id CHAR(36) NOT NULL,
   actor_name VARCHAR(120) NOT NULL,
   actor_role ENUM('employee','hrdo_staff','hrdo_admin','system') NOT NULL,
-  type ENUM('submitted','verified','correction_requested','resubmitted','processing','template_sent','document_uploaded','ready_for_pickup','released','rejected') NOT NULL,
+  type ENUM('submitted','viewed','verified','correction_requested','resubmitted','processing','template_sent','document_uploaded','ready_for_pickup','released','rejected') NOT NULL,
   message VARCHAR(500) NOT NULL,
   happened_at DATETIME NOT NULL,
   PRIMARY KEY (id),

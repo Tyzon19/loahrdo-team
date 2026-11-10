@@ -2484,6 +2484,41 @@
   gap: 0.9rem 1rem;
 }
 
+.coe-fields-verification {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.coe-fields-verification-pair {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.coe-subsection {
+  display: grid;
+  gap: 0.75rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.coe-subsection-heading {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.coe-subsection-heading h3 {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 0.9rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.coe-subsection-heading p {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
 .coe-fields-name > div:nth-child(2) {
   gap: 0.65rem;
 }
@@ -2503,6 +2538,13 @@
     border-color 150ms ease,
     box-shadow 150ms ease,
     background-color 150ms ease;
+  font-weight: 600;
+}
+
+.coe-request input:not([type="checkbox"]):not([type="radio"])::placeholder,
+.coe-request textarea::placeholder {
+  font-weight: 500;
+  opacity: 0.8;
 }
 
 .coe-request input:not([type="checkbox"]):not([type="radio"]):focus,
@@ -2621,6 +2663,11 @@
   .coe-request-types,
   .coe-deliveries,
   .coe-document-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .coe-fields-verification,
+  .coe-fields-verification-pair {
     grid-template-columns: minmax(0, 1fr);
   }
 
