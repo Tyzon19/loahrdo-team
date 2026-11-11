@@ -1901,6 +1901,159 @@
   }
 }
 
+.permission-status-check {
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.permission-status-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.permission-status-eyebrow {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.permission-status-heading h2 {
+  margin: 0.25rem 0 0;
+  color: var(--foreground);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.permission-status-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 1.15rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.permission-status-steps > li {
+  position: relative;
+  min-width: 0;
+}
+
+.permission-status-step-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.5rem;
+  padding-right: 0.65rem;
+  background: var(--card);
+}
+
+.permission-status-circle {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.permission-status-steps > li[data-state="active"] .permission-status-circle {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: 0 0 0 4px oklch(0.33 0.09 258 / 12%);
+}
+
+.permission-status-steps > li[data-state="done"] .permission-status-circle {
+  border-color: var(--success);
+  background: var(--success);
+  color: white;
+}
+
+.permission-status-label {
+  overflow: hidden;
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.permission-status-steps > li[data-state="active"] .permission-status-label,
+.permission-status-steps > li[data-state="done"] .permission-status-label {
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+.permission-status-line {
+  position: absolute;
+  top: 1rem;
+  right: 0.25rem;
+  left: 2.4rem;
+  height: 1px;
+  background: var(--border);
+}
+
+.permission-status-steps > li[data-state="done"] .permission-status-line {
+  background: var(--success);
+}
+
+.permission-status-caption {
+  margin: 0.9rem 0 0;
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+@media (max-width: 640px) {
+  .permission-status-heading {
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
+  .permission-status-heading .inline-flex {
+    align-self: flex-start;
+  }
+
+  .permission-status-step-content {
+    width: 100%;
+    flex-direction: column;
+    gap: 0.3rem;
+    padding: 0;
+    background: transparent;
+  }
+
+  .permission-status-label {
+    width: 100%;
+    overflow: visible;
+    font-size: 0.68rem;
+    line-height: 1.15;
+    text-align: center;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .permission-status-line {
+    top: 1rem;
+    right: -50%;
+    left: 50%;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .coe-request .coe-button {
     transition: none;
@@ -2300,6 +2453,16 @@
   justify-content: center;
   gap: 0.75rem;
   margin-top: 1.5rem;
+}
+
+.coe-review-reason {
+  border: 1px solid var(--coe-border);
+  border-radius: 8px;
+  background: var(--coe-soft);
+  color: var(--coe-fg);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .request-success-wrap {

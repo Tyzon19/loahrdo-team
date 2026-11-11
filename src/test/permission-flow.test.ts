@@ -4,6 +4,7 @@ import {
   createPermissionSchema,
   sendPermissionReceiptSchema,
 } from "@/lib/permission-schema";
+import { fmtTime } from "@/lib/format";
 
 describe("Permission Slip Approval & Receipt Schemas", () => {
   const dummySignature =
@@ -64,5 +65,12 @@ describe("Permission Slip Approval & Receipt Schemas", () => {
       signature: "short",
     });
     expect(missingSig.success).toBe(false);
+  });
+
+  it("formats receipt times using Philippine 12-hour notation", () => {
+    expect(fmtTime("00:05")).toBe("12:05 AM");
+    expect(fmtTime("10:30")).toBe("10:30 AM");
+    expect(fmtTime("14:00")).toBe("2:00 PM");
+    expect(fmtTime("23:45")).toBe("11:45 PM");
   });
 });

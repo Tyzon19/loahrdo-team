@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EmailMessage, VehicleRequest } from "@/lib/types";
-import { sendCoeStatusEmail, sendTemporaryPasswordEmail, sendWorkflowEmails } from "@/server/gmail";
+import {
+  sendCoeStatusEmail,
+  sendPermissionSlipEmail,
+  sendTemporaryPasswordEmail,
+  sendWorkflowEmails,
+} from "@/server/gmail";
 
 const request: VehicleRequest = {
   id: "request-1",
@@ -268,5 +273,47 @@ describe("Gmail workflow delivery", () => {
       message: expect.stringContaining("grant Gmail send permission"),
     });
     expect(log).toHaveBeenCalledWith("[gmail] Message send failed (403).");
+  });
+
+  it("sends a Permission Slip receipt to the employee with its PNG attachment", async () => {
+    let sentMime = "";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = String(input);
+        if (url === "https://oauth2.googleapis.com/token") {
+          return Response.json({ access_token: "mock-access-token" });
+        }
+        if (url === "https://gmail.googleapis.com/gmail/v1/users/me/messages/send") {
+          const body = JSON.parse(String(init?.body)) as { raw: string };
+          sentMime = Buffer.from(body.raw, "base64url").toString("utf8");
+          return Response.json({});
+        }
+        throw new Error(`Unexpected email request: ${url}`);
+      }),
+    );
+
+    const result = await sendPermissionSlipEmail({
+      kind: "employee_approved",
+      recipientName: "Alex Requester",
+      recipientEmail: "alex@example.edu",
+      permissionId: "permission-1",
+      employeeName: "Alex Requester",
+      department: "HRDO",
+      requestedDate: "2026-11-12",
+      timeOut: "10:30",
+      timeIn: "14:00",
+      reason: "Official school errand",
+      attachment: {
+        filename: "permission-slip-permission-1.png",
+        mime: "image/png",
+        content: Buffer.from("permission-receipt"),
+      },
+    });
+
+    expect(result).toEqual({ sent: true, delivered: 1, failed: 0 });
+    expect(sentMime).toContain("To: alex@example.edu");
+    expect(sentMime).toContain('Content-Disposition: attachment; filename="permission-slip-permission-1.png"');
+    expect(sentMime).toContain(Buffer.from("permission-receipt").toString("base64"));
   });
 });

@@ -4,15 +4,11 @@ import { useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
-  CalendarDays,
   Check,
   CheckCircle2,
   Clock,
   FilePlus2,
   FileText,
-  Info,
-  ShieldCheck,
-  Sparkles,
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -82,14 +78,6 @@ const PERMISSION_STEPS = [
   },
 ] as const;
 
-const REASON_TEMPLATES = [
-  "Official School Business / Off-campus Task",
-  "Personal Urgent Matter / Family Emergency",
-  "Medical / Dental Appointment",
-  "Government Agency Transaction (SSS / PhilHealth / Pag-IBIG)",
-  "Bank / Financial Institution Errand",
-];
-
 function formatPhilippineDate(value: string) {
   if (!value) return "Not provided";
   const date = new Date(`${value}T00:00:00.000Z`);
@@ -114,7 +102,6 @@ function PermissionSlipsPage() {
   const pathname = useRouterState({ select: (router) => router.location.pathname });
   const isDetailRoute = isPermissionSlipDetailPath(pathname);
   const search = Route.useSearch();
-  const navigate = Route.useNavigate();
   const { viewer } = Route.useRouteContext();
   const isHead = isPermissionHead(viewer);
   const queryClient = useQueryClient();
@@ -134,8 +121,6 @@ function PermissionSlipsPage() {
     enabled: isHead && !isHistoryView && !isExplicitNewView && !isDetailRoute,
   });
 
-  if (isDetailRoute) return <Outlet />;
-
   // Multi-step form state
   const [currentStep, setCurrentStep] = useState(0);
   const [requestedDate, setRequestedDate] = useState("");
@@ -151,6 +136,12 @@ function PermissionSlipsPage() {
   const [submittedId, setSubmittedId] = useState<string | null>(null);
   const [emailSent, setEmailSent] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // Keep every hook above this route branch. The detail child can replace the
+  // parent outlet while the list view is mounted; returning before the form
+  // state hooks changes hook order and triggers React's conditional-suspension
+  // error during navigation.
+  if (isDetailRoute) return <Outlet />;
 
   const today = new Date().toISOString().slice(0, 10);
   const currentStepConfig = PERMISSION_STEPS[currentStep] ?? PERMISSION_STEPS[0];
@@ -287,12 +278,11 @@ function PermissionSlipsPage() {
               receipts.
             </p>
           </div>
-          <Button
-            className="gap-2 shrink-0"
-            onClick={() => void navigate({ search: { view: isHead ? "new" : undefined } })}
-          >
-            <FilePlus2 className="h-4 w-4" />
-            Request Permission Slip
+          <Button asChild className="gap-2 shrink-0">
+            <Link to="/permission-slips" search={{ view: "new" }}>
+              <FilePlus2 className="h-4 w-4" />
+              Request Permission Slip
+            </Link>
           </Button>
         </div>
 
@@ -342,10 +332,10 @@ function PermissionSlipsPage() {
                           <Clock className="h-3.5 w-3.5" /> Pending Review
                         </span>
                       )}
-                      <Button variant="ghost" size="sm" className="gap-1 text-xs">
+                      <span className="inline-flex h-8 items-center justify-center gap-1 rounded-md px-3 text-xs font-medium text-primary transition-colors hover:bg-accent hover:text-accent-foreground">
                         View Details
                         <ArrowRight className="h-3.5 w-3.5" />
-                      </Button>
+                      </span>
                     </div>
                   </CardContent>
                 </Card>
@@ -364,12 +354,11 @@ function PermissionSlipsPage() {
                   You haven&apos;t submitted any permission slip requests yet. Click below to file
                   your first request.
                 </p>
-                <Button
-                  className="mt-4 gap-2"
-                  onClick={() => void navigate({ search: { view: isHead ? "new" : undefined } })}
-                >
-                  <FilePlus2 className="h-4 w-4" />
-                  Request Permission Slip
+                <Button asChild className="mt-4 gap-2">
+                  <Link to="/permission-slips" search={{ view: "new" }}>
+                    <FilePlus2 className="h-4 w-4" />
+                    Request Permission Slip
+                  </Link>
                 </Button>
               </CardContent>
             </Card>
@@ -393,13 +382,11 @@ function PermissionSlipsPage() {
               Review, verify, and electronically sign permission slips submitted by school personnel.
             </p>
           </div>
-          <Button
-            variant="outline"
-            className="gap-2 shrink-0"
-            onClick={() => void navigate({ search: { view: "new" } })}
-          >
-            <FilePlus2 className="h-4 w-4" />
-            File Permission Slip
+          <Button asChild variant="outline" className="gap-2 shrink-0">
+            <Link to="/permission-slips" search={{ view: "new" }}>
+              <FilePlus2 className="h-4 w-4" />
+              File Permission Slip
+            </Link>
           </Button>
         </div>
 
@@ -426,10 +413,10 @@ function PermissionSlipsPage() {
                       {slip.reason}
                     </p>
                   </div>
-                  <Button size="sm" className="gap-1.5 shrink-0">
+                  <span className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90">
                     Review
                     <ArrowRight className="h-4 w-4" aria-hidden />
-                  </Button>
+                  </span>
                 </CardContent>
               </Card>
             </Link>
@@ -511,38 +498,29 @@ function PermissionSlipsPage() {
 
   // ── VIEW 4: SPACIOUS STEP-BY-STEP REQUEST FORM (NO AUTO-PLACED NAME/DEPT) ───
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-6 py-4 sm:py-8">
+    <div className="coe-request">
       {busy && <LoadingScreen label="Submitting Permission Slip" mode="overlay" immediate />}
 
-      <main className="w-full space-y-6">
+      <div className="coe-main">
         {/* Intro header with seal & title */}
-        <div className="text-center space-y-2">
-          <div className="flex items-center justify-center gap-3 mb-2">
+        <div className="coe-form-intro">
+          <div className="coe-form-logos" aria-label="Lyceum of Alabang and HRDO">
             <img
               src="/lyceum-logo.png.png"
               alt="Lyceum of Alabang seal"
-              className="h-12 w-12 object-contain"
             />
             <img
               src="/HRDO%20LOGO.png"
               alt="HRDO logo"
-              className="h-11 w-11 object-contain"
             />
           </div>
-          <p className="text-xs font-bold uppercase tracking-widest text-primary">
-            Human Resource Development Office
-          </p>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
-            Permission Slip Request
-          </h1>
-          <p className="text-sm sm:text-base text-muted-foreground max-w-xl mx-auto">
-            {currentStepConfig.blurb}
-          </p>
+          <h1>Permission Slip Request</h1>
+          <p>{currentStepConfig.blurb}</p>
         </div>
 
         {/* 4-Step Progress Indicator (Spacious & Prominent) */}
         <ol
-          className="coe-steps my-4"
+          className="coe-steps"
           aria-label="Request progress"
           style={{ gridTemplateColumns: `repeat(${PERMISSION_STEPS.length}, minmax(0, 1fr))` }}
         >
@@ -552,10 +530,12 @@ function PermissionSlipsPage() {
             return (
               <li key={step.key} className="coe-step" data-state={state}>
                 <div className="coe-step-content">
-                  <span className="coe-step-circle h-9 w-9 text-sm font-bold">
+                  <span className="coe-step-circle">
                     {state === "done" ? <Check className="h-4 w-4" aria-hidden /> : index + 1}
                   </span>
-                  <span className="coe-step-name text-xs sm:text-sm font-bold">{step.title}</span>
+                  <span className="coe-step-name">
+                    {step.title}
+                  </span>
                 </div>
                 {index < PERMISSION_STEPS.length - 1 ? <span className="coe-step-line" /> : null}
               </li>
@@ -564,25 +544,21 @@ function PermissionSlipsPage() {
         </ol>
 
         {/* Form Card (Roomy, large inputs, no auto name/department) */}
-        <Card className="border shadow-sm">
-          <CardContent className="p-6 sm:p-10 space-y-6">
+        <form className="coe-form" onSubmit={(event) => event.preventDefault()}>
             {/* ── STEP 0: SCHEDULE (Date, Time Out, Time In) ─────────────── */}
             {currentStep === 0 && (
-              <section aria-labelledby="step-schedule-title" className="space-y-6">
+              <section aria-labelledby="step-schedule-title" className="coe-section">
                 <div>
-                  <h2
-                    id="step-schedule-title"
-                    className="text-xl sm:text-2xl font-bold tracking-tight text-foreground"
-                  >
+                  <h2 id="step-schedule-title" className="coe-section-title">
                     Off-Campus Schedule
                   </h2>
-                  <p className="mt-1 text-sm sm:text-base text-muted-foreground">
+                  <p className="coe-section-description">
                     Select the date you will leave campus and your expected departure and return
                     times.
                   </p>
                 </div>
 
-                <div className="grid gap-6 sm:grid-cols-3">
+                <div className="coe-fields coe-fields-schedule">
                   <div>
                     <Label htmlFor="permission-date" className="text-sm font-bold text-foreground">
                       Date Leaving Campus <span className="text-destructive">*</span>
@@ -600,7 +576,7 @@ function PermissionSlipsPage() {
                         setRequestedDate(event.target.value);
                         clearFieldError("requestedDate");
                       }}
-                      className="mt-2 min-h-12 text-base font-medium"
+                      className="coe-input text-base font-medium"
                     />
                     <FieldError id="permission-date-error" message={fieldErrors.requestedDate} />
                   </div>
@@ -624,7 +600,7 @@ function PermissionSlipsPage() {
                         setTimeOut(event.target.value);
                         clearFieldError("timeOut");
                       }}
-                      className="mt-2 min-h-12 text-base font-medium"
+                      className="coe-input text-base font-medium"
                     />
                     <FieldError id="permission-time-out-error" message={fieldErrors.timeOut} />
                   </div>
@@ -648,59 +624,25 @@ function PermissionSlipsPage() {
                         setTimeIn(event.target.value);
                         clearFieldError("timeIn");
                       }}
-                      className="mt-2 min-h-12 text-base font-medium"
+                      className="coe-input text-base font-medium"
                     />
                     <FieldError id="permission-time-in-error" message={fieldErrors.timeIn} />
                   </div>
                 </div>
 
-                <div className="rounded-lg border bg-muted/40 p-4 text-xs sm:text-sm text-muted-foreground flex items-start gap-2.5">
-                  <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                  <p id="permission-time-help">
-                    Departure and return must occur within the same workday. Time In must be later
-                    than Time Out. Your employee name (<strong>{viewer?.name}</strong>) and department (
-                    <strong>{viewer?.department}</strong>) are automatically tied to this submission.
-                  </p>
-                </div>
               </section>
             )}
 
             {/* ── STEP 1: REASON ─────────────────────────────────────────── */}
             {currentStep === 1 && (
-              <section aria-labelledby="step-reason-title" className="space-y-6">
+              <section aria-labelledby="step-reason-title" className="coe-section">
                 <div>
-                  <h2
-                    id="step-reason-title"
-                    className="text-xl sm:text-2xl font-bold tracking-tight text-foreground"
-                  >
+                  <h2 id="step-reason-title" className="coe-section-title">
                     Reason for Going Out
                   </h2>
-                  <p className="mt-1 text-sm sm:text-base text-muted-foreground">
-                    State the specific purpose of your off-campus absence. This will appear on your
-                    official ISO 9001:2015 permission slip.
+                  <p className="coe-section-description">
+                    State the specific purpose of your off-campus absence.
                   </p>
-                </div>
-
-                {/* Quick suggestions */}
-                <div className="space-y-2">
-                  <span className="text-xs sm:text-sm font-bold text-muted-foreground">
-                    Common suggestions (click to use):
-                  </span>
-                  <div className="flex flex-wrap gap-2">
-                    {REASON_TEMPLATES.map((tmpl) => (
-                      <button
-                        key={tmpl}
-                        type="button"
-                        onClick={() => {
-                          setReason(tmpl);
-                          clearFieldError("reason");
-                        }}
-                        className="rounded-full border border-border bg-muted/50 px-3.5 py-1.5 text-xs sm:text-sm font-medium text-foreground transition-colors hover:border-primary hover:bg-primary/5 hover:text-primary"
-                      >
-                        {tmpl}
-                      </button>
-                    ))}
-                  </div>
                 </div>
 
                 <div>
@@ -717,7 +659,7 @@ function PermissionSlipsPage() {
                     maxLength={500}
                     aria-invalid={Boolean(fieldErrors.reason)}
                     aria-describedby={
-                      fieldErrors.reason ? "permission-reason-error" : "permission-reason-help"
+                      fieldErrors.reason ? "permission-reason-error" : undefined
                     }
                     onChange={(event) => {
                       setReason(event.target.value);
@@ -725,10 +667,10 @@ function PermissionSlipsPage() {
                     }}
                     placeholder="Provide clear details on where you are going and why…"
                     rows={6}
-                    className="mt-2 min-h-[140px] text-base p-3.5 leading-relaxed"
+                    className="coe-input text-base leading-relaxed"
                   />
                   <div className="mt-2 flex justify-between gap-3 text-xs text-muted-foreground">
-                    <span id="permission-reason-help">Minimum 5 characters.</span>
+                    <span>Minimum 5 characters.</span>
                     <span>{reason.length}/500</span>
                   </div>
                   <FieldError id="permission-reason-error" message={fieldErrors.reason} />
@@ -738,15 +680,15 @@ function PermissionSlipsPage() {
 
             {/* ── STEP 2: SIGNATURE ──────────────────────────────────────── */}
             {currentStep === 2 && (
-              <section aria-labelledby="step-signature-title" className="space-y-6">
+              <section aria-labelledby="step-signature-title" className="coe-section">
                 <div>
                   <h2
                     id="step-signature-title"
-                    className="text-xl sm:text-2xl font-bold tracking-tight text-foreground"
+                    className="coe-section-title"
                   >
-                    Employee Electronic Signature
+                    Employee Signature
                   </h2>
-                  <p className="mt-1 text-sm sm:text-base text-muted-foreground">
+                  <p                   className="coe-section-description">
                     Draw your signature inside the box or upload an existing signature image to
                     certify this request.
                   </p>
@@ -767,7 +709,7 @@ function PermissionSlipsPage() {
                   />
                   <FieldError id="permission-signature-error" message={fieldErrors.signature} />
 
-                  <div className="rounded-lg border bg-muted/30 p-4 text-xs sm:text-sm text-muted-foreground">
+                  <div className="coe-notice text-xs sm:text-sm">
                     <p>
                       Signing as <strong className="text-foreground">{viewer?.name}</strong> (
                       {viewer?.department}). Your signature certifies that you have informed your
@@ -781,21 +723,21 @@ function PermissionSlipsPage() {
 
             {/* ── STEP 3: REVIEW & CONFIRMATION ──────────────────────────── */}
             {currentStep === 3 && (
-              <section aria-labelledby="step-review-title" className="space-y-6">
+              <section aria-labelledby="step-review-title" className="coe-section">
                 <div>
                   <h2
                     id="step-review-title"
-                    className="text-xl sm:text-2xl font-bold tracking-tight text-foreground"
+                    className="coe-section-title"
                   >
                     Review Request Details
                   </h2>
-                  <p className="mt-1 text-sm sm:text-base text-muted-foreground">
+                  <p                   className="coe-section-description">
                     Carefully review your information before submitting to the HRDO Director for
                     approval.
                   </p>
                 </div>
 
-                <dl className="grid gap-4 sm:grid-cols-2 rounded-xl border bg-muted/20 p-5 text-sm">
+                <dl className="coe-summary-grid grid gap-4 sm:grid-cols-2 text-sm">
                   <div>
                     <dt className="text-xs font-semibold text-muted-foreground">Employee Name</dt>
                     <dd className="mt-1 text-base font-bold text-foreground">{viewer?.name}</dd>
@@ -822,7 +764,7 @@ function PermissionSlipsPage() {
                     <dt className="text-xs font-semibold text-muted-foreground">
                       Reason for Going Out
                     </dt>
-                    <dd className="mt-1.5 rounded-lg border-l-4 border-l-amber-500 bg-amber-50/80 p-4 text-base font-semibold text-slate-950">
+                    <dd className="coe-review-reason mt-1.5 p-4 text-base font-semibold">
                       {reason}
                     </dd>
                   </div>
@@ -848,7 +790,7 @@ function PermissionSlipsPage() {
                   </div>
                 </dl>
 
-                <div className="flex items-start gap-3 rounded-lg border p-4 bg-card">
+                <div className="coe-confirmation flex items-start gap-3 p-4">
                   <Checkbox
                     id="confirm-permission-review"
                     checked={confirmedAgreement}
@@ -871,12 +813,13 @@ function PermissionSlipsPage() {
             )}
 
             {/* Wizard Navigation Footer */}
-            <div className="flex items-center justify-between border-t pt-6 gap-3">
+            <div className="coe-footer">
+              <div className="coe-footer-inner">
               <Button
                 type="button"
                 variant="outline"
                 size="lg"
-                className="gap-2 min-h-12 px-5 text-sm sm:text-base font-semibold"
+                className="coe-button coe-button-back gap-2"
                 disabled={currentStep === 0 || busy}
                 onClick={() => setCurrentStep((step) => Math.max(0, step - 1))}
               >
@@ -884,7 +827,7 @@ function PermissionSlipsPage() {
                 Back
               </Button>
 
-              <span className="text-xs sm:text-sm font-bold text-muted-foreground">
+              <span className="coe-footer-step">
                 Step {currentStep + 1} of {PERMISSION_STEPS.length}
               </span>
 
@@ -892,7 +835,7 @@ function PermissionSlipsPage() {
                 <Button
                   type="button"
                   size="lg"
-                  className="gap-2 min-h-12 px-6 text-sm sm:text-base font-bold"
+                  className="coe-button coe-button-next gap-2"
                   onClick={handleNext}
                 >
                   Next
@@ -902,16 +845,16 @@ function PermissionSlipsPage() {
                 <Button
                   type="button"
                   size="lg"
-                  className="gap-2 min-h-12 px-6 text-sm sm:text-base font-bold"
+                  className="coe-button coe-button-next gap-2"
                   disabled={!confirmedAgreement || busy}
                   onClick={() => setShowConfirm(true)}
                 >
                   {busy ? <ButtonLoading label="Submitting…" /> : "Submit Permission Slip"}
                 </Button>
               )}
+              </div>
             </div>
-          </CardContent>
-        </Card>
+        </form>
 
         {/* Confirmation Modal */}
         <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
@@ -937,7 +880,7 @@ function PermissionSlipsPage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </main>
+      </div>
     </div>
   );
 }

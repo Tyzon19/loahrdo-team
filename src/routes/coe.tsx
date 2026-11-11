@@ -38,7 +38,7 @@ function CoeEntryPage() {
         <Link
           to="/hrdo/login"
           search={{ redirect: "/hrdo/coe?requestor=internal" }}
-          className="group flex min-h-52 flex-col items-start rounded-xl border border-border bg-background p-6 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary hover:bg-primary/[0.03] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          className="group flex min-h-52 w-full touch-manipulation flex-col items-start rounded-xl border border-border bg-background p-6 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary hover:bg-primary/[0.03] hover:shadow-md active:translate-y-0 active:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         >
           <span className="grid h-16 w-16 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
             <FileBadge className="h-8 w-8" aria-hidden />
@@ -60,7 +60,7 @@ function CoeEntryPage() {
 
         <a
           href="/api/auth/google?mode=external&redirect=%2Fhrdo%2Fcoe"
-          className="group flex min-h-52 flex-col items-start rounded-xl border border-border bg-background p-6 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary hover:bg-primary/[0.03] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          className="group flex min-h-52 w-full touch-manipulation flex-col items-start rounded-xl border border-border bg-background p-6 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary hover:bg-primary/[0.03] hover:shadow-md active:translate-y-0 active:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         >
           <span className="grid h-16 w-16 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
             <Mail className="h-8 w-8" aria-hidden />

@@ -118,8 +118,8 @@ const ITEMS = {
   },
 } satisfies Record<string, NavItem>;
 export const NAV: Record<Role, NavItem[]> = {
-  requisitioner: [ITEMS.newReq, ITEMS.myReq, ITEMS.permission, ITEMS.notif, ITEMS.phoneDirectory, ITEMS.profile],
-  department_head: [ITEMS.dash, ITEMS.permission, ITEMS.notif, ITEMS.phoneDirectory, ITEMS.profile],
+  requisitioner: [ITEMS.newReq, ITEMS.myReq, ITEMS.notif, ITEMS.phoneDirectory, ITEMS.profile],
+  department_head: [ITEMS.dash, ITEMS.notif, ITEMS.phoneDirectory, ITEMS.profile],
   transport_head: [
     ITEMS.dash,
     ITEMS.req,
@@ -219,7 +219,7 @@ function SideNav({
         })}
       </ul>
       <div className="border-t border-sidebar-border px-4 py-3 text-xs opacity-80">
-        <p>PFMO · Lyceum of Alabang</p>
+        <p>{permissionPortal ? "HRDO" : "PFMO"} · Lyceum of Alabang</p>
         <Link
           to="/privacy"
           onClick={onNavigate}
@@ -360,14 +360,6 @@ export function AppShell({ user, children }: { user: Viewer; children: ReactNode
             {permissionPortal ? "Permission Slip" : "LOA VRTT"}
           </span>
           <div className="ml-auto flex items-center gap-1.5">
-            {permissionPortal && (
-              <Button asChild variant="outline" size="sm" className="h-8 gap-1 text-xs">
-                <Link to="/dashboard">
-                  <LayoutDashboard className="h-3.5 w-3.5" />
-                  Vehicle Portal
-                </Link>
-              </Button>
-            )}
             {!permissionPortal && (
               <Button
                 asChild

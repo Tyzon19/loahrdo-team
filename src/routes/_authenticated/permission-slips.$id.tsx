@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import {
   ArrowLeft,
   CheckCircle2,
+  Check,
   CircleDot,
   Clock,
   Download,
@@ -63,6 +64,48 @@ function formatDate(value: string) {
   }).format(date);
 }
 
+async function waitForReceiptImages(node: HTMLDivElement) {
+  const images = Array.from(node.querySelectorAll("img"));
+  await Promise.all(
+    images.map(async (image) => {
+      if (!image.complete) {
+        await new Promise<void>((resolve, reject) => {
+          const cleanup = () => {
+            image.removeEventListener("load", finish);
+            image.removeEventListener("error", fail);
+            window.clearTimeout(timeoutId);
+          };
+          const finish = () => {
+            cleanup();
+            resolve();
+          };
+          const fail = () => {
+            cleanup();
+            reject(new Error("A receipt image could not be loaded."));
+          };
+          const timeoutId = window.setTimeout(() => {
+            cleanup();
+            reject(new Error("The receipt preview took too long to prepare."));
+          }, 5000);
+          image.addEventListener("load", finish, { once: true });
+          image.addEventListener("error", fail, { once: true });
+        });
+      }
+      if (!image.complete || image.naturalWidth === 0) {
+        throw new Error("A receipt image is not ready for capture.");
+      }
+      if (typeof image.decode === "function") {
+        try {
+          await image.decode();
+        } catch {
+          // A decoded image is preferred, but html-to-image can still capture it.
+        }
+      }
+    }),
+  );
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+}
+
 function Notice({
   tone,
   icon: Icon,
@@ -119,6 +162,53 @@ function PermissionStatusBadge({ status }: { status: PermissionSlip["status"] })
   );
 }
 
+function PermissionStatusCheck({ status }: { status: PermissionSlip["status"] }) {
+  const rejected = status === "rejected";
+  const steps = [
+    { label: "Submitted", state: "done" },
+    {
+      label: "HRDO Review",
+      state: status === "pending_approval" ? "active" : "done",
+    },
+    {
+      label: rejected ? "Rejected" : "Approved",
+      state: status === "pending_approval" ? "upcoming" : "active",
+    },
+  ] as const;
+
+  return (
+    <section className="permission-status-check" aria-labelledby="permission-status-title">
+      <div className="permission-status-heading">
+        <div>
+          <p className="permission-status-eyebrow">Request status</p>
+          <h2 id="permission-status-title">Track your Permission Slip</h2>
+        </div>
+        <PermissionStatusBadge status={status} />
+      </div>
+      <ol className="permission-status-steps">
+        {steps.map((step, index) => (
+          <li key={step.label} data-state={step.state}>
+            <div className="permission-status-step-content">
+              <span className="permission-status-circle">
+                {step.state === "done" ? <Check className="h-4 w-4" aria-hidden /> : index + 1}
+              </span>
+              <span className="permission-status-label">{step.label}</span>
+            </div>
+            {index < steps.length - 1 ? <span className="permission-status-line" /> : null}
+          </li>
+        ))}
+      </ol>
+      <p className="permission-status-caption">
+        {status === "pending_approval"
+          ? "Your request is waiting for HRDO review."
+          : rejected
+            ? "This request was reviewed and rejected."
+            : "Your request has been approved. Your official receipt is ready."}
+      </p>
+    </section>
+  );
+}
+
 function PermissionSlipDetailPage() {
   const { id } = Route.useParams();
   const search = Route.useSearch();
@@ -143,6 +233,8 @@ function PermissionSlipDetailPage() {
   const [sendingReceipt, setSendingReceipt] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [receiptEmailedLocally, setReceiptEmailedLocally] = useState(false);
+  const [receiptOpen, setReceiptOpen] = useState(false);
+  const [receiptSentSuccess, setReceiptSentSuccess] = useState(false);
 
   const slip = query.data;
   const isApproved = slip?.status === "approved";
@@ -184,7 +276,7 @@ function PermissionSlipDetailPage() {
         queryClient.invalidateQueries({ queryKey: ["permission-slip", id] }),
         queryClient.invalidateQueries({ queryKey: ["permission-slips"] }),
       ]);
-      await navigate({ search: { view: "receipt" } });
+      await navigate({ search: { view: "receipt" as const } });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Approval failed.");
     } finally {
@@ -223,13 +315,30 @@ function PermissionSlipDetailPage() {
   }
 
   async function captureReceiptImage() {
-    if (!receiptRef.current) throw new Error("Receipt preview is not ready.");
-    return toPng(receiptRef.current, {
-      pixelRatio: 2,
-      backgroundColor: "#ffffff",
-      cacheBust: true,
-      skipFonts: true,
-    });
+    const receipt = receiptRef.current;
+    if (!receipt) throw new Error("Receipt preview is not ready.");
+    const previousWidth = receipt.style.width;
+    const previousMaxWidth = receipt.style.maxWidth;
+    const previousMargin = receipt.style.margin;
+    const previousTransform = receipt.style.transform;
+    receipt.style.width = "794px";
+    receipt.style.maxWidth = "none";
+    receipt.style.margin = "0";
+    receipt.style.transform = "none";
+    try {
+      await waitForReceiptImages(receipt);
+      return await toPng(receipt, {
+        pixelRatio: 2,
+        backgroundColor: "#ffffff",
+        cacheBust: true,
+        skipFonts: true,
+      });
+    } finally {
+      receipt.style.width = previousWidth;
+      receipt.style.maxWidth = previousMaxWidth;
+      receipt.style.margin = previousMargin;
+      receipt.style.transform = previousTransform;
+    }
   }
 
   async function handleSendReceiptEmail() {
@@ -247,6 +356,7 @@ function PermissionSlipDetailPage() {
       );
       if (result.emailDelivery.sent) {
         setReceiptEmailedLocally(true);
+        setReceiptSentSuccess(true);
         toast.success(`Permission Slip receipt emailed to ${slip.employeeEmail} via Gmail.`);
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: ["permission-slip", id] }),
@@ -298,35 +408,58 @@ function PermissionSlipDetailPage() {
   }
   if (!slip) return <p className="text-sm text-destructive">Permission Slip not found.</p>;
 
-  // RECEIPT VIEW (mapupunta sa receipt kung isesend ba tru gmail or nah)
-  if (search.view === "receipt") {
+  if (receiptSentSuccess) {
     return (
-      <div className="mx-auto w-full max-w-5xl space-y-6">
-        {(busy || sendingReceipt || downloading) && (
-          <LoadingScreen
-            label={
-              sendingReceipt
-                ? "Sending receipt via Gmail"
-                : downloading
-                  ? "Preparing receipt download"
-                  : "Processing"
-            }
-            mode="overlay"
-            immediate
-          />
-        )}
+      <div className="coe-success-wrap">
+        <section className="panel coe-success-card" aria-labelledby="permission-receipt-success-title">
+          <div className="coe-success-logos" aria-label="Lyceum of Alabang and HRDO">
+            <img src="/lyceum-logo.png.png" alt="Lyceum of Alabang seal" />
+            <img src="/HRDO%20LOGO.png" alt="Human Resources Development Office logo" />
+          </div>
+          <div className="coe-success-icon" aria-hidden="true">
+            <Check />
+          </div>
+          <h1 id="permission-receipt-success-title">Permission Slip Receipt Sent Successfully</h1>
+          <p className="coe-success-lead">
+            The approved Permission Slip receipt has been emailed to {slip.employeeEmail}.
+          </p>
+          <p className="coe-success-message">
+            The employee can now view and download the official receipt from Gmail.
+          </p>
+          <p className="coe-success-reference">
+            Permission Slip reference: <strong>{slip.id}</strong>
+          </p>
+          <div className="coe-success-actions">
+            <Button type="button" onClick={() => setReceiptSentSuccess(false)}>
+              View receipt
+            </Button>
+            <Button type="button" variant="outline" asChild>
+              <Link to="/permission-slips/$id" params={{ id: slip.id }} search={{ view: undefined }}>
+              Back to request
+              </Link>
+            </Button>
+          </div>
+        </section>
+      </div>
+    );
+  }
 
+  if (search.view === "receipt" || receiptOpen) {
+    return (
+      <div className="mx-auto w-full max-w-5xl space-y-6 relative z-0">
         <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-center sm:justify-between">
           <Button
+            type="button"
             variant="ghost"
             className="w-fit gap-2"
-            onClick={() => void navigate({ search: { view: undefined } })}
+            onClick={() => setReceiptOpen(false)}
           >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Request Form
+              <ArrowLeft className="h-4 w-4" />
+              Back to Request Form
           </Button>
           <div className="flex flex-wrap items-center gap-2">
             <Button
+              type="button"
               variant="outline"
               className="gap-2"
               onClick={() => void handleDownloadReceipt()}
@@ -337,6 +470,7 @@ function PermissionSlipDetailPage() {
             </Button>
             {isHead && (
               <Button
+                type="button"
                 className="gap-2"
                 onClick={() => void handleSendReceiptEmail()}
                 disabled={sendingReceipt || emailAlreadyDelivered}
@@ -352,9 +486,10 @@ function PermissionSlipDetailPage() {
           <Notice
             tone="success"
             icon={CheckCircle2}
-            title="Receipt sent to employee's Gmail."
+            title={`Permission Slip receipt emailed to ${slip.employeeEmail} via Gmail.`}
           >
-            The official permission slip receipt was successfully delivered to {slip.employeeEmail}.
+            The official permission slip receipt was successfully delivered to{" "}
+            {slip.employeeEmail}.
           </Notice>
         ) : (
           <Notice
@@ -368,7 +503,7 @@ function PermissionSlipDetailPage() {
           </Notice>
         )}
 
-        <div className="rounded-xl border bg-card p-6 shadow-sm">
+        <div className="overflow-hidden rounded-xl border bg-card p-2 shadow-sm sm:p-6">
           <PermissionSlipReceipt slip={slip} receiptRef={receiptRef} />
         </div>
 
@@ -379,7 +514,11 @@ function PermissionSlipDetailPage() {
   // DEFAULT VIEW: REQUEST FORM & DETAILS (makikita muna ang details and information bago fillupan ng hr director)
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
-      {busy && <LoadingScreen label="Processing request" mode="overlay" immediate />}
+      {busy && (
+        <div className="fixed inset-0 z-[9999] pointer-events-auto">
+          <LoadingScreen label="Processing request" mode="overlay" immediate />
+        </div>
+      )}
 
       <PageHeader
         title={`Permission Slip ${slip.id.slice(0, 8).toUpperCase()}`}
@@ -399,16 +538,19 @@ function PermissionSlipDetailPage() {
             </Button>
             {isApproved && (
               <Button
+                type="button"
                 className="gap-2"
-                onClick={() => void navigate({ search: { view: "receipt" } })}
+                onClick={() => setReceiptOpen(true)}
               >
                 <FileText className="h-4 w-4" />
-                View Receipt / Send via Gmail
+                View Receipt
               </Button>
             )}
           </div>
         }
       />
+
+      <PermissionStatusCheck status={slip.status} />
 
       {isApproved && (
         <Notice
@@ -418,7 +560,7 @@ function PermissionSlipDetailPage() {
         >
           {emailAlreadyDelivered
             ? `The official receipt was already emailed to ${slip.employeeEmail}.`
-            : `The official receipt is ready. Use "View Receipt / Send via Gmail" above to open and send it.`}
+            : `The official receipt is ready. Use "View Receipt" above, then choose "Send via Gmail" when ready.`}
         </Notice>
       )}
 
@@ -455,10 +597,10 @@ function PermissionSlipDetailPage() {
               <strong>{hrDirectorName}</strong>, or <strong>Reject Request</strong> if it cannot be
               approved.
             </p>
-            <div className="flex flex-wrap gap-3 border-t pt-3">
+            <div className="flex flex-col gap-3 border-t pt-3 sm:flex-row sm:flex-wrap">
               <Button
                 size="lg"
-                className="gap-2 sm:min-w-64"
+                className="w-full gap-2 sm:w-auto sm:min-w-64"
                 onClick={() => setApproveOpen(true)}
               >
                 <CheckCircle2 className="h-4 w-4" />
@@ -466,7 +608,7 @@ function PermissionSlipDetailPage() {
               </Button>
               <Button
                 variant="destructive"
-                className="gap-2"
+                className="w-full gap-2 sm:w-auto"
                 onClick={() => setRejectOpen(true)}
               >
                 <X className="h-4 w-4" />

@@ -20,6 +20,13 @@ describe("Google sign-in eligibility", () => {
     expect(googleAccountProblem("teacher@loa.edu.ph", "requisitioner")).toBe("google_domain");
   });
 
+  it("reports the institutional-email requirement before account lookup", () => {
+    expect(googleAccountProblem("visitor@gmail.com", null)).toBe("google_domain");
+    expect(googleSignInErrorMessage("google_domain")).toBe(
+      "Use your @lyceumalabang.edu.ph Google account. Other accounts cannot sign in here.",
+    );
+  });
+
   it("accepts institutional addresses even when no account record exists yet", () => {
     expect(googleAccountProblem("teacher@lyceumalabang.edu.ph", null)).toBeNull();
   });
@@ -58,6 +65,18 @@ describe("Google sign-in redirect target", () => {
       expect(googleSignInCredentials("external")).toEqual({
         clientId: "external-client",
         clientSecret: "external-secret",
+      });
+    });
+
+    it("falls back to the shared OAuth client when no external client is configured", () => {
+      vi.stubEnv("GOOGLE_CLIENT_ID", "shared-client");
+      vi.stubEnv("GOOGLE_CLIENT_SECRET", "shared-secret");
+      vi.stubEnv("GOOGLE_EXTERNAL_CLIENT_ID", "");
+      vi.stubEnv("GOOGLE_EXTERNAL_CLIENT_SECRET", "");
+
+      expect(googleSignInCredentials("external")).toEqual({
+        clientId: "shared-client",
+        clientSecret: "shared-secret",
       });
     });
   });

@@ -42,30 +42,28 @@ function cropSignature(canvas: HTMLCanvasElement) {
   const cropped = document.createElement("canvas");
   cropped.width = sourceRight - sourceLeft;
   cropped.height = sourceBottom - sourceTop;
-  cropped
-    .getContext("2d")
-    ?.drawImage(
+  const croppedContext = cropped.getContext("2d");
+  if (!croppedContext) return null;
+  const draw = (x: number, y: number) => {
+    croppedContext.drawImage(
       canvas,
       sourceLeft,
       sourceTop,
       cropped.width,
       cropped.height,
-      0,
-      0,
+      x,
+      y,
       cropped.width,
       cropped.height,
     );
-  if (cropped.width >= cropped.height) return cropped.toDataURL("image/png");
-
-  const landscape = document.createElement("canvas");
-  landscape.width = cropped.height;
-  landscape.height = cropped.width;
-  const landscapeContext = landscape.getContext("2d");
-  if (!landscapeContext) return null;
-  landscapeContext.translate(landscape.width, 0);
-  landscapeContext.rotate(Math.PI / 2);
-  landscapeContext.drawImage(cropped, 0, 0);
-  return landscape.toDataURL("image/png");
+  };
+  const strokePadding = Math.max(1, Math.round((window.devicePixelRatio || 1) * 1.25));
+  for (let y = -strokePadding; y <= strokePadding; y += 1) {
+    for (let x = -strokePadding; x <= strokePadding; x += 1) {
+      if (x * x + y * y <= strokePadding * strokePadding) draw(x, y);
+    }
+  }
+  return cropped.toDataURL("image/png");
 }
 
 function configureCanvas(canvas: HTMLCanvasElement, lineWidth: number) {
@@ -261,7 +259,10 @@ export function SignaturePad({ onChange }: { onChange: (v: SignatureValue | null
             type="button"
             variant="outline"
             className="min-h-10 w-full text-sm"
-            onClick={() => setFullScreenOpen(true)}
+            onClick={(event) => {
+              event.preventDefault();
+              setFullScreenOpen(true);
+            }}
           >
             <Maximize2 className="h-4 w-4 shrink-0" aria-hidden />
             Open larger signing area
@@ -281,12 +282,12 @@ export function SignaturePad({ onChange }: { onChange: (v: SignatureValue | null
           ) : (
             <canvas
               ref={canvas}
-              aria-label="Signature drawing area. Sign with your mouse, finger, or stylus."
+              aria-label="Signature drawing area. Sign with your mouse or finger."
               className="h-56 w-full touch-none rounded-md border-2 border-dashed border-input bg-card text-foreground sm:h-64"
               onPointerDown={(e) => {
                 const target = canvas.current;
                 if (!target) return;
-                configureCanvas(target, 2);
+                configureCanvas(target, 4);
                 drawing.current = true;
                 const p = pos(e, target);
                 const ctx = target.getContext("2d");
@@ -360,24 +361,24 @@ export function SignaturePad({ onChange }: { onChange: (v: SignatureValue | null
         </div>
       )}
       <Dialog open={fullScreenOpen} onOpenChange={handleFullScreenOpenChange}>
-        <DialogContent className="flex h-[100dvh] w-screen max-w-none flex-col gap-0 p-0 sm:h-auto sm:max-h-[85vh] sm:w-[90vw] sm:max-w-2xl sm:rounded-xl sm:border">
+        <DialogContent className="flex h-[100svh] w-screen max-w-none flex-col gap-0 p-0 sm:h-[min(85vh,720px)] sm:max-h-[85vh] sm:w-[90vw] sm:max-w-2xl sm:rounded-xl sm:border">
           <DialogHeader className="border-b px-4 pr-12 pb-3 pt-4 text-left">
-            <DialogTitle>Large Signing Area</DialogTitle>
+            <DialogTitle>Sign here</DialogTitle>
             <DialogDescription>
-              Write your signature inside the box using your mouse, trackpad, finger, or stylus.
+              Write your signature inside the box using your mouse, trackpad, finger.
             </DialogDescription>
           </DialogHeader>
           <div className="flex min-h-0 flex-1 flex-col p-4">
             <div className="relative flex min-h-0 flex-1 items-center justify-center">
-              <div className="relative h-64 sm:h-80 w-full">
+              <div className="relative h-full min-h-[22rem] w-full sm:min-h-[26rem]">
                 <canvas
                   ref={fullScreenCanvas}
-                  aria-label="Full-screen signature drawing area. Sign with your mouse, finger, or stylus."
+                  aria-label="Full-screen signature drawing area. Sign with your mouse or finger."
                   className="absolute inset-0 h-full w-full touch-none rounded-lg border-2 border-dashed border-input bg-card text-foreground"
                   onPointerDown={(e) => {
                     const target = fullScreenCanvas.current;
                     if (!target) return;
-                    configureCanvas(target, 3);
+                    configureCanvas(target, 5);
                     fullScreenDrawing.current = true;
                     const p = pos(e, target);
                     const ctx = target.getContext("2d");
@@ -469,10 +470,8 @@ function SignatureImage({
     if (!canvas) return;
     const signatureImage = new Image();
     signatureImage.onload = () => {
-      const rotate =
-        method === "drawn" && signatureImage.naturalHeight > signatureImage.naturalWidth;
-      const width = rotate ? signatureImage.naturalHeight : signatureImage.naturalWidth;
-      const height = rotate ? signatureImage.naturalWidth : signatureImage.naturalHeight;
+      const width = signatureImage.naturalWidth;
+      const height = signatureImage.naturalHeight;
       const imageScale = Math.min((180 * scale) / width, (48 * scale) / height);
       canvas.width = width;
       canvas.height = height;
@@ -480,10 +479,6 @@ function SignatureImage({
       canvas.style.height = `${height * imageScale}px`;
       const context = canvas.getContext("2d");
       if (!context) return;
-      if (rotate) {
-        context.translate(width, 0);
-        context.rotate(Math.PI / 2);
-      }
       context.drawImage(signatureImage, 0, 0);
     };
     signatureImage.src = image;

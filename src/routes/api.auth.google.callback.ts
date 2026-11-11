@@ -204,6 +204,9 @@ export const Route = createFileRoute("/api/auth/google/callback")({
             { encryptedCookieRequired },
           ] = await Promise.all([import("@/server/auth"), import("@/server/env")]);
 
+          const domainProblem = googleAccountProblem(email, null);
+          if (domainProblem) return failure(domainProblem, cleared, mode);
+
           const requisitionerAccount = await ensureGoogleRequisitionerAccount(email);
           const problem = googleAccountProblem(email, requisitionerAccount.role);
           if (problem) return failure(problem, cleared, mode);

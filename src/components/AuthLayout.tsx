@@ -22,23 +22,25 @@ export function AuthLayout({
 }) {
   return (
     <div
-      className={`auth-layout flex min-h-screen bg-background ${centered ? "justify-center" : ""}`}
+      className={`auth-layout flex min-h-[100svh] w-full overflow-x-hidden bg-background ${
+        centered ? "justify-center" : ""
+      }`}
     >
       <aside
-        className={`flex w-full flex-col justify-center overflow-y-auto px-4 py-10 sm:px-9 ${
+        className={`box-border flex min-w-0 w-full flex-col justify-center overflow-y-auto px-4 py-8 sm:px-9 sm:py-10 ${
           centered ? "md:w-[560px]" : "md:w-[480px] md:shrink-0"
         }`}
       >
         {back && (
           <Link
             to={backTo}
-            className="mb-4 inline-flex w-fit items-center gap-1.5 text-sm font-semibold text-primary hover:underline"
+            className="mb-4 inline-flex min-h-11 w-fit items-center gap-1.5 text-sm font-semibold text-primary hover:underline"
           >
             <ArrowLeft className="h-4 w-4" aria-hidden />
             Back to Sign In
           </Link>
         )}
-        <div className="mx-auto mb-6 flex items-center justify-center gap-3">
+        <div className="mx-auto mb-6 flex max-w-full items-center justify-center gap-3">
           <img
             src={LOGO_URL}
             alt="Lyceum of Alabang"
@@ -50,10 +52,12 @@ export function AuthLayout({
             className="h-12 w-12 object-contain"
           />
         </div>
-        <h1 className="mb-6 text-xl font-bold uppercase text-primary">{title}</h1>
+        <h1 className="mb-6 text-lg font-bold uppercase text-primary sm:text-xl">{title}</h1>
         {children}
-        <div className="mt-14 space-y-3 text-sm text-muted-foreground">
-          <p>For inquiries and comments please send us a message at https://www.facebook.com/lyceumhrdo</p>
+        <div className="mt-10 space-y-3 text-sm text-muted-foreground sm:mt-14">
+          <p className="break-words">
+            For inquiries and comments please send us a message at https://www.facebook.com/lyceumhrdo
+          </p>
           <p>
             Copyright © 2026 Lyceum of Alabang.
             <br />
@@ -105,7 +109,7 @@ export function Field({ icon: Icon, type, ...props }: FieldProps) {
       <input
         {...props}
         type={isPassword && show ? "text" : type}
-        className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+        className="w-full bg-transparent text-base text-foreground outline-none placeholder:text-muted-foreground sm:text-sm"
       />
       {isPassword && (
         <button
@@ -134,7 +138,7 @@ export function SubmitButton({
     <button
       type="submit"
       disabled={disabled}
-      className="flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-primary py-2 text-sm font-medium uppercase text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
+      className="flex min-h-12 w-full touch-manipulation items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium uppercase text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
     >
       <Icon className="h-4 w-4" />
       {children}
@@ -155,7 +159,7 @@ export function SubmitButtonWithSpinner({
     <button
       type="submit"
       disabled={busy}
-      className="flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-primary py-2 text-sm font-medium uppercase text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
+      className="flex min-h-12 w-full touch-manipulation items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium uppercase text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
     >
       <Icon className="h-4 w-4" />
       {children}
@@ -195,7 +199,7 @@ export function GoogleButton({ href, label }: { href: string; label: string }) {
   return (
     <a
       href={href}
-      className="flex min-h-11 w-full items-center justify-center gap-3 rounded-md border border-border bg-background py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+      className="flex min-h-12 w-full touch-manipulation items-center justify-center gap-3 rounded-md border border-border bg-background px-4 py-2 text-center text-sm font-medium leading-5 text-foreground transition-colors hover:bg-muted"
     >
       <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
         <path

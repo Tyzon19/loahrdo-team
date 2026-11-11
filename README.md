@@ -67,6 +67,9 @@ mode, each requisitioner must also be listed as a test user.
 Former employees and third-party verifiers use the separate COE path at `/coe` and the
 `GOOGLE_EXTERNAL_CLIENT_ID` / `GOOGLE_EXTERNAL_CLIENT_SECRET` OAuth client. Configure that
 client's consent screen as **External** and add the same `/api/auth/google/callback` redirect URI.
+If the external client variables are not configured, the COE flow falls back to
+`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`; the callback still accepts verified personal Google
+accounts only in the external COE mode.
 The external flow accepts verified personal Google accounts and does not change the institutional
 domain restriction for vehicle tickets or current-employee sign-in.
 Approver, administrator, and assistant accounts cannot be self-registered. The administrator
@@ -87,7 +90,7 @@ Copy values from `.env.example` when setting up a new environment. Never commit 
 | `ALLOWED_EMAIL_DOMAINS`                                                                   | Institutional domains accepted for admin-created accounts                                      |
 | `GA_MEASUREMENT_ID`                                                                       | Optional GA4 ID, loaded only after analytics consent                                           |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `GOOGLE_SENDER_EMAIL` | Institutional sign-in and Gmail sender credentials; the approved personal sender is `markjosephturingan4@gmail.com` |
-| `GOOGLE_EXTERNAL_CLIENT_ID`, `GOOGLE_EXTERNAL_CLIENT_SECRET`                              | Separate Google OAuth client for former employees/verifiers using personal Google accounts     |
+| `GOOGLE_EXTERNAL_CLIENT_ID`, `GOOGLE_EXTERNAL_CLIENT_SECRET`                              | Optional separate Google OAuth client for former employees/verifiers; falls back to the shared client when unset |
 | `GOOGLE_SIGNIN_REDIRECT_URI`                                                              | Optional Google sign-in callback; defaults to the site origin plus `/api/auth/google/callback` |
 
 To connect the sender locally, configure the Google OAuth client ID and secret, add
