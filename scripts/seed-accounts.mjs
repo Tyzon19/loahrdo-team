@@ -13,6 +13,7 @@ for (const line of readFileSync(envPath, "utf8").split(/\r?\n/)) {
   const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
   if (m) env[m[1]] = m[2].replace(/^["']|["']$/g, "");
 }
+Object.assign(env, process.env);
 
 const SCRYPT = { N: 16384, r: 8, p: 1, keylen: 64 };
 
@@ -54,6 +55,14 @@ const accounts = [
     email: "admin@lyceumalabang.edu.ph",
     role: "admin",
     department: "Physical Facilities Management Office",
+  },
+  {
+    name: "HRDO Director",
+    email: "hrdirector@lyceumalabang.edu.ph",
+    role: "department_head",
+    department: "Human Resources Development Office",
+    passwordEnv: "PERMISSION_HEAD_PASSWORD",
+    mustChangePassword: 0,
   },
   {
     name: "HRDO Administrator",
@@ -121,13 +130,29 @@ try {
     const tableName = account.table ?? "users";
     const [rows] = await conn.query(`SELECT id FROM ${tableName} WHERE email = ?`, [account.email]);
     if (rows.length) {
+      if (account.role === "department_head" && tableName === "users") {
+        const existingPassword = account.passwordEnv ? env[account.passwordEnv] : undefined;
+        if (existingPassword) {
+          await conn.query(
+            "UPDATE users SET role = ?, department = ?, password_hash = ?, must_change_password = ? WHERE email = ?",
+            [account.role, account.department, hashPassword(existingPassword), account.mustChangePassword ?? 0, account.email],
+          );
+        } else {
+          await conn.query(
+            "UPDATE users SET role = ?, department = ?, must_change_password = ? WHERE email = ?",
+            [account.role, account.department, account.mustChangePassword ?? 0, account.email],
+          );
+        }
+      }
       created.push({ ...account, table: tableName, password: null });
       continue;
     }
-    const password = makePassword();
+    const passwordFromEnv = account.passwordEnv ? env[account.passwordEnv] : undefined;
+    const password = passwordFromEnv || makePassword();
+    const mustChangePassword = account.mustChangePassword ?? 1;
     await conn.query(
       `INSERT INTO ${tableName} (id, name, email, password_hash, role, department, must_change_password)
-       VALUES (?, ?, ?, ?, ?, ?, 1)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         randomUUID(),
         account.name,
@@ -135,17 +160,20 @@ try {
         hashPassword(password),
         account.role,
         account.department,
+        mustChangePassword,
       ],
     );
-    created.push({ ...account, table: tableName, password });
+    created.push({ ...account, table: tableName, password, passwordFromEnv: Boolean(passwordFromEnv) });
   }
 
   console.log("\nInitial application accounts ready.\n");
   for (const a of created) {
     console.log(`- ${a.table ?? "users"}`.padEnd(12) + ` ${a.role.padEnd(15)} ${a.email}`);
-    if (a.password) {
+    if (a.password && !a.passwordFromEnv) {
       console.log(`  initial password: ${a.password}`);
       console.log("  (shown once — store it in your password manager; change on first sign-in)");
+    } else if (a.passwordFromEnv) {
+      console.log("  password supplied through the configured environment variable");
     } else {
       console.log("  already exists — password left unchanged");
     }

@@ -19,6 +19,9 @@ import { joinFullName, splitFullName } from "@/lib/name";
 import { SITE } from "@/lib/site";
 
 export const Route = createFileRoute("/_authenticated/profile")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    portal: search["portal"] === "permission" ? ("permission" as const) : undefined,
+  }),
   head: () => ({
     meta: [
       { title: `Profile | ${SITE.name}` },

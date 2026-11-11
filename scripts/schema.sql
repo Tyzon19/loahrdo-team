@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS users (
   email VARCHAR(190) NOT NULL,
   phone_number VARCHAR(32) NULL,
   password_hash VARCHAR(255) NOT NULL,
-  role ENUM('requisitioner','transport_head','director','president','transport_staff','assistant','guard','driver','admin') NOT NULL,
+  role ENUM('requisitioner','department_head','transport_head','director','president','transport_staff','assistant','guard','driver','admin') NOT NULL,
   department VARCHAR(190) NOT NULL DEFAULT '',
   must_change_password TINYINT(1) NOT NULL DEFAULT 0,
   failed_attempts INT NOT NULL DEFAULT 0,
@@ -31,6 +31,48 @@ CREATE TABLE IF NOT EXISTS sessions (
   KEY sessions_user_idx (user_id),
   KEY sessions_expiry_idx (expires_at),
   CONSTRAINT sessions_user_fk FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS permission_slips (
+  id CHAR(36) NOT NULL,
+  employee_id CHAR(36) NOT NULL,
+  employee_name VARCHAR(120) NOT NULL,
+  employee_email VARCHAR(190) NOT NULL,
+  department VARCHAR(190) NOT NULL,
+  requested_date DATE NOT NULL,
+  time_out CHAR(5) NOT NULL,
+  time_in CHAR(5) NOT NULL,
+  reason VARCHAR(500) NOT NULL,
+  employee_signature MEDIUMTEXT NOT NULL,
+  status ENUM('pending_approval','approved','rejected') NOT NULL DEFAULT 'pending_approval',
+  department_head_id CHAR(36) NULL,
+  department_head_name VARCHAR(120) NULL,
+  department_head_signature MEDIUMTEXT NULL,
+  rejection_reason VARCHAR(500) NULL,
+  requested_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  approved_at DATETIME NULL,
+  rejected_at DATETIME NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY permission_employee_idx (employee_id, requested_at),
+  KEY permission_status_idx (status, department),
+  CONSTRAINT permission_employee_fk FOREIGN KEY (employee_id) REFERENCES users (id) ON DELETE CASCADE,
+  CONSTRAINT permission_head_fk FOREIGN KEY (department_head_id) REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS permission_history (
+  id CHAR(36) NOT NULL,
+  permission_slip_id CHAR(36) NOT NULL,
+  actor_id CHAR(36) NULL,
+  actor_name VARCHAR(120) NOT NULL,
+  actor_role ENUM('requisitioner','department_head','system') NOT NULL,
+  type ENUM('submitted','approved','rejected') NOT NULL,
+  message VARCHAR(500) NOT NULL,
+  happened_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY permission_history_idx (permission_slip_id, happened_at),
+  CONSTRAINT permission_history_slip_fk FOREIGN KEY (permission_slip_id) REFERENCES permission_slips (id) ON DELETE CASCADE,
+  CONSTRAINT permission_history_actor_fk FOREIGN KEY (actor_id) REFERENCES users (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS registration_otps (
@@ -117,7 +159,7 @@ CREATE TABLE IF NOT EXISTS request_signatures (
   attempt INT NOT NULL,
   signer_id CHAR(36) NULL,
   signer_name VARCHAR(120) NOT NULL,
-  signer_role ENUM('requisitioner','transport_head','director','president','transport_staff','assistant','guard','driver','admin') NOT NULL,
+  signer_role ENUM('requisitioner','department_head','transport_head','director','president','transport_staff','assistant','guard','driver','admin') NOT NULL,
   proxy_signer_name VARCHAR(120) NULL,
   image MEDIUMTEXT NULL,
   method ENUM('drawn','uploaded') NOT NULL,
@@ -135,7 +177,7 @@ CREATE TABLE IF NOT EXISTS request_history (
   attempt INT NOT NULL,
   actor_id CHAR(36) NULL,
   actor_name VARCHAR(120) NOT NULL,
-  actor_role ENUM('requisitioner','transport_head','director','president','transport_staff','assistant','guard','driver','admin') NOT NULL,
+  actor_role ENUM('requisitioner','department_head','transport_head','director','president','transport_staff','assistant','guard','driver','admin') NOT NULL,
   type ENUM('submitted','updated','signed','returned','resubmitted','approved','dispatch','completed') NOT NULL,
   message VARCHAR(500) NOT NULL,
   reason TEXT NULL,
@@ -152,7 +194,7 @@ CREATE TABLE IF NOT EXISTS request_returns (
   stage ENUM('review','recommend','approve') NOT NULL,
   by_id CHAR(36) NULL,
   by_name VARCHAR(120) NOT NULL,
-  by_role ENUM('requisitioner','transport_head','director','president','transport_staff','assistant','guard','driver','admin') NOT NULL,
+  by_role ENUM('requisitioner','department_head','transport_head','director','president','transport_staff','assistant','guard','driver','admin') NOT NULL,
   reason TEXT NOT NULL,
   attempt INT NOT NULL,
   returned_at DATETIME NOT NULL,

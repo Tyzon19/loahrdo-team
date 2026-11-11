@@ -268,7 +268,6 @@ export function HrdoShell({ user, children }: { user: HrdoViewer; children: Reac
           {children}
         </main>
 
-
       </div>
       <MobileNav items={items} />
     </div>

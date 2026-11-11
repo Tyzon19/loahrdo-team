@@ -71,6 +71,44 @@ export const logoutFn = createServerFn({ method: "POST" }).handler(async () =>
   runSafely(async () => (await import("./server/auth")).logout()),
 );
 
+export const submitPermissionSlipFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/permission")).submitPermissionSlip(data)),
+  );
+
+export const listMyPermissionSlipsFn = createServerFn({ method: "GET" }).handler(async () =>
+  runSafely(async () => (await import("./server/permission")).listMyPermissionSlips()),
+);
+
+export const listPendingPermissionSlipsFn = createServerFn({ method: "GET" }).handler(async () =>
+  runSafely(async () => (await import("./server/permission")).listPendingPermissionSlips()),
+);
+
+export const getPermissionSlipFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/permission")).getPermissionSlip(data)),
+  );
+
+export const approvePermissionSlipFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/permission")).approvePermissionSlip(data)),
+  );
+
+export const rejectPermissionSlipFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/permission")).rejectPermissionSlip(data)),
+  );
+
+export const sendPermissionSlipReceiptFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/permission")).sendPermissionSlipReceipt(data)),
+  );
+
 export const hrdoLogoutFn = createServerFn({ method: "POST" }).handler(async () =>
   runSafely(async () => (await import("./server/hrdo/auth")).hrdoLogout()),
 );

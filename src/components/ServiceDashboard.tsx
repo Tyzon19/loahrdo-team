@@ -23,7 +23,7 @@ type Service = {
   desc: string;
   icon: LucideIcon;
   tag: string;
-  to?: "/requests/new" | "/coe";
+  to?: "/requests/new" | "/coe" | "/permission-slips";
 };
 
 const SERVICES: Service[] = [
@@ -46,6 +46,7 @@ const SERVICES: Service[] = [
     desc: "File a pass slip for leaving campus during work hours.",
     icon: FolderClock,
     tag: "Attendance",
+    to: "/permission-slips",
   },
   {
     title: "Late & Absences",

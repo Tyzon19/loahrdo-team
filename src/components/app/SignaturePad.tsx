@@ -217,8 +217,8 @@ export function SignaturePad({ onChange }: { onChange: (v: SignatureValue | null
     rd.readAsDataURL(f);
   };
   return (
-    <div>
-      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+    <div className="min-w-0">
+      <div className="mb-3 flex flex-col gap-2">
         <div
           className="grid w-full grid-cols-2 gap-1 sm:flex sm:w-auto"
           role="tablist"
@@ -229,7 +229,7 @@ export function SignaturePad({ onChange }: { onChange: (v: SignatureValue | null
             type="button"
             size="default"
             variant={mode === "draw" ? "secondary" : "ghost"}
-            className="min-h-11 w-full px-4 text-sm sm:w-auto"
+            className="min-h-10 w-full truncate px-3 text-sm sm:w-auto"
             onClick={() => {
               clear();
               setMode("draw");
@@ -238,13 +238,13 @@ export function SignaturePad({ onChange }: { onChange: (v: SignatureValue | null
             aria-selected={mode === "draw"}
             aria-controls="signature-draw-panel"
           >
-            <PenLine className="h-4 w-4" aria-hidden /> Draw signature
+            <PenLine className="h-4 w-4 shrink-0" aria-hidden /> Draw signature
           </Button>
           <Button
             type="button"
             size="default"
             variant={mode === "upload" ? "secondary" : "ghost"}
-            className="min-h-11 w-full px-4 text-sm sm:w-auto"
+            className="min-h-10 w-full truncate px-3 text-sm sm:w-auto"
             onClick={() => {
               clear();
               setMode("upload");
@@ -253,17 +253,17 @@ export function SignaturePad({ onChange }: { onChange: (v: SignatureValue | null
             aria-selected={mode === "upload"}
             aria-controls="signature-upload-panel"
           >
-            <Upload className="h-4 w-4" aria-hidden /> Upload image
+            <Upload className="h-4 w-4 shrink-0" aria-hidden /> Upload image
           </Button>
         </div>
         {mode === "draw" && (
           <Button
             type="button"
             variant="outline"
-            className="min-h-11 w-full sm:w-auto"
+            className="min-h-10 w-full text-sm"
             onClick={() => setFullScreenOpen(true)}
           >
-            <Maximize2 className="h-4 w-4" aria-hidden />
+            <Maximize2 className="h-4 w-4 shrink-0" aria-hidden />
             Open larger signing area
           </Button>
         )}
@@ -360,25 +360,19 @@ export function SignaturePad({ onChange }: { onChange: (v: SignatureValue | null
         </div>
       )}
       <Dialog open={fullScreenOpen} onOpenChange={handleFullScreenOpenChange}>
-        <DialogContent className="fixed inset-0 left-0 top-0 flex h-[100dvh] w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none border-0 p-0 [&>button]:top-[max(1rem,env(safe-area-inset-top))] sm:hidden">
-          <DialogHeader className="border-b px-4 pr-12 pb-3 pt-[max(1rem,env(safe-area-inset-top))] text-left">
-            <DialogTitle>Sign with your finger</DialogTitle>
+        <DialogContent className="flex h-[100dvh] w-screen max-w-none flex-col gap-0 p-0 sm:h-auto sm:max-h-[85vh] sm:w-[90vw] sm:max-w-2xl sm:rounded-xl sm:border">
+          <DialogHeader className="border-b px-4 pr-12 pb-3 pt-4 text-left">
+            <DialogTitle>Large Signing Area</DialogTitle>
             <DialogDescription>
-              Write your signature inside the box, then tap Use signature.
+              Write your signature inside the box using your mouse, trackpad, finger, or stylus.
             </DialogDescription>
           </DialogHeader>
           <div className="flex min-h-0 flex-1 flex-col p-4">
             <div className="relative flex min-h-0 flex-1 items-center justify-center">
-              <div
-                className="relative max-h-full max-w-full"
-                style={{
-                  width: "min(100%, calc((100dvh - 13rem) * 1.5))",
-                  aspectRatio: "3 / 2",
-                }}
-              >
+              <div className="relative h-64 sm:h-80 w-full">
                 <canvas
                   ref={fullScreenCanvas}
-                  aria-label="Full-screen signature drawing area. Sign with your finger or stylus."
+                  aria-label="Full-screen signature drawing area. Sign with your mouse, finger, or stylus."
                   className="absolute inset-0 h-full w-full touch-none rounded-lg border-2 border-dashed border-input bg-card text-foreground"
                   onPointerDown={(e) => {
                     const target = fullScreenCanvas.current;
@@ -412,14 +406,14 @@ export function SignaturePad({ onChange }: { onChange: (v: SignatureValue | null
                     fullScreenDrawing.current = false;
                   }}
                 />
-                <span className="pointer-events-none absolute inset-x-8 bottom-12 border-b border-dotted border-muted-foreground/40" />
+                <span className="pointer-events-none absolute inset-x-8 bottom-10 border-b border-dotted border-muted-foreground/40" />
               </div>
             </div>
             <p className="mt-2 text-center text-xs text-muted-foreground">
-              Rotate your phone to landscape for more room.
+              Sign above the dotted line. Tap &ldquo;Use signature&rdquo; when finished.
             </p>
           </div>
-          <DialogFooter className="flex-row border-t px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <DialogFooter className="flex-row border-t p-3 sm:px-6">
             <Button type="button" variant="outline" className="flex-1" onClick={clearFullScreen}>
               <Eraser className="h-4 w-4" aria-hidden />
               Clear

@@ -45,6 +45,7 @@ export const STAGES: {
 
 export const ROLE_TITLES: Record<Role, string> = {
   requisitioner: "Requestor",
+  department_head: "HRDO Department Head",
   transport_head: "Head of Transport Services",
   director: "Director for Administration",
   president: "President",

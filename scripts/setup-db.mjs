@@ -92,7 +92,7 @@ try {
   ]) {
     await conn.query(
       `ALTER TABLE \`${table}\` MODIFY \`${column}\`
-       ENUM('requisitioner','transport_head','director','president','transport_staff','assistant','guard','driver','admin') NOT NULL`,
+       ENUM('requisitioner','department_head','transport_head','director','president','transport_staff','assistant','guard','driver','admin') NOT NULL`,
     );
   }
   await conn.query(

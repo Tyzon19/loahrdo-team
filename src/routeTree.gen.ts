@@ -21,6 +21,7 @@ import { Route as TermsOfServiceRouteImport } from './routes/terms-of-service'
 import { Route as AuthenticatedChangePasswordRouteImport } from './routes/_authenticated/change-password'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedNotificationsRouteImport } from './routes/_authenticated/notifications'
+import { Route as AuthenticatedPermissionSlipsRouteImport } from './routes/_authenticated/permission-slips'
 import { Route as AuthenticatedPhoneDirectoryRouteImport } from './routes/_authenticated/phone-directory'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 import { Route as AuthenticatedTripArchiveRouteImport } from './routes/_authenticated/trip-archive'
@@ -36,6 +37,7 @@ import { Route as HrdoProfileRouteImport } from './routes/hrdo/profile'
 import { Route as HrdoRequestsRouteImport } from './routes/hrdo/requests'
 import { Route as ServiceSlugRouteImport } from './routes/service.$slug'
 import { Route as VerifyTicketTokenRouteImport } from './routes/verify-ticket.$token'
+import { Route as AuthenticatedPermissionSlipsIdRouteImport } from './routes/_authenticated/permission-slips.$id'
 import { Route as AuthenticatedPrintIdRouteImport } from './routes/_authenticated/print.$id'
 import { Route as AuthenticatedRequestsIndexRouteImport } from './routes/_authenticated/requests.index'
 import { Route as AuthenticatedRequestsIdRouteImport } from './routes/_authenticated/requests.$id'
@@ -107,6 +109,12 @@ const AuthenticatedNotificationsRoute =
   AuthenticatedNotificationsRouteImport.update({
     id: '/notifications',
     path: '/notifications',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedPermissionSlipsRoute =
+  AuthenticatedPermissionSlipsRouteImport.update({
+    id: '/permission-slips',
+    path: '/permission-slips',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedPhoneDirectoryRoute =
@@ -186,6 +194,12 @@ const VerifyTicketTokenRoute = VerifyTicketTokenRouteImport.update({
   path: '/verify-ticket/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedPermissionSlipsIdRoute =
+  AuthenticatedPermissionSlipsIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => AuthenticatedPermissionSlipsRoute,
+  } as any)
 const AuthenticatedPrintIdRoute = AuthenticatedPrintIdRouteImport.update({
   id: '/print/$id',
   path: '/print/$id',
@@ -256,6 +270,7 @@ export interface FileRoutesByFullPath {
   '/change-password': typeof AuthenticatedChangePasswordRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/notifications': typeof AuthenticatedNotificationsRoute
+  '/permission-slips': typeof AuthenticatedPermissionSlipsRouteWithChildren
   '/phone-directory': typeof AuthenticatedPhoneDirectoryRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/trip-archive': typeof AuthenticatedTripArchiveRoute
@@ -271,6 +286,7 @@ export interface FileRoutesByFullPath {
   '/hrdo/requests': typeof HrdoRequestsRoute
   '/service/$slug': typeof ServiceSlugRoute
   '/verify-ticket/$token': typeof VerifyTicketTokenRoute
+  '/permission-slips/$id': typeof AuthenticatedPermissionSlipsIdRoute
   '/print/$id': typeof AuthenticatedPrintIdRoute
   '/requests/$id': typeof AuthenticatedRequestsIdRoute
   '/requests/new': typeof AuthenticatedRequestsNewRoute
@@ -295,6 +311,7 @@ export interface FileRoutesByTo {
   '/change-password': typeof AuthenticatedChangePasswordRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/notifications': typeof AuthenticatedNotificationsRoute
+  '/permission-slips': typeof AuthenticatedPermissionSlipsRouteWithChildren
   '/phone-directory': typeof AuthenticatedPhoneDirectoryRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/trip-archive': typeof AuthenticatedTripArchiveRoute
@@ -310,6 +327,7 @@ export interface FileRoutesByTo {
   '/hrdo/requests': typeof HrdoRequestsRoute
   '/service/$slug': typeof ServiceSlugRoute
   '/verify-ticket/$token': typeof VerifyTicketTokenRoute
+  '/permission-slips/$id': typeof AuthenticatedPermissionSlipsIdRoute
   '/print/$id': typeof AuthenticatedPrintIdRoute
   '/requests/$id': typeof AuthenticatedRequestsIdRoute
   '/requests/new': typeof AuthenticatedRequestsNewRoute
@@ -336,6 +354,7 @@ export interface FileRoutesById {
   '/_authenticated/change-password': typeof AuthenticatedChangePasswordRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/notifications': typeof AuthenticatedNotificationsRoute
+  '/_authenticated/permission-slips': typeof AuthenticatedPermissionSlipsRouteWithChildren
   '/_authenticated/phone-directory': typeof AuthenticatedPhoneDirectoryRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/trip-archive': typeof AuthenticatedTripArchiveRoute
@@ -351,6 +370,7 @@ export interface FileRoutesById {
   '/hrdo/requests': typeof HrdoRequestsRoute
   '/service/$slug': typeof ServiceSlugRoute
   '/verify-ticket/$token': typeof VerifyTicketTokenRoute
+  '/_authenticated/permission-slips/$id': typeof AuthenticatedPermissionSlipsIdRoute
   '/_authenticated/print/$id': typeof AuthenticatedPrintIdRoute
   '/_authenticated/requests/$id': typeof AuthenticatedRequestsIdRoute
   '/_authenticated/requests/new': typeof AuthenticatedRequestsNewRoute
@@ -377,6 +397,7 @@ export interface FileRouteTypes {
     | '/change-password'
     | '/dashboard'
     | '/notifications'
+    | '/permission-slips'
     | '/phone-directory'
     | '/profile'
     | '/trip-archive'
@@ -392,6 +413,7 @@ export interface FileRouteTypes {
     | '/hrdo/requests'
     | '/service/$slug'
     | '/verify-ticket/$token'
+    | '/permission-slips/$id'
     | '/print/$id'
     | '/requests/$id'
     | '/requests/new'
@@ -416,6 +438,7 @@ export interface FileRouteTypes {
     | '/change-password'
     | '/dashboard'
     | '/notifications'
+    | '/permission-slips'
     | '/phone-directory'
     | '/profile'
     | '/trip-archive'
@@ -431,6 +454,7 @@ export interface FileRouteTypes {
     | '/hrdo/requests'
     | '/service/$slug'
     | '/verify-ticket/$token'
+    | '/permission-slips/$id'
     | '/print/$id'
     | '/requests/$id'
     | '/requests/new'
@@ -456,6 +480,7 @@ export interface FileRouteTypes {
     | '/_authenticated/change-password'
     | '/_authenticated/dashboard'
     | '/_authenticated/notifications'
+    | '/_authenticated/permission-slips'
     | '/_authenticated/phone-directory'
     | '/_authenticated/profile'
     | '/_authenticated/trip-archive'
@@ -471,6 +496,7 @@ export interface FileRouteTypes {
     | '/hrdo/requests'
     | '/service/$slug'
     | '/verify-ticket/$token'
+    | '/_authenticated/permission-slips/$id'
     | '/_authenticated/print/$id'
     | '/_authenticated/requests/$id'
     | '/_authenticated/requests/new'
@@ -588,6 +614,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedNotificationsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/permission-slips': {
+      id: '/_authenticated/permission-slips'
+      path: '/permission-slips'
+      fullPath: '/permission-slips'
+      preLoaderRoute: typeof AuthenticatedPermissionSlipsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/phone-directory': {
       id: '/_authenticated/phone-directory'
       path: '/phone-directory'
@@ -693,6 +726,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VerifyTicketTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/permission-slips/$id': {
+      id: '/_authenticated/permission-slips/$id'
+      path: '/$id'
+      fullPath: '/permission-slips/$id'
+      preLoaderRoute: typeof AuthenticatedPermissionSlipsIdRouteImport
+      parentRoute: typeof AuthenticatedPermissionSlipsRoute
+    }
     '/_authenticated/print/$id': {
       id: '/_authenticated/print/$id'
       path: '/print/$id'
@@ -773,10 +813,25 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthenticatedPermissionSlipsRouteChildren {
+  AuthenticatedPermissionSlipsIdRoute: typeof AuthenticatedPermissionSlipsIdRoute
+}
+
+const AuthenticatedPermissionSlipsRouteChildren: AuthenticatedPermissionSlipsRouteChildren =
+  {
+    AuthenticatedPermissionSlipsIdRoute: AuthenticatedPermissionSlipsIdRoute,
+  }
+
+const AuthenticatedPermissionSlipsRouteWithChildren =
+  AuthenticatedPermissionSlipsRoute._addFileChildren(
+    AuthenticatedPermissionSlipsRouteChildren,
+  )
+
 interface AuthenticatedRouteChildren {
   AuthenticatedChangePasswordRoute: typeof AuthenticatedChangePasswordRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedNotificationsRoute: typeof AuthenticatedNotificationsRoute
+  AuthenticatedPermissionSlipsRoute: typeof AuthenticatedPermissionSlipsRouteWithChildren
   AuthenticatedPhoneDirectoryRoute: typeof AuthenticatedPhoneDirectoryRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
   AuthenticatedTripArchiveRoute: typeof AuthenticatedTripArchiveRoute
@@ -792,6 +847,8 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedChangePasswordRoute: AuthenticatedChangePasswordRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedNotificationsRoute: AuthenticatedNotificationsRoute,
+  AuthenticatedPermissionSlipsRoute:
+    AuthenticatedPermissionSlipsRouteWithChildren,
   AuthenticatedPhoneDirectoryRoute: AuthenticatedPhoneDirectoryRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
   AuthenticatedTripArchiveRoute: AuthenticatedTripArchiveRoute,

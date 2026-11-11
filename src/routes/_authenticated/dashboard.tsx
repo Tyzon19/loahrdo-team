@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
@@ -38,6 +38,11 @@ import type { EmailMessage } from "@/lib/types";
 import { FACEBOOK_URL, LOGO_URL } from "@/components/AuthLayout";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
+  beforeLoad: ({ context }) => {
+    if (context.viewer?.role === "department_head") {
+      throw redirect({ to: "/permission-slips" });
+    }
+  },
   head: () => ({
     meta: [
       { title: "LOA HRDO Desk | Lyceum of Alabang" },
@@ -64,7 +69,7 @@ type Service = {
   desc: string;
   icon: LucideIcon;
   tag: string;
-  to?: "/requests/new" | "/coe";
+  to?: "/requests/new" | "/coe" | "/permission-slips";
 };
 
 const SERVICES: Service[] = [
@@ -87,6 +92,7 @@ const SERVICES: Service[] = [
     desc: "File a pass slip for leaving campus during work hours.",
     icon: FolderClock,
     tag: "Attendance",
+    to: "/permission-slips",
   },
   {
     title: "Late & Absences",

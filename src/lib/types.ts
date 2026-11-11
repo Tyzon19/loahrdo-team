@@ -1,5 +1,6 @@
 export type Role =
   | "requisitioner"
+  | "department_head"
   | "transport_head"
   | "director"
   | "president"

@@ -836,3 +836,94 @@ export async function sendRegistrationOtpEmail(
   const mime = createMimeMessage(recipient, email.subject, email.text, email.html, logo);
   await sendMimeMessage(token, mime);
 }
+
+export async function sendPermissionSlipEmail(input: {
+  kind: "head_review" | "employee_approved" | "employee_rejected";
+  recipientName: string;
+  recipientEmail: string;
+  permissionId: string;
+  employeeName: string;
+  department: string;
+  requestedDate: string;
+  timeOut: string;
+  timeIn: string;
+  reason: string;
+  rejectionReason?: string;
+  attachment?: EmailAttachment;
+}): Promise<EmailDeliveryResult> {
+  try {
+    if (!validEmail(input.recipientEmail)) {
+      throw new AppError("The permission slip recipient email address is invalid.");
+    }
+    const token = await accessToken();
+    const siteUrl = siteUrlForEmail();
+    const actionPath = `/permission-slips/${encodeURIComponent(input.permissionId)}`;
+    const actionUrl = new URL(actionPath, siteUrl.origin).toString();
+    const subject =
+      input.kind === "head_review"
+        ? "Permission Slip — HRDO approval required"
+        : input.kind === "employee_approved"
+          ? "Your Permission Slip has been approved"
+          : "Your Permission Slip was rejected";
+    const message =
+      input.kind === "head_review"
+        ? `A Permission Slip from ${input.employeeName} is waiting for your review and signature.`
+        : input.kind === "employee_approved"
+          ? "Your Permission Slip has been approved by the HRDO Department Head. The softcopy is attached."
+          : `Your Permission Slip was rejected. Reason: ${input.rejectionReason ?? "Please review the request."}`;
+    const safe = {
+      recipientName: escapeHtml(input.recipientName),
+      employeeName: escapeHtml(input.employeeName),
+      department: escapeHtml(input.department),
+      requestedDate: escapeHtml(input.requestedDate),
+      timeOut: escapeHtml(input.timeOut),
+      timeIn: escapeHtml(input.timeIn),
+      reason: escapeHtml(input.reason),
+      message: escapeHtml(message),
+      actionUrl: escapeHtml(actionUrl),
+    };
+    const text = [
+      `Dear ${input.recipientName},`,
+      "",
+      message,
+      "",
+      `Employee: ${input.employeeName}`,
+      `Department: ${input.department}`,
+      `Date: ${input.requestedDate}`,
+      `Time Out: ${input.timeOut}`,
+      `Time In: ${input.timeIn}`,
+      `Reason: ${input.reason}`,
+      "",
+      `Open the Permission Slip: ${actionUrl}`,
+      "",
+      "Lyceum of Alabang Human Resource Development Office",
+    ].join("\n");
+    const html = `<!doctype html><html lang="en"><body style="margin:0;background:#f3f5f8;padding:32px 12px;font-family:Arial,sans-serif;color:#172033"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center"><table role="presentation" width="600" style="width:100%;max-width:600px;background:#fff;border:1px solid #e2e7ef;border-radius:8px"><tr><td style="padding:30px 32px"><img src="cid:${LOGO_CONTENT_ID}" width="190" alt="Lyceum of Alabang" style="display:block;max-width:100%;height:auto"><h1 style="margin:28px 0 12px;color:#1f3b68;font-size:22px">Permission Slip</h1><p>Dear ${safe.recipientName},</p><p>${safe.message}</p><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin:20px 0"><tr><td style="padding:8px;border-bottom:1px solid #e5e9f0;color:#687386">Name</td><td style="padding:8px;border-bottom:1px solid #e5e9f0;font-weight:700">${safe.employeeName}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #e5e9f0;color:#687386">Department</td><td style="padding:8px;border-bottom:1px solid #e5e9f0;font-weight:700">${safe.department}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #e5e9f0;color:#687386">Date</td><td style="padding:8px;border-bottom:1px solid #e5e9f0;font-weight:700">${safe.requestedDate}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #e5e9f0;color:#687386">Time</td><td style="padding:8px;border-bottom:1px solid #e5e9f0;font-weight:700">${safe.timeOut} — ${safe.timeIn}</td></tr><tr><td style="padding:8px;color:#687386;vertical-align:top">Reason</td><td style="padding:8px;font-weight:700">${safe.reason}</td></tr></table><p><a href="${safe.actionUrl}" style="display:inline-block;background:#1f3b68;color:#fff;padding:13px 22px;border-radius:5px;text-decoration:none;font-weight:700">${input.kind === "head_review" ? "Review Permission Slip" : "View Permission Slip"}</a></p><p style="margin-top:28px;color:#687386;font-size:12px">This is an automated notification from Lyceum of Alabang HRDO.</p></td></tr></table></td></tr></table></body></html>`;
+    const logo = await readFile(join(process.cwd(), "public", "loa-loading.png"));
+    const mime = createMimeMessage(
+      input.recipientEmail,
+      subject,
+      text,
+      html,
+      logo,
+      undefined,
+      undefined,
+      input.attachment ? [input.attachment] : [],
+    );
+    await sendMimeMessage(token, mime);
+    return { sent: true, delivered: 1, failed: 0 };
+  } catch (error) {
+    console.error(
+      `[email] Permission Slip email failed: ${error instanceof Error ? error.name : "unknown"}`,
+    );
+    return {
+      sent: false,
+      delivered: 0,
+      failed: 1,
+      message:
+        error instanceof AppError
+          ? error.message
+          : "The Permission Slip was saved, but its email could not be sent.",
+    };
+  }
+}
