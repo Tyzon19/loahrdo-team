@@ -91,7 +91,7 @@ function LoginPage() {
         : search.redirect && search.redirect !== "/login"
           ? search.redirect
           : "/dashboard";
-      window.location.assign(target);
+      await router.navigate({ href: target });
     } catch {
       setError("We couldn't sign you in. Check your connection and try again.");
     } finally {

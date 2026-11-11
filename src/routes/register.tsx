@@ -1,7 +1,7 @@
 import { createFileRoute, Link, redirect as routerRedirect } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
-import { Building2, Lock, Mail, User, UserPlus } from "lucide-react";
+import { Lock, Mail, User, UserPlus } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { LoadingScreen } from "@/components/app/LoadingPanel";
 import {
@@ -59,7 +59,6 @@ type Errors = {
       | "middleName"
       | "lastName"
       | "email"
-      | "department"
       | "password"
       | "confirm"
       | "code"
@@ -73,7 +72,6 @@ function RegisterPage() {
     middleName: "",
     lastName: "",
     email: search.email ?? "",
-    department: "",
     password: "",
     confirm: "",
   });
@@ -107,7 +105,6 @@ function RegisterPage() {
         data: {
           name: fullName,
           email: form.email,
-          department: form.department,
           password: form.password,
         },
       });
@@ -173,7 +170,6 @@ function RegisterPage() {
     const parsed = registerSchema.safeParse({
       name: fullName,
       email: form.email,
-      department: form.department,
       password: form.password,
     });
     if (!parsed.success) {
@@ -338,15 +334,6 @@ function RegisterPage() {
                 onChange={(event) => set("email", event.target.value)}
               />
               {fieldError("email")}
-              <Field
-                icon={Building2}
-                placeholder="Department or office"
-                autoComplete="organization"
-                required
-                value={form.department}
-                onChange={(event) => set("department", event.target.value)}
-              />
-              {fieldError("department")}
               <Field
                 icon={Lock}
                 type="password"

@@ -30,7 +30,7 @@ export function AuthShell({
           {children}
 
           <div className="module-login-footer">
-            <p>For inquiries and comments please send us a message at info@lyceumalabang.edu.ph.</p>
+            <p>For inquiries and comments please send us a message at https://www.facebook.com/lyceumhrdo.</p>
             <p>
               Copyright © 2026 Lyceum of Alabang.
               <br />

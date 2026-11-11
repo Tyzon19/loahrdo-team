@@ -53,7 +53,7 @@ export function AuthLayout({
         <h1 className="mb-6 text-xl font-bold uppercase text-primary">{title}</h1>
         {children}
         <div className="mt-14 space-y-3 text-sm text-muted-foreground">
-          <p>For inquiries and comments please send us a message at info@lyceumalabang.edu.ph.</p>
+          <p>For inquiries and comments please send us a message at https://www.facebook.com/lyceumhrdo</p>
           <p>
             Copyright © 2026 Lyceum of Alabang.
             <br />

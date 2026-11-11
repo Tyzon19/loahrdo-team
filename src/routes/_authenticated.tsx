@@ -11,6 +11,10 @@ import { AppShell } from "@/components/app/AppShell";
 import NotFound from "@/components/NotFound";
 import { SITE } from "@/lib/site";
 export const Route = createFileRoute("/_authenticated")({
+  // Authentication is resolved asynchronously from the session cookie. Keep the
+  // private app client-rendered so the first client pass cannot hydrate a
+  // server-rendered dashboard while the auth bootstrap is still pending.
+  ssr: false,
   beforeLoad: ({ context, location }) => {
     if (!context.viewer) {
       throw redirect({

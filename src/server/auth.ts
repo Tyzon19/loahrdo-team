@@ -519,7 +519,7 @@ export async function requestRegistrationOtp(input: unknown): Promise<{ sent: tr
       [
         email,
         data.name,
-        data.department,
+        "General",
         passwordHash,
         codeHash,
         sendNonce,
@@ -629,7 +629,7 @@ export async function verifyRegistrationOtp(
       await run(
         `INSERT INTO users (id, name, email, password_hash, role, department, must_change_password)
          VALUES (?, ?, ?, ?, 'requisitioner', ?, 0)`,
-        [userId, pending.name, email, pending.password_hash, pending.department],
+        [userId, pending.name, email, pending.password_hash, pending.department || "General"],
         conn,
       );
       if (hrdoAccount) {
