@@ -109,8 +109,7 @@ function PermissionLoginPage() {
           </SubmitButton>
 
           <p className="mt-4 text-sm text-muted-foreground">
-            Use the same institutional account you use in the other LOA systems. Signed-in users
-            without a Permission Slip role can file and track their own slips.{" "}
+            Use the same institutional account you use in the other LOA systems.{" "}
             <Link to="/register" className="font-semibold text-primary hover:underline">
               Need an account?
             </Link>

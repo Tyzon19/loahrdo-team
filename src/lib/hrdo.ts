@@ -234,6 +234,10 @@ export const COE_REQUESTOR_STATUS_LABELS: Record<CoeStatus, string> = {
   rejected: "Not approved",
 };
 
+export function isThirdPartyCoeRequest(note: string) {
+  return /(?:^|\| )Requestor type: Third-Party Verifier/i.test(note);
+}
+
 /** Shown on the requestor dashboard and request details for each status. */
 export const COE_STATUS_HINTS: Record<CoeStatus, string> = {
   pending: "HRDO has received your request and will review it shortly.",
@@ -381,12 +385,7 @@ export interface CoeRequest {
 
 /** Staff actions available for a request in its current state. */
 export type CoeAction =
-  | "process"
-  | "request_correction"
-  | "upload_document"
-  | "mark_ready"
-  | "release"
-  | "reject";
+  "process" | "request_correction" | "upload_document" | "mark_ready" | "release" | "reject";
 
 export function coeStaffActions(request: {
   status: CoeStatus;

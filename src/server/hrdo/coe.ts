@@ -51,7 +51,6 @@ const submitSchema = z.object({
   department: z
     .string()
     .trim()
-    .min(2, "Choose or enter a valid department or office.")
     .max(120, "Department must be 120 characters or fewer.")
     .optional()
     .default(""),
@@ -146,7 +145,6 @@ const resubmitSchema = submitSchema.extend({
   department: z
     .string()
     .trim()
-    .min(2, "Choose or enter a valid department or office.")
     .max(120, "Department must be 120 characters or fewer.")
     .optional()
     .default(""),
@@ -243,13 +241,14 @@ function isoFromMs(value: number | string | null | undefined) {
 }
 
 function mapRow(row: CoeRow, history: CoeHistoryEntry[] = []): CoeRequest {
+  const isThirdParty = /(?:^|\| )Requestor type: Third-Party Verifier/i.test(row.note ?? "");
   return {
     id: row.id,
     employeeId: row.employee_id,
     employeeName: row.employee_name,
     employeeEmail: row.employee_email,
     employeeNumber: row.employee_number,
-    department: row.department,
+    department: isThirdParty ? "" : row.department,
     purpose: row.purpose,
     note: row.note ?? "",
     copyType: row.copy_type,
@@ -473,8 +472,14 @@ export async function submitCoeRequest(input: unknown): Promise<CoeRequest> {
   if (viewer.isExternal && data.requestorType !== "third_party") {
     throw new AppError("External accounts can submit third-party COE verifications only.");
   }
+  if (data.requestorType === "internal" && data.department.trim().length < 2) {
+    throw new AppError("Choose or enter a valid department or office.");
+  }
   const id = crypto.randomUUID();
-  const department = data.department?.trim() || viewer.department.trim() || "General";
+  const department =
+    data.requestorType === "third_party"
+      ? ""
+      : data.department.trim() || viewer.department.trim() || "General";
 
   await withTransaction(async (conn) => {
     await run(
@@ -514,8 +519,13 @@ export async function resubmitCoeRequest(input: unknown): Promise<CoeRequest> {
       throw new AppError("This request is no longer waiting for corrections.");
     }
 
-    const department =
-      data.department?.trim() || row.department.trim() || viewer.department.trim() || "General";
+    const isThirdParty = /(?:^|\| )Requestor type: Third-Party Verifier/i.test(data.note);
+    if (!isThirdParty && data.department.trim().length < 2) {
+      throw new AppError("Choose or enter a valid department or office.");
+    }
+    const department = isThirdParty
+      ? ""
+      : data.department.trim() || row.department.trim() || viewer.department.trim() || "General";
 
     // The original submission timestamp and deadline are deliberately preserved.
     await run(

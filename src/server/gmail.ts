@@ -268,14 +268,10 @@ function createMimeMessage(
   }
 
   const mixedBoundary = `loa_mixed_${randomBytes(18).toString("hex")}`;
-  const parts = [
-    `To: ${recipient}`,
-    `Subject: ${encodedHeader(subject)}`,
-    "MIME-Version: 1.0",
-    ...threadHeaders,
-    `Content-Type: multipart/mixed; boundary="${mixedBoundary}"`,
+  const relatedParts = [
+    `Content-Type: multipart/related; boundary="${relatedBoundary}"`,
     "",
-    `--${mixedBoundary}`,
+    `--${relatedBoundary}`,
     `Content-Type: multipart/alternative; boundary="${alternativeBoundary}"`,
     "",
     `--${alternativeBoundary}`,
@@ -289,6 +285,30 @@ function createMimeMessage(
     "",
     base64(html),
     `--${alternativeBoundary}--`,
+  ];
+
+  if (logo) {
+    relatedParts.push(
+      `--${relatedBoundary}`,
+      'Content-Type: image/png; name="loa-loading.png"',
+      "Content-Transfer-Encoding: base64",
+      `Content-ID: <${LOGO_CONTENT_ID}>`,
+      'Content-Disposition: inline; filename="loa-loading.png"',
+      "",
+      base64(logo),
+    );
+  }
+  relatedParts.push(`--${relatedBoundary}--`, "");
+
+  const parts = [
+    `To: ${recipient}`,
+    `Subject: ${encodedHeader(subject)}`,
+    "MIME-Version: 1.0",
+    ...threadHeaders,
+    `Content-Type: multipart/mixed; boundary="${mixedBoundary}"`,
+    "",
+    `--${mixedBoundary}`,
+    ...relatedParts,
   ];
 
   for (const attachment of attachments) {

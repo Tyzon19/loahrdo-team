@@ -463,7 +463,10 @@ function PermissionSlipDetailPage() {
             type="button"
             variant="ghost"
             className="w-fit gap-2"
-            onClick={() => setReceiptOpen(false)}
+            onClick={() => {
+              setReceiptOpen(false);
+              void navigate({ search: { view: undefined } });
+            }}
           >
             <ArrowLeft className="h-4 w-4" />
             Back to Request Form

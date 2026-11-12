@@ -13,6 +13,9 @@ export interface SignatureValue {
   image: string;
   method: "drawn" | "uploaded";
 }
+
+const SIGNATURE_LINE_WIDTH = 4;
+
 function cropSignature(canvas: HTMLCanvasElement) {
   const context = canvas.getContext("2d");
   if (!context) return null;
@@ -88,6 +91,7 @@ export function SignaturePad({ onChange }: { onChange: (v: SignatureValue | null
   const [fullScreenOpen, setFullScreenOpen] = useState(false);
   const [fullScreenHasDrawing, setFullScreenHasDrawing] = useState(false);
   const [drawnPreview, setDrawnPreview] = useState<string | null>(null);
+  const [drawnHasInk, setDrawnHasInk] = useState(false);
   const [uploaded, setUploaded] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -122,7 +126,7 @@ export function SignaturePad({ onChange }: { onChange: (v: SignatureValue | null
       const ctx = c.getContext("2d");
       if (!ctx) return;
       ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-      ctx.lineWidth = 3;
+      ctx.lineWidth = SIGNATURE_LINE_WIDTH;
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
       ctx.strokeStyle = getComputedStyle(c).color;
@@ -170,11 +174,21 @@ export function SignaturePad({ onChange }: { onChange: (v: SignatureValue | null
     const c = canvas.current;
     clearCanvas(c);
     hasInk.current = false;
+    setDrawnHasInk(false);
     fullScreenHasInk.current = false;
     setFullScreenHasDrawing(false);
     setDrawnPreview(null);
     setUploaded(null);
     onChange(null);
+  };
+  const useDrawnSignature = () => {
+    const c = canvas.current;
+    if (!c || !hasInk.current) return;
+    const image = cropSignature(c);
+    if (!image) return;
+    setDrawnPreview(image);
+    setDrawnHasInk(false);
+    onChange({ image, method: "drawn" });
   };
   const clearFullScreen = () => {
     const c = fullScreenCanvas.current;
@@ -287,7 +301,7 @@ export function SignaturePad({ onChange }: { onChange: (v: SignatureValue | null
               onPointerDown={(e) => {
                 const target = canvas.current;
                 if (!target) return;
-                configureCanvas(target, 4);
+                configureCanvas(target, SIGNATURE_LINE_WIDTH);
                 drawing.current = true;
                 const p = pos(e, target);
                 const ctx = target.getContext("2d");
@@ -305,20 +319,27 @@ export function SignaturePad({ onChange }: { onChange: (v: SignatureValue | null
                 ctx.lineTo(p.x, p.y);
                 ctx.stroke();
                 hasInk.current = true;
+                setDrawnHasInk(true);
               }}
               onPointerUp={() => {
                 drawing.current = false;
-                const target = canvas.current;
-                if (hasInk.current && target) {
-                  const image = target.toDataURL("image/png");
-                  setDrawnPreview(image);
-                  onChange({ image, method: "drawn" });
-                }
               }}
             />
           )}
           <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
-            <span>{drawnPreview ? "Signature ready." : "Sign inside the box."}</span>
+            <span>
+              {drawnPreview
+                ? "Signature ready."
+                : drawnHasInk
+                  ? "Continue signing or use the signature when finished."
+                  : "Sign inside the box."}
+            </span>
+            {drawnHasInk && (
+              <Button type="button" size="sm" onClick={useDrawnSignature}>
+                <Check className="h-4 w-4" aria-hidden />
+                Use signature
+              </Button>
+            )}
             {drawnPreview && (
               <Button
                 type="button"
@@ -327,6 +348,7 @@ export function SignaturePad({ onChange }: { onChange: (v: SignatureValue | null
                 onClick={() => {
                   setDrawnPreview(null);
                   hasInk.current = false;
+                  setDrawnHasInk(false);
                   onChange(null);
                 }}
               >
@@ -378,7 +400,7 @@ export function SignaturePad({ onChange }: { onChange: (v: SignatureValue | null
                   onPointerDown={(e) => {
                     const target = fullScreenCanvas.current;
                     if (!target) return;
-                    configureCanvas(target, 5);
+                    configureCanvas(target, SIGNATURE_LINE_WIDTH);
                     fullScreenDrawing.current = true;
                     const p = pos(e, target);
                     const ctx = target.getContext("2d");

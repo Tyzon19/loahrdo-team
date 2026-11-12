@@ -120,7 +120,7 @@ function formatPhilippineDate(value: string) {
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat("en-PH", {
     day: "2-digit",
-    month: "short",
+    month: "long",
     year: "numeric",
     timeZone: "UTC",
   }).format(date);
@@ -173,9 +173,7 @@ function CoeRequestPage() {
   const requestor =
     search.requestor === "internal" || search.requestor === "third_party" ? search.requestor : null;
   const typeLocked = Boolean(hrdoViewer);
-  const initialRequestor = hrdoViewer?.isExternal
-    ? "third_party"
-    : (requestor ?? "internal");
+  const initialRequestor = hrdoViewer?.isExternal ? "third_party" : (requestor ?? "internal");
   const queryClient = useQueryClient();
   const [requestorType, setRequestorType] = useState<"internal" | "third_party" | null>(
     initialRequestor,
@@ -207,6 +205,7 @@ function CoeRequestPage() {
   const [subjectFirstName, setSubjectFirstName] = useState("");
   const [subjectMiddleName, setSubjectMiddleName] = useState("");
   const [subjectLastName, setSubjectLastName] = useState("");
+  const [subjectTitle, setSubjectTitle] = useState("");
   const [subjectPosition, setSubjectPosition] = useState("");
   const [subjectDob, setSubjectDob] = useState("");
   const [employmentEndDate, setEmploymentEndDate] = useState("");
@@ -258,6 +257,7 @@ function CoeRequestPage() {
           : [
               `Requestor type: Third-Party Verifier`,
               `Purpose of verification: ${purpose.trim()}`,
+              `Subject title: ${subjectTitle}`,
               `Subject position: ${subjectPosition}`,
               `Verifier company: ${verifierCompany || "Not provided"}`,
               `Authorized representative: ${verifierName || "Not provided"}`,
@@ -284,7 +284,7 @@ function CoeRequestPage() {
           ? department === "Other"
             ? customDepartment.trim()
             : department.trim()
-          : "Third-party verification";
+          : "";
 
       return unwrap(
         submitCoeRequestFn({
@@ -335,6 +335,7 @@ function CoeRequestPage() {
       setSubjectFirstName("");
       setSubjectMiddleName("");
       setSubjectLastName("");
+      setSubjectTitle("");
       setSubjectPosition("");
       setSubjectDob("");
       setEmploymentEndDate("");
@@ -452,6 +453,7 @@ function CoeRequestPage() {
         if (!employmentStatus) return "Select your employment status.";
       }
       if (requestorType === "third_party") {
+        if (!subjectTitle) return "Select the former employee's title.";
         if (!verifierCompany.trim()) return "Enter the verifying company or agency name.";
         if (!verifierName.trim()) return "Enter the authorized representative name.";
         if (!verifierEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(verifierEmail)) {
@@ -465,7 +467,8 @@ function CoeRequestPage() {
         if (!subjectPosition.trim()) return "Enter the former employee's job title or position.";
         if (!subjectDob) return "Enter the hiring date.";
         if (subjectDob > dateRequested) return "Date hired cannot be in the future.";
-        if (!currentlyEmployed && !employmentEndDate) return "Enter the last day of employment or select Currently employed.";
+        if (!currentlyEmployed && !employmentEndDate)
+          return "Enter the last day of employment or select Currently employed.";
         if (!currentlyEmployed && employmentEndDate < subjectDob) {
           return "Last day of employment must be on or after the hiring date.";
         }
@@ -857,6 +860,23 @@ function CoeRequestPage() {
                           </div>
                           <div className="coe-fields coe-fields-verification">
                             <div>
+                              <Label htmlFor="subject-title">
+                                Title <span className="text-destructive">*</span>
+                              </Label>
+                              <Select value={subjectTitle} onValueChange={setSubjectTitle}>
+                                <SelectTrigger id="subject-title" className="mt-1">
+                                  <SelectValue placeholder="Select title" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {COE_TITLES.map((title) => (
+                                    <SelectItem key={title} value={title}>
+                                      {title}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
                               <Label htmlFor="subject-first-name">
                                 First Name <span className="text-destructive">*</span>
                               </Label>
@@ -935,7 +955,9 @@ function CoeRequestPage() {
                                 max={dateRequested}
                                 value={employmentEndDate}
                                 onChange={(event) => setEmploymentEndDate(event.target.value)}
-                                disabled={currentlyEmployed || !subjectDob || subjectDob > dateRequested}
+                                disabled={
+                                  currentlyEmployed || !subjectDob || subjectDob > dateRequested
+                                }
                                 required={!currentlyEmployed}
                               />
                               <label className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
@@ -964,7 +986,8 @@ function CoeRequestPage() {
                           <div className="coe-fields coe-fields-verification coe-fields-verification-pair">
                             <div>
                               <Label htmlFor="verifier-company">
-                                Requesting Company / Agency Name <span className="text-destructive">*</span>
+                                Requesting Company / Agency Name{" "}
+                                <span className="text-destructive">*</span>
                               </Label>
                               <Input
                                 id="verifier-company"
@@ -976,7 +999,8 @@ function CoeRequestPage() {
                             </div>
                             <div>
                               <Label htmlFor="verifier-name">
-                                Authorized Representative Name <span className="text-destructive">*</span>
+                                Authorized Representative Name{" "}
+                                <span className="text-destructive">*</span>
                               </Label>
                               <Input
                                 id="verifier-name"
@@ -1021,8 +1045,7 @@ function CoeRequestPage() {
                               <p
                                 id="verifier-contact-help"
                                 className="mt-1 text-xs text-muted-foreground"
-                              >
-                              </p>
+                              ></p>
                             </div>
                           </div>
                         </div>
@@ -1201,11 +1224,11 @@ function CoeRequestPage() {
                     </div>
                     <div>
                       <dt className="text-muted-foreground">Date needed</dt>
-                    <dd className="font-medium">{formatPhilippineDate(dateNeeded)}</dd>
+                      <dd className="font-medium">{formatPhilippineDate(dateNeeded)}</dd>
                     </div>
                     <div>
                       <dt className="text-muted-foreground">Date requested</dt>
-                    <dd className="font-medium">{formatPhilippineDate(dateRequested)}</dd>
+                      <dd className="font-medium">{formatPhilippineDate(dateRequested)}</dd>
                     </div>
                     <div>
                       <dt className="text-muted-foreground">Copy / delivery</dt>
@@ -1261,7 +1284,7 @@ function CoeRequestPage() {
                         <div>
                           <dt className="text-muted-foreground">Employee to verify</dt>
                           <dd className="font-medium">
-                            {subjectName} · {subjectPosition}
+                            {subjectTitle}. {subjectName} · {subjectPosition}
                           </dd>
                         </div>
                         <div>

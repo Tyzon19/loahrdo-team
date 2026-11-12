@@ -313,7 +313,10 @@ describe("Gmail workflow delivery", () => {
 
     expect(result).toEqual({ sent: true, delivered: 1, failed: 0 });
     expect(sentMime).toContain("To: alex@example.edu");
-    expect(sentMime).toContain('Content-Disposition: attachment; filename="permission-slip-permission-1.png"');
+    expect(sentMime).toContain(`Content-ID: <loa-header-logo>`);
+    expect(sentMime).toContain(
+      'Content-Disposition: attachment; filename="permission-slip-permission-1.png"',
+    );
     expect(sentMime).toContain(Buffer.from("permission-receipt").toString("base64"));
   });
 });

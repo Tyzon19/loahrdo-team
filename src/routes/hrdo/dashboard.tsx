@@ -15,10 +15,7 @@ import { LoadingPanel } from "@/components/app/LoadingPanel";
 import { PageHeader, Section } from "@/components/app/PageHeader";
 import { CoeSummaryCards, type CoeSummaryCard } from "@/components/hrdo/CoeSummaryCards";
 import { CoeRequestTable } from "@/components/hrdo/CoeRequestTable";
-import {
-  listAllCoeRequestsFn,
-  searchStaffCoeRequestsFn,
-} from "@/server-functions";
+import { listAllCoeRequestsFn, searchStaffCoeRequestsFn } from "@/server-functions";
 import { unwrap } from "@/lib/api";
 import { hrCoeSummary, isHrdoStaffRole } from "@/lib/hrdo";
 import { SITE } from "@/lib/site";
@@ -184,7 +181,7 @@ function HrDashboard() {
         title="COE Request Management"
         description="Review requests, monitor deadlines, and manage document releases."
         actions={
-          <Button asChild size="lg">
+          <Button asChild variant="outline">
             <Link to="/hrdo/requests">
               <FileBadge className="h-4 w-4" aria-hidden /> Open COE Requests
             </Link>
@@ -226,7 +223,13 @@ function HrDashboard() {
               </Link>
             }
           >
-            <div className="mb-4 rounded-lg border bg-muted/20 p-3 sm:p-4">
+            <div className="mb-5 border-y py-4">
+              <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+                <p className="text-sm font-medium text-foreground">Find a request</p>
+                <p className="text-xs text-muted-foreground">
+                  Search, filter, and sort the current queue.
+                </p>
+              </div>
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <label className="grid gap-1.5 text-xs font-medium text-muted-foreground md:col-span-2 xl:col-span-2">
                   Search requests
@@ -367,49 +370,49 @@ function HrDashboard() {
               )}
             </div>
 
-              {requests.isPending || searchResults.isPending ? (
-                <LoadingPanel label="Loading COE requests" rows={6} />
-              ) : searchResults.isError ? (
-                <LoadError
-                  message="Check your connection and try again."
-                  onRetry={() => void searchResults.refetch()}
+            {requests.isPending || searchResults.isPending ? (
+              <LoadingPanel label="Loading COE requests" rows={6} />
+            ) : searchResults.isError ? (
+              <LoadError
+                message="Check your connection and try again."
+                onRetry={() => void searchResults.refetch()}
+              />
+            ) : (
+              <>
+                <CoeRequestTable
+                  requests={visible}
+                  audience="staff"
+                  empty={
+                    activeFilters || queue !== "all"
+                      ? "No COE requests match these filters."
+                      : "No COE requests have been submitted yet."
+                  }
                 />
-              ) : (
-                <>
-                  <CoeRequestTable
-                    requests={visible}
-                    audience="staff"
-                    empty={
-                      activeFilters || queue !== "all"
-                        ? "No COE requests match these filters."
-                        : "No COE requests have been submitted yet."
-                    }
-                  />
-                  {pages > 1 && (
-                    <div className="mt-3 flex items-center justify-end gap-2 text-sm">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={currentPage === 0}
-                        onClick={() => setPage(currentPage - 1)}
-                      >
-                        Previous
-                      </Button>
-                      <span>
-                        Page {currentPage + 1} of {pages}
-                      </span>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={currentPage >= pages - 1}
-                        onClick={() => setPage(currentPage + 1)}
-                      >
-                        Next
-                      </Button>
-                    </div>
-                  )}
-                </>
-              )}
+                {pages > 1 && (
+                  <div className="mt-3 flex items-center justify-end gap-2 text-sm">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={currentPage === 0}
+                      onClick={() => setPage(currentPage - 1)}
+                    >
+                      Previous
+                    </Button>
+                    <span>
+                      Page {currentPage + 1} of {pages}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={currentPage >= pages - 1}
+                      onClick={() => setPage(currentPage + 1)}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
           </Section>
         </>
       )}

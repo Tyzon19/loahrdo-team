@@ -69,18 +69,16 @@ import {
   coeRequestsCompensation,
   coeReference,
   coeStaffActions,
+  isThirdPartyCoeRequest,
   type CoeAction,
   type CoeCopyType,
   type CoeRequest,
   type CoeStatus,
 } from "@/lib/hrdo";
-import { fmtDateTime } from "@/lib/format";
+import { fmtDate, fmtDateTime } from "@/lib/format";
 import { SITE } from "@/lib/site";
 import { SignaturePad, type SignatureValue } from "@/components/app/SignaturePad";
-import {
-  COE_PURPOSE_OPTIONS,
-  COE_PURPOSE_OTHER,
-} from "@/lib/coe-form";
+import { COE_PURPOSE_OPTIONS, COE_PURPOSE_OTHER } from "@/lib/coe-form";
 
 export const Route = createFileRoute("/hrdo/coe_/$id")({
   head: ({ params }) => ({
@@ -129,12 +127,7 @@ const ACTION_SUCCESS: Record<ActionPayload["kind"], string> = {
 };
 
 /** The one action we show as the big primary button, in the order work normally happens. */
-const PRIMARY_ORDER: CoeAction[] = [
-  "process",
-  "upload_document",
-  "mark_ready",
-  "release",
-];
+const PRIMARY_ORDER: CoeAction[] = ["process", "upload_document", "mark_ready", "release"];
 
 function normalizePurposeChoice(value: string) {
   return COE_PURPOSE_OPTIONS.includes(value as (typeof COE_PURPOSE_OPTIONS)[number])
@@ -182,6 +175,16 @@ function requestEmploymentDate(note: string, label: string) {
   return value.toLowerCase() === "present" || value.toLowerCase() === "not provided" ? "" : value;
 }
 
+function formatMetadataDate(label: string, value: string) {
+  if (
+    !/^(?:Date requested|Date needed|Date hired|Employment end date)$/i.test(label) ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(value)
+  ) {
+    return value;
+  }
+  return fmtDate(value);
+}
+
 function todayISO() {
   // en-CA gives YYYY-MM-DD in the viewer's local time zone (not UTC).
   return new Date().toLocaleDateString("en-CA");
@@ -198,7 +201,8 @@ function safeWords(amount: string) {
 function staffHint(status: CoeStatus) {
   const hints: Record<CoeStatus, string> = {
     pending: "Opening this request will notify the requestor that HRDO has viewed it.",
-    under_review: "The requestor has been notified that HRDO viewed the request. Start processing when ready.",
+    under_review:
+      "The requestor has been notified that HRDO viewed the request. Start processing when ready.",
     correction_requested: "Waiting for the employee to submit the corrected details.",
     processing:
       "Prepare and sign the COE, then upload it. HRDO will send the soft copy and show the pickup step when needed.",
@@ -437,7 +441,9 @@ function CoeDetailPage() {
       await queryClient.invalidateQueries({ queryKey: ["coe"] });
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "We couldn't mark this request as viewed.");
+      toast.error(
+        error instanceof Error ? error.message : "We couldn't mark this request as viewed.",
+      );
     },
   });
 
@@ -545,7 +551,7 @@ function CoeDetailPage() {
   const actions: CoeAction[] = isStaff ? coeStaffActions(request) : [];
   const canDownload = coeCanDownloadDocument(request, audience);
   const formattedNote = formatRequestNote(request.note);
-  const isThirdPartyVerifier = /(?:^|\| )Requestor type: Third-Party Verifier/i.test(request.note);
+  const isThirdPartyVerifier = isThirdPartyCoeRequest(request.note);
   const includesCompensation = coeRequestsCompensation(request.note);
   const viewerName = hrdoViewer.name;
   const isOriginalCopy = request.copyType === "original";
@@ -991,9 +997,22 @@ function CoeDetailPage() {
             <dl>
               <RowGroup title="Requestor" />
               <Row label="Name">{request.employeeName}</Row>
+              <Row label="Requestor type">
+                <span
+                  className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${
+                    isThirdPartyVerifier
+                      ? "border-amber-300 bg-amber-50 text-amber-800"
+                      : "border-blue-300 bg-blue-50 text-blue-800"
+                  }`}
+                >
+                  {isThirdPartyVerifier ? "External / former employee" : "Internal employee"}
+                </span>
+              </Row>
               <Row label="Employee ID">{request.employeeNumber || "—"}</Row>
               <Row label="Email address">{request.employeeEmail}</Row>
-              <Row label="Department / office">{request.department || "—"}</Row>
+              {!isThirdPartyVerifier && (
+                <Row label="Department / office">{request.department || "—"}</Row>
+              )}
 
               <RowGroup title="Request" />
               <Row label="Purpose">{request.purpose}</Row>
@@ -1008,7 +1027,7 @@ function CoeDetailPage() {
                   <RowGroup title="Employment details" />
                   {formattedNote.fields.map(([label, value]) => (
                     <Row key={label} label={label}>
-                      {value}
+                      {formatMetadataDate(label, value)}
                     </Row>
                   ))}
                 </>

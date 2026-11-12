@@ -37,7 +37,7 @@ export function CoeSummaryCards({
   return (
     <div
       className={cn(
-        "mb-4 grid gap-2 sm:gap-3",
+        "mb-5 grid overflow-hidden rounded-lg border bg-card shadow-xs",
         columns === 6
           ? "grid-cols-2 sm:grid-cols-3 xl:grid-cols-6"
           : columns === 5
@@ -51,18 +51,18 @@ export function CoeSummaryCards({
         const active = activeKey === card.key;
         const content = (
           <>
-            <span className="block break-words text-[10px] font-medium uppercase leading-tight tracking-wide text-muted-foreground sm:text-xs">
+            <span className="block break-words text-[10px] font-medium leading-tight text-muted-foreground sm:text-xs">
               {card.label}
             </span>
             <span
               className={cn(
-                "mt-1 block break-words text-xl font-semibold tabular-nums sm:text-2xl",
+                "mt-1 block break-words text-2xl font-semibold tabular-nums tracking-tight sm:text-[1.75rem]",
                 VALUE_TONE[card.tone ?? "default"],
               )}
             >
               {loading ? "—" : card.value}
             </span>
-            <span className="mt-1 block break-words text-[10px] leading-tight text-muted-foreground sm:text-xs">
+            <span className="mt-1 block break-words text-[10px] leading-tight text-muted-foreground sm:text-[11px]">
               {card.hint}
             </span>
           </>
@@ -70,7 +70,10 @@ export function CoeSummaryCards({
 
         if (!onSelect) {
           return (
-            <div key={card.key} className="panel min-w-0 p-3 sm:p-4">
+            <div
+              key={card.key}
+              className="min-w-0 border-b p-3 transition-colors last:border-b-0 sm:border-b-0 sm:border-r sm:p-4 sm:last:border-r-0"
+            >
               {content}
             </div>
           );
@@ -84,8 +87,8 @@ export function CoeSummaryCards({
             aria-pressed={active}
             aria-label={`${card.label}: ${loading ? "loading" : card.value}. Show these requests.`}
             className={cn(
-              "panel block h-full w-full p-3 text-left transition-colors hover:bg-muted/60 sm:p-4",
-              active && "border-primary/50 ring-1 ring-primary/30",
+              "block h-full w-full border-b p-3 text-left transition-colors hover:bg-muted/50 active:bg-muted/70 sm:border-b-0 sm:border-r sm:p-4 sm:last:border-r-0",
+              active && "bg-accent/60",
             )}
           >
             {content}
