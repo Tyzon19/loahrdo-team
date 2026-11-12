@@ -70,6 +70,22 @@ export const registerSchema = z.object({
   password,
 });
 
+const namePart = (label: string, required: boolean) => {
+  const schema = z
+    .string()
+    .trim()
+    .max(60, `${label} must be 60 characters or fewer.`)
+    .regex(/^[\p{L}\p{M}.'\-\s]*$/u, "Use letters, spaces, periods, apostrophes or hyphens only.");
+  return required ? schema.min(1, `Enter your ${label.toLowerCase()}.`) : schema;
+};
+
+/** Split name fields used when a Google account completes its profile. */
+export const namePartsSchema = z.object({
+  firstName: namePart("First name", true),
+  middleName: namePart("Middle name", false),
+  lastName: namePart("Last name", true),
+});
+
 export const registrationOtpSchema = z.object({
   email: email.refine(institutionalEmailAllowed, "Use your @lyceumalabang.edu.ph address."),
   code: z.string().regex(/^\d{6}$/, "Enter the six-digit verification code."),

@@ -193,6 +193,10 @@ export const Route = createFileRoute("/api/auth/google/callback")({
               // ignore malformed next target and keep the HRDO dashboard as the fallback.
             }
 
+            if (mode === "hrdo" && account.isNew) {
+              return redirect("/hrdo/complete-profile", [...cleared, sessionCookie]);
+            }
+
             return redirect(
               account.mustChangePassword ? "/hrdo/change-password" : safeSignInNext(nextTarget),
               [...cleared, sessionCookie],
@@ -223,10 +227,13 @@ export const Route = createFileRoute("/api/auth/google/callback")({
             encryptedCookieRequired() || secure ? "; Secure" : ""
           }`;
 
-          return redirect(requisitionerAccount.mustChangePassword ? "/change-password" : next, [
-            ...cleared,
-            sessionCookie2,
-          ]);
+          const target = requisitionerAccount.isNew
+            ? "/complete-profile"
+            : requisitionerAccount.mustChangePassword
+              ? "/change-password"
+              : next;
+
+          return redirect(target, [...cleared, sessionCookie2]);
         } catch (error) {
           console.error(
             `[google-signin] Callback failed: ${error instanceof Error ? error.message : "unknown error"}`,

@@ -53,6 +53,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     return {
       viewer: bootstrap.viewer,
       hrdoViewer: bootstrap.hrdoViewer,
+      permissionViewer: bootstrap.permissionViewer,
       analytics: bootstrap.analytics,
     };
   },
@@ -61,7 +62,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     return {
       meta: [
         { charSet: "utf-8" },
-        { name: "viewport", content: "width=device-width, initial-scale=1" },
+        {
+          name: "viewport",
+          content: "width=device-width, initial-scale=1, viewport-fit=cover",
+        },
         {
           title: isNotFound
             ? `Page not found — ${SITE.name}`
@@ -70,6 +74,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         { name: "description", content: SITE.description },
         { name: "robots", content: isNotFound ? "noindex, nofollow" : "index, follow" },
         { name: "theme-color", content: "#ffffff" },
+        { name: "mobile-web-app-capable", content: "yes" },
+        { name: "apple-mobile-web-app-capable", content: "yes" },
+        { name: "apple-mobile-web-app-status-bar-style", content: "default" },
         { property: "og:site_name", content: SITE.name },
         { property: "og:type", content: "website" },
         { property: "og:title", content: `${SITE.name} — ${SITE.institution}` },
@@ -89,6 +96,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       links: [
         { rel: "stylesheet", href: appCss },
         { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+        { rel: "manifest", href: "/manifest.webmanifest" },
+        { rel: "icon", href: "/pwa-icon.svg", type: "image/svg+xml" },
+        { rel: "apple-touch-icon", href: "/pwa-icon-192.png" },
         { rel: "preconnect", href: "https://fonts.googleapis.com" },
         { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
         {
@@ -126,6 +136,14 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient, analytics } = Route.useRouteContext();
+
+  useEffect(() => {
+    if ("serviceWorker" in navigator && import.meta.env.PROD) {
+      void navigator.serviceWorker.register("/sw.js").catch((error: unknown) => {
+        if (import.meta.env.DEV) console.error("Service worker registration failed", error);
+      });
+    }
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

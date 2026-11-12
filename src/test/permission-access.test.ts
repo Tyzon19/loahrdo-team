@@ -1,22 +1,47 @@
 import { describe, expect, it } from "vitest";
-import { isPermissionHead, PERMISSION_HEAD_EMAIL } from "@/lib/permission-access";
+import {
+  isPermissionHead,
+  permissionRoleFor,
+  PERMISSION_HEAD_EMAIL,
+  type PermissionViewer,
+} from "@/lib/permission-access";
+
+function viewer(overrides: Partial<PermissionViewer> = {}): PermissionViewer {
+  return {
+    id: "8d1f2f58-6a1b-4f2e-9c6f-1f0d2f0a9b11",
+    name: "HRDO Director",
+    email: PERMISSION_HEAD_EMAIL,
+    role: "director",
+    department: "Human Resources Development Office",
+    ...overrides,
+  };
+}
 
 describe("Permission Slip access", () => {
-  it("recognizes the designated HRDO director even when the account role is director", () => {
-    expect(
-      isPermissionHead({
-        email: PERMISSION_HEAD_EMAIL,
-        role: "director",
-      }),
-    ).toBe(true);
+  it("gives the designated HRDO director approval powers in this system", () => {
+    expect(permissionRoleFor({ email: PERMISSION_HEAD_EMAIL, role: "department_head" })).toBe(
+      "director",
+    );
+    expect(permissionRoleFor({ email: PERMISSION_HEAD_EMAIL, role: "requisitioner" })).toBe(
+      "director",
+    );
   });
 
-  it("keeps unrelated directors out of the Permission Slip approval queue", () => {
+  it("treats every other institutional account as an ordinary employee", () => {
     expect(
-      isPermissionHead({
-        email: "director@lyceumalabang.edu.ph",
-        role: "director",
+      permissionRoleFor({
+        email: "transport.head@lyceumalabang.edu.ph",
+        role: "transport_head",
       }),
-    ).toBe(false);
+    ).toBe("employee");
+    expect(
+      permissionRoleFor({ email: "employee@lyceumalabang.edu.ph", role: "requisitioner" }),
+    ).toBe("employee");
+  });
+
+  it("only the director profile can review slips", () => {
+    expect(isPermissionHead(viewer())).toBe(true);
+    expect(isPermissionHead(viewer({ role: "employee" }))).toBe(false);
+    expect(isPermissionHead(null)).toBe(false);
   });
 });

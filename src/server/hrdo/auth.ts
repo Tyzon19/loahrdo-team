@@ -15,10 +15,12 @@ import {
 } from "@tanstack/react-start/server";
 import type { RowDataPacket } from "mysql2/promise";
 import type { HrdoRole, HrdoViewer } from "@/lib/hrdo";
+import { joinFullName } from "@/lib/name";
 import {
   changePasswordSchema,
   institutionalEmailAllowed,
   loginSchema,
+  namePartsSchema,
   normaliseEmail,
   passwordIssues,
   profileSchema,
@@ -150,6 +152,11 @@ export interface HrdoGoogleSignInAccount {
   mustChangePassword: boolean;
 }
 
+export interface HrdoGoogleSignInResult extends HrdoGoogleSignInAccount {
+  /** True when this sign-in created the account, so the name must be completed. */
+  isNew: boolean;
+}
+
 export async function hrdoGoogleSignInAccount(
   email: string,
 ): Promise<HrdoGoogleSignInAccount | null> {
@@ -166,7 +173,7 @@ export async function hrdoGoogleSignInAccount(
 export async function ensureHrdoGoogleAccount(
   email: string,
   allowExternal = false,
-): Promise<HrdoGoogleSignInAccount> {
+): Promise<HrdoGoogleSignInResult> {
   const normalised = normaliseEmail(email);
   const existing = await hrdoGoogleSignInAccount(normalised);
   if (existing) {
@@ -182,7 +189,7 @@ export async function ensureHrdoGoogleAccount(
         existing.id,
       ]);
     }
-    return existing;
+    return { ...existing, isNew: false };
   }
 
   if (!allowExternal && !institutionalEmailAllowed(normalised)) {
@@ -205,7 +212,7 @@ export async function ensureHrdoGoogleAccount(
     [id, name, normalised, DUMMY_HASH, allowExternal ? 1 : 0, department],
   );
 
-  return { id, role: "employee", mustChangePassword: false };
+  return { id, role: "employee", mustChangePassword: false, isNew: true };
 }
 
 async function startSession(userId: string) {
@@ -304,7 +311,7 @@ export async function hrdoLogin(input: unknown): Promise<{ mustChangePassword: b
       `SELECT id, name, email, password_hash, department, must_change_password,
               (locked_until IS NOT NULL AND locked_until > NOW()) AS is_locked,
               TIMESTAMPDIFF(MINUTE, NOW(), locked_until) AS lock_minutes
-       FROM users WHERE email = ? AND role = 'requisitioner' LIMIT 1`,
+       FROM users WHERE email = ? LIMIT 1`,
       [email],
     );
     const requisitioner = requisitionerRows[0];
@@ -363,7 +370,7 @@ export async function hrdoLogin(input: unknown): Promise<{ mustChangePassword: b
   if (!valid) {
     if (user.role === "employee") {
       const requisitionerRows = await all<Array<RowDataPacket & { password_hash: string }>>(
-        "SELECT password_hash FROM users WHERE email = ? AND role = 'requisitioner' LIMIT 1",
+        "SELECT password_hash FROM users WHERE email = ? LIMIT 1",
         [email],
       );
       const requisitioner = requisitionerRows[0];
@@ -767,4 +774,25 @@ export async function hrdoUpdateProfile(input: unknown): Promise<HrdoViewer> {
     }
   });
   return { ...current, name: data.name, department: data.department };
+}
+
+/** Saves the split name collected from first-time HRDO Google sign-ins. */
+export async function hrdoCompleteProfileName(input: unknown): Promise<HrdoViewer> {
+  const current = await requireHrdoViewer();
+  const data = parseInput(namePartsSchema, input);
+  const name = joinFullName(data);
+  if (name.length < 2) throw new AppError("Enter your full name.");
+  if (name.length > 120) throw new AppError("Names must be 120 characters or fewer.");
+
+  await withTransaction(async (conn) => {
+    await run("UPDATE hrdo_users SET name = ? WHERE id = ?", [name, current.id], conn);
+    if (current.role === "employee") {
+      await run(
+        "UPDATE users SET name = ? WHERE email = ? AND role = 'requisitioner'",
+        [name, current.email],
+        conn,
+      );
+    }
+  });
+  return { ...current, name };
 }

@@ -33,6 +33,21 @@ CREATE TABLE IF NOT EXISTS sessions (
   CONSTRAINT sessions_user_fk FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS permission_sessions (
+  id CHAR(36) NOT NULL,
+  user_id CHAR(36) NOT NULL,
+  token_hash CHAR(64) NOT NULL,
+  user_agent VARCHAR(255) NOT NULL DEFAULT '',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  last_seen_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expires_at DATETIME NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY permission_sessions_token_uq (token_hash),
+  KEY permission_sessions_user_idx (user_id),
+  KEY permission_sessions_expiry_idx (expires_at),
+  CONSTRAINT permission_sessions_user_fk FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS permission_slips (
   id CHAR(36) NOT NULL,
   employee_id CHAR(36) NOT NULL,
@@ -55,9 +70,8 @@ CREATE TABLE IF NOT EXISTS permission_slips (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY permission_employee_idx (employee_id, requested_at),
-  KEY permission_status_idx (status, department),
-  CONSTRAINT permission_employee_fk FOREIGN KEY (employee_id) REFERENCES users (id) ON DELETE CASCADE,
-  CONSTRAINT permission_head_fk FOREIGN KEY (department_head_id) REFERENCES users (id) ON DELETE SET NULL
+  KEY permission_employee_email_idx (employee_email, requested_at),
+  KEY permission_status_idx (status, department)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS permission_history (
@@ -71,8 +85,7 @@ CREATE TABLE IF NOT EXISTS permission_history (
   happened_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY permission_history_idx (permission_slip_id, happened_at),
-  CONSTRAINT permission_history_slip_fk FOREIGN KEY (permission_slip_id) REFERENCES permission_slips (id) ON DELETE CASCADE,
-  CONSTRAINT permission_history_actor_fk FOREIGN KEY (actor_id) REFERENCES users (id) ON DELETE SET NULL
+  CONSTRAINT permission_history_slip_fk FOREIGN KEY (permission_slip_id) REFERENCES permission_slips (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS registration_otps (

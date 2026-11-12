@@ -15,10 +15,12 @@ import {
 } from "@tanstack/react-start/server";
 import type { RowDataPacket } from "mysql2/promise";
 import type { Role, Viewer } from "@/lib/types";
+import { joinFullName } from "@/lib/name";
 import {
   changePasswordSchema,
   institutionalEmailAllowed,
   loginSchema,
+  namePartsSchema,
   normaliseEmail,
   passwordIssues,
   profileSchema,
@@ -32,6 +34,12 @@ import { all, run, withTransaction } from "./db";
 import { AppError, isDuplicateKey, parseInput } from "@/lib/errors";
 import { DUMMY_HASH, hashPassword, verifyPassword } from "./password";
 import { sendRegistrationOtpEmail } from "./gmail";
+import {
+  clearLinkedLock,
+  findLinkedAccount,
+  linkUserProfile,
+  recordLinkedFailure,
+} from "./identity";
 
 export const SESSION_COOKIE_NAME = "loa_session";
 
@@ -102,10 +110,19 @@ function mapViewer(row: UserRow): Viewer {
     id: row.id,
     name: row.name,
     email: row.email,
-    role: row.role,
+    // `department_head` is a Permission Slip role. The vehicle trip ticket has
+    // no duty for it, so the same account acts as an ordinary requester here.
+    role: row.role === "department_head" ? "requisitioner" : row.role,
     department: row.department,
     mustChangePassword: Boolean(row.must_change_password),
   };
+}
+
+function lockError(row: { lock_minutes?: number | null }) {
+  const minutes = Math.max(1, Number(row.lock_minutes ?? LOCK_MINUTES));
+  return new AppError(
+    `Too many failed sign-in attempts. Try again in ${minutes} minute${minutes === 1 ? "" : "s"}.`,
+  );
 }
 
 function cookieOptions(maxAge: number) {
@@ -148,6 +165,11 @@ export interface GoogleSignInAccount {
   mustChangePassword: boolean;
 }
 
+export interface GoogleRequisitionerSignInAccount extends GoogleSignInAccount {
+  /** True when this sign-in created the account, so the name must be completed. */
+  isNew: boolean;
+}
+
 /** Looks up an account for Google sign-in without starting a session. */
 export async function googleSignInAccount(email: string): Promise<GoogleSignInAccount | null> {
   const rows = await all<UserRow[]>(
@@ -162,10 +184,10 @@ export async function googleSignInAccount(email: string): Promise<GoogleSignInAc
 
 export async function ensureGoogleRequisitionerAccount(
   email: string,
-): Promise<GoogleSignInAccount> {
+): Promise<GoogleRequisitionerSignInAccount> {
   const normalised = normaliseEmail(email);
   const existing = await googleSignInAccount(normalised);
-  if (existing) return existing;
+  if (existing) return { ...existing, isNew: false };
 
   if (!institutionalEmailAllowed(normalised)) {
     throw new AppError("Use your official Lyceum of Alabang email address.");
@@ -183,7 +205,7 @@ export async function ensureGoogleRequisitionerAccount(
     [id, name, normalised, DUMMY_HASH],
   );
 
-  return { id, role: "requisitioner", mustChangePassword: true };
+  return { id, role: "requisitioner", mustChangePassword: true, isNew: true };
 }
 
 function clearSessionCookie() {
@@ -245,73 +267,30 @@ export async function login(input: unknown): Promise<{ mustChangePassword: boole
   );
   const invalid = new AppError("Incorrect email or password.");
 
-  let user = rows[0];
+  const user = rows[0];
+
   if (!user) {
-    const employeeRows = await all<
-      Array<
-        RowDataPacket & {
-          id: string;
-          name: string;
-          email: string;
-          password_hash: string;
-          department: string;
-          must_change_password: number;
-          is_locked: number;
-          lock_minutes: number | null;
-        }
-      >
-    >(
-      `SELECT id, name, email, password_hash, department, must_change_password,
-              (locked_until IS NOT NULL AND locked_until > NOW()) AS is_locked,
-              TIMESTAMPDIFF(MINUTE, NOW(), locked_until) AS lock_minutes
-       FROM hrdo_users WHERE email = ? AND role = 'employee' LIMIT 1`,
-      [email],
-    );
-    const employee = employeeRows[0];
-    if (!employee) {
+    const linked = await findLinkedAccount(email);
+    if (!linked) {
       await verifyPassword(data.password, DUMMY_HASH);
       throw invalid;
     }
 
-    if (employee.is_locked) {
-      const minutes = Math.max(1, Number(employee.lock_minutes ?? LOCK_MINUTES));
-      throw new AppError(
-        `Too many failed sign-in attempts. Try again in ${minutes} minute${minutes === 1 ? "" : "s"}.`,
-      );
-    }
+    if (linked.is_locked) throw lockError(linked);
 
-    if (!(await verifyPassword(data.password, employee.password_hash))) {
-      await run(
-        `UPDATE hrdo_users SET failed_attempts = failed_attempts + 1,
-          locked_until = IF(failed_attempts + 1 >= ?, DATE_ADD(NOW(), INTERVAL ? MINUTE), locked_until)
-         WHERE id = ?`,
-        [MAX_FAILED_ATTEMPTS, LOCK_MINUTES, employee.id],
-      );
+    if (!(await verifyPassword(data.password, linked.password_hash))) {
+      await recordLinkedFailure(linked);
       throw invalid;
     }
 
-    await run(
-      `INSERT INTO users (id, name, email, password_hash, role, department, must_change_password)
-       VALUES (?, ?, ?, ?, 'requisitioner', ?, ?)`,
-      [
-        employee.id,
-        employee.name,
-        employee.email,
-        employee.password_hash,
-        employee.department,
-        employee.must_change_password,
-      ],
-    );
-    const linkedRows = await all<UserRow[]>(
-      `SELECT id, name, email, password_hash, role, department, must_change_password,
-              0 AS is_locked, NULL AS lock_minutes
-       FROM users WHERE id = ? LIMIT 1`,
-      [employee.id],
-    );
-    user = linkedRows[0];
+    // The account belongs to another LOA system. Signing in here links it to a
+    // plain requester profile because the vehicle trip ticket has no duty for
+    // that role.
+    const userId = await linkUserProfile(linked);
+    await clearLinkedLock(linked);
+    await startSession(userId);
+    return { mustChangePassword: Boolean(linked.must_change_password) };
   }
-
-  if (!user) throw new AppError("We couldn't sign you in. Please try again.");
 
   if (user.is_locked) {
     const minutes = Math.max(1, Number(user.lock_minutes ?? LOCK_MINUTES));
@@ -322,28 +301,18 @@ export async function login(input: unknown): Promise<{ mustChangePassword: boole
 
   const valid = await verifyPassword(data.password, user.password_hash);
   if (!valid) {
-    if (user.role === "requisitioner") {
-      const employeeRows = await all<Array<RowDataPacket & { password_hash: string }>>(
-        "SELECT password_hash FROM hrdo_users WHERE email = ? AND role = 'employee' LIMIT 1",
-        [email],
-      );
-      const employee = employeeRows[0];
-      if (employee && (await verifyPassword(data.password, employee.password_hash))) {
-        await withTransaction(async (conn) => {
-          await run(
-            "UPDATE users SET password_hash = ?, failed_attempts = 0, locked_until = NULL WHERE id = ?",
-            [employee.password_hash, user.id],
-            conn,
-          );
-          await run(
-            "UPDATE hrdo_users SET failed_attempts = 0, locked_until = NULL WHERE email = ? AND role = 'employee'",
-            [email],
-            conn,
-          );
-        });
-        await startSession(user.id);
-        return { mustChangePassword: Boolean(user.must_change_password) };
-      }
+    // The same institutional account may also live in the COE store. Accept
+    // that password here as well and keep this profile as a requester.
+    const linked = await findLinkedAccount(email);
+    if (
+      linked &&
+      !linked.is_locked &&
+      (await verifyPassword(data.password, linked.password_hash))
+    ) {
+      const userId = await linkUserProfile(linked);
+      await clearLinkedLock(linked);
+      await startSession(userId);
+      return { mustChangePassword: Boolean(linked.must_change_password) };
     }
 
     await run(
@@ -404,10 +373,9 @@ export async function resetPasswordWithRecoveryCode(input: unknown): Promise<{ r
   if (!user) throw new AppError("The recovery code is invalid or expired.");
   const otpRows = await all<
     Array<RowDataPacket & { code_hash: string; expires_at: string; attempts: number }>
-  >(
-    "SELECT code_hash, expires_at, attempts FROM registration_otps WHERE email = ? LIMIT 1",
-    [email],
-  );
+  >("SELECT code_hash, expires_at, attempts FROM registration_otps WHERE email = ? LIMIT 1", [
+    email,
+  ]);
   const otp = otpRows[0];
   if (
     !otp ||
@@ -516,15 +484,7 @@ export async function requestRegistrationOtp(input: unknown): Promise<{ sent: tr
          attempts = IF(last_sent_at <= DATE_SUB(NOW(), INTERVAL 60 SECOND), 0, attempts),
          expires_at = IF(last_sent_at <= DATE_SUB(NOW(), INTERVAL 60 SECOND), VALUES(expires_at), expires_at),
          last_sent_at = IF(last_sent_at <= DATE_SUB(NOW(), INTERVAL 60 SECOND), NOW(), last_sent_at)`,
-      [
-        email,
-        data.name,
-        "General",
-        passwordHash,
-        codeHash,
-        sendNonce,
-        REGISTRATION_OTP_MINUTES,
-      ],
+      [email, data.name, "General", passwordHash, codeHash, sendNonce, REGISTRATION_OTP_MINUTES],
       conn,
     );
     const pending = await all<RegistrationOtpRow[]>(
@@ -743,4 +703,28 @@ export async function updateProfile(input: unknown): Promise<Viewer> {
     }
   });
   return { ...current, name: data.name, department: data.department };
+}
+
+/**
+ * Saves the split name collected from first-time Google sign-ins. The joined
+ * value is what receipts and official documents print.
+ */
+export async function completeProfileName(input: unknown): Promise<Viewer> {
+  const current = await requireViewer();
+  const data = parseInput(namePartsSchema, input);
+  const name = joinFullName(data);
+  if (name.length < 2) throw new AppError("Enter your full name.");
+  if (name.length > 120) throw new AppError("Names must be 120 characters or fewer.");
+
+  await withTransaction(async (conn) => {
+    await run("UPDATE users SET name = ? WHERE id = ?", [name, current.id], conn);
+    if (current.role === "requisitioner") {
+      await run(
+        "UPDATE hrdo_users SET name = ? WHERE email = ? AND role = 'employee'",
+        [name, current.email],
+        conn,
+      );
+    }
+  });
+  return { ...current, name };
 }

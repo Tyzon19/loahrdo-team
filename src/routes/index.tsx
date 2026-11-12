@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ServiceDashboard } from "@/components/ServiceDashboard";
 import { unwrap } from "@/lib/api";
 import { canonical } from "@/lib/site";
-import { hrdoLogoutFn, logoutFn } from "@/server-functions";
+import { hrdoLogoutFn, logoutFn, permissionLogoutFn } from "@/server-functions";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -27,7 +27,7 @@ export const Route = createFileRoute("/")({
 });
 
 function LandingPage() {
-  const { viewer, hrdoViewer } = Route.useRouteContext();
+  const { viewer, hrdoViewer, permissionViewer } = Route.useRouteContext();
   const navigate = useNavigate();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -35,10 +35,16 @@ function LandingPage() {
   async function signOut() {
     if (viewer) await unwrap(logoutFn());
     if (hrdoViewer) await unwrap(hrdoLogoutFn());
+    if (permissionViewer) await unwrap(permissionLogoutFn());
     queryClient.clear();
     await router.invalidate();
     navigate({ to: "/" });
   }
 
-  return <ServiceDashboard authenticated={Boolean(viewer || hrdoViewer)} onSignOut={signOut} />;
+  return (
+    <ServiceDashboard
+      authenticated={Boolean(viewer || hrdoViewer || permissionViewer)}
+      onSignOut={signOut}
+    />
+  );
 }

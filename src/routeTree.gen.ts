@@ -12,16 +12,17 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as CoeRouteImport } from './routes/coe'
+import { Route as CompleteProfileRouteImport } from './routes/complete-profile'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as HrdoRouteImport } from './routes/hrdo'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as PermissionSlipsRouteImport } from './routes/permission-slips'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as TermsOfServiceRouteImport } from './routes/terms-of-service'
 import { Route as AuthenticatedChangePasswordRouteImport } from './routes/_authenticated/change-password'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedNotificationsRouteImport } from './routes/_authenticated/notifications'
-import { Route as AuthenticatedPermissionSlipsRouteImport } from './routes/_authenticated/permission-slips'
 import { Route as AuthenticatedPhoneDirectoryRouteImport } from './routes/_authenticated/phone-directory'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 import { Route as AuthenticatedTripArchiveRouteImport } from './routes/_authenticated/trip-archive'
@@ -29,15 +30,18 @@ import { Route as AuthenticatedVehiclesRouteImport } from './routes/_authenticat
 import { Route as HrdoAnalyticsRouteImport } from './routes/hrdo/analytics'
 import { Route as HrdoChangePasswordRouteImport } from './routes/hrdo/change-password'
 import { Route as HrdoCoeRouteImport } from './routes/hrdo/coe'
+import { Route as HrdoCompleteProfileRouteImport } from './routes/hrdo/complete-profile'
 import { Route as HrdoDashboardRouteImport } from './routes/hrdo/dashboard'
 import { Route as HrdoForgotPasswordRouteImport } from './routes/hrdo/forgot-password'
 import { Route as HrdoHistoryRouteImport } from './routes/hrdo/history'
 import { Route as HrdoLoginRouteImport } from './routes/hrdo/login'
 import { Route as HrdoProfileRouteImport } from './routes/hrdo/profile'
 import { Route as HrdoRequestsRouteImport } from './routes/hrdo/requests'
+import { Route as PermissionSlipsIndexRouteImport } from './routes/permission-slips.index'
+import { Route as PermissionSlipsIdRouteImport } from './routes/permission-slips.$id'
+import { Route as PermissionSlipsLoginRouteImport } from './routes/permission-slips.login'
 import { Route as ServiceSlugRouteImport } from './routes/service.$slug'
 import { Route as VerifyTicketTokenRouteImport } from './routes/verify-ticket.$token'
-import { Route as AuthenticatedPermissionSlipsIdRouteImport } from './routes/_authenticated/permission-slips.$id'
 import { Route as AuthenticatedPrintIdRouteImport } from './routes/_authenticated/print.$id'
 import { Route as AuthenticatedRequestsIndexRouteImport } from './routes/_authenticated/requests.index'
 import { Route as AuthenticatedRequestsIdRouteImport } from './routes/_authenticated/requests.$id'
@@ -64,6 +68,11 @@ const CoeRoute = CoeRouteImport.update({
   path: '/coe',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CompleteProfileRoute = CompleteProfileRouteImport.update({
+  id: '/complete-profile',
+  path: '/complete-profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
   id: '/forgot-password',
   path: '/forgot-password',
@@ -77,6 +86,11 @@ const HrdoRoute = HrdoRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PermissionSlipsRoute = PermissionSlipsRouteImport.update({
+  id: '/permission-slips',
+  path: '/permission-slips',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrivacyRoute = PrivacyRouteImport.update({
@@ -109,12 +123,6 @@ const AuthenticatedNotificationsRoute =
   AuthenticatedNotificationsRouteImport.update({
     id: '/notifications',
     path: '/notifications',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedPermissionSlipsRoute =
-  AuthenticatedPermissionSlipsRouteImport.update({
-    id: '/permission-slips',
-    path: '/permission-slips',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedPhoneDirectoryRoute =
@@ -154,6 +162,11 @@ const HrdoCoeRoute = HrdoCoeRouteImport.update({
   path: '/coe',
   getParentRoute: () => HrdoRoute,
 } as any)
+const HrdoCompleteProfileRoute = HrdoCompleteProfileRouteImport.update({
+  id: '/complete-profile',
+  path: '/complete-profile',
+  getParentRoute: () => HrdoRoute,
+} as any)
 const HrdoDashboardRoute = HrdoDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -184,6 +197,21 @@ const HrdoRequestsRoute = HrdoRequestsRouteImport.update({
   path: '/requests',
   getParentRoute: () => HrdoRoute,
 } as any)
+const PermissionSlipsIndexRoute = PermissionSlipsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => PermissionSlipsRoute,
+} as any)
+const PermissionSlipsIdRoute = PermissionSlipsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => PermissionSlipsRoute,
+} as any)
+const PermissionSlipsLoginRoute = PermissionSlipsLoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => PermissionSlipsRoute,
+} as any)
 const ServiceSlugRoute = ServiceSlugRouteImport.update({
   id: '/service/$slug',
   path: '/service/$slug',
@@ -194,12 +222,6 @@ const VerifyTicketTokenRoute = VerifyTicketTokenRouteImport.update({
   path: '/verify-ticket/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedPermissionSlipsIdRoute =
-  AuthenticatedPermissionSlipsIdRouteImport.update({
-    id: '/$id',
-    path: '/$id',
-    getParentRoute: () => AuthenticatedPermissionSlipsRoute,
-  } as any)
 const AuthenticatedPrintIdRoute = AuthenticatedPrintIdRouteImport.update({
   id: '/print/$id',
   path: '/print/$id',
@@ -261,16 +283,17 @@ const ApiAuthGoogleCallbackRoute = ApiAuthGoogleCallbackRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/coe': typeof CoeRoute
+  '/complete-profile': typeof CompleteProfileRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/hrdo': typeof HrdoRouteWithChildren
   '/login': typeof LoginRoute
+  '/permission-slips': typeof PermissionSlipsRouteWithChildren
   '/privacy': typeof PrivacyRoute
   '/register': typeof RegisterRoute
   '/terms-of-service': typeof TermsOfServiceRoute
   '/change-password': typeof AuthenticatedChangePasswordRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/notifications': typeof AuthenticatedNotificationsRoute
-  '/permission-slips': typeof AuthenticatedPermissionSlipsRouteWithChildren
   '/phone-directory': typeof AuthenticatedPhoneDirectoryRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/trip-archive': typeof AuthenticatedTripArchiveRoute
@@ -278,15 +301,18 @@ export interface FileRoutesByFullPath {
   '/hrdo/analytics': typeof HrdoAnalyticsRoute
   '/hrdo/change-password': typeof HrdoChangePasswordRoute
   '/hrdo/coe': typeof HrdoCoeRoute
+  '/hrdo/complete-profile': typeof HrdoCompleteProfileRoute
   '/hrdo/dashboard': typeof HrdoDashboardRoute
   '/hrdo/forgot-password': typeof HrdoForgotPasswordRoute
   '/hrdo/history': typeof HrdoHistoryRoute
   '/hrdo/login': typeof HrdoLoginRoute
   '/hrdo/profile': typeof HrdoProfileRoute
   '/hrdo/requests': typeof HrdoRequestsRoute
+  '/permission-slips/$id': typeof PermissionSlipsIdRoute
+  '/permission-slips/login': typeof PermissionSlipsLoginRoute
   '/service/$slug': typeof ServiceSlugRoute
   '/verify-ticket/$token': typeof VerifyTicketTokenRoute
-  '/permission-slips/$id': typeof AuthenticatedPermissionSlipsIdRoute
+  '/permission-slips/': typeof PermissionSlipsIndexRoute
   '/print/$id': typeof AuthenticatedPrintIdRoute
   '/requests/$id': typeof AuthenticatedRequestsIdRoute
   '/requests/new': typeof AuthenticatedRequestsNewRoute
@@ -302,6 +328,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/coe': typeof CoeRoute
+  '/complete-profile': typeof CompleteProfileRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/hrdo': typeof HrdoRouteWithChildren
   '/login': typeof LoginRoute
@@ -311,7 +338,6 @@ export interface FileRoutesByTo {
   '/change-password': typeof AuthenticatedChangePasswordRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/notifications': typeof AuthenticatedNotificationsRoute
-  '/permission-slips': typeof AuthenticatedPermissionSlipsRouteWithChildren
   '/phone-directory': typeof AuthenticatedPhoneDirectoryRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/trip-archive': typeof AuthenticatedTripArchiveRoute
@@ -319,15 +345,18 @@ export interface FileRoutesByTo {
   '/hrdo/analytics': typeof HrdoAnalyticsRoute
   '/hrdo/change-password': typeof HrdoChangePasswordRoute
   '/hrdo/coe': typeof HrdoCoeRoute
+  '/hrdo/complete-profile': typeof HrdoCompleteProfileRoute
   '/hrdo/dashboard': typeof HrdoDashboardRoute
   '/hrdo/forgot-password': typeof HrdoForgotPasswordRoute
   '/hrdo/history': typeof HrdoHistoryRoute
   '/hrdo/login': typeof HrdoLoginRoute
   '/hrdo/profile': typeof HrdoProfileRoute
   '/hrdo/requests': typeof HrdoRequestsRoute
+  '/permission-slips/$id': typeof PermissionSlipsIdRoute
+  '/permission-slips/login': typeof PermissionSlipsLoginRoute
   '/service/$slug': typeof ServiceSlugRoute
   '/verify-ticket/$token': typeof VerifyTicketTokenRoute
-  '/permission-slips/$id': typeof AuthenticatedPermissionSlipsIdRoute
+  '/permission-slips': typeof PermissionSlipsIndexRoute
   '/print/$id': typeof AuthenticatedPrintIdRoute
   '/requests/$id': typeof AuthenticatedRequestsIdRoute
   '/requests/new': typeof AuthenticatedRequestsNewRoute
@@ -345,16 +374,17 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/coe': typeof CoeRoute
+  '/complete-profile': typeof CompleteProfileRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/hrdo': typeof HrdoRouteWithChildren
   '/login': typeof LoginRoute
+  '/permission-slips': typeof PermissionSlipsRouteWithChildren
   '/privacy': typeof PrivacyRoute
   '/register': typeof RegisterRoute
   '/terms-of-service': typeof TermsOfServiceRoute
   '/_authenticated/change-password': typeof AuthenticatedChangePasswordRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/notifications': typeof AuthenticatedNotificationsRoute
-  '/_authenticated/permission-slips': typeof AuthenticatedPermissionSlipsRouteWithChildren
   '/_authenticated/phone-directory': typeof AuthenticatedPhoneDirectoryRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/trip-archive': typeof AuthenticatedTripArchiveRoute
@@ -362,15 +392,18 @@ export interface FileRoutesById {
   '/hrdo/analytics': typeof HrdoAnalyticsRoute
   '/hrdo/change-password': typeof HrdoChangePasswordRoute
   '/hrdo/coe': typeof HrdoCoeRoute
+  '/hrdo/complete-profile': typeof HrdoCompleteProfileRoute
   '/hrdo/dashboard': typeof HrdoDashboardRoute
   '/hrdo/forgot-password': typeof HrdoForgotPasswordRoute
   '/hrdo/history': typeof HrdoHistoryRoute
   '/hrdo/login': typeof HrdoLoginRoute
   '/hrdo/profile': typeof HrdoProfileRoute
   '/hrdo/requests': typeof HrdoRequestsRoute
+  '/permission-slips/$id': typeof PermissionSlipsIdRoute
+  '/permission-slips/login': typeof PermissionSlipsLoginRoute
   '/service/$slug': typeof ServiceSlugRoute
   '/verify-ticket/$token': typeof VerifyTicketTokenRoute
-  '/_authenticated/permission-slips/$id': typeof AuthenticatedPermissionSlipsIdRoute
+  '/permission-slips/': typeof PermissionSlipsIndexRoute
   '/_authenticated/print/$id': typeof AuthenticatedPrintIdRoute
   '/_authenticated/requests/$id': typeof AuthenticatedRequestsIdRoute
   '/_authenticated/requests/new': typeof AuthenticatedRequestsNewRoute
@@ -388,16 +421,17 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/coe'
+    | '/complete-profile'
     | '/forgot-password'
     | '/hrdo'
     | '/login'
+    | '/permission-slips'
     | '/privacy'
     | '/register'
     | '/terms-of-service'
     | '/change-password'
     | '/dashboard'
     | '/notifications'
-    | '/permission-slips'
     | '/phone-directory'
     | '/profile'
     | '/trip-archive'
@@ -405,15 +439,18 @@ export interface FileRouteTypes {
     | '/hrdo/analytics'
     | '/hrdo/change-password'
     | '/hrdo/coe'
+    | '/hrdo/complete-profile'
     | '/hrdo/dashboard'
     | '/hrdo/forgot-password'
     | '/hrdo/history'
     | '/hrdo/login'
     | '/hrdo/profile'
     | '/hrdo/requests'
+    | '/permission-slips/$id'
+    | '/permission-slips/login'
     | '/service/$slug'
     | '/verify-ticket/$token'
-    | '/permission-slips/$id'
+    | '/permission-slips/'
     | '/print/$id'
     | '/requests/$id'
     | '/requests/new'
@@ -429,6 +466,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/coe'
+    | '/complete-profile'
     | '/forgot-password'
     | '/hrdo'
     | '/login'
@@ -438,7 +476,6 @@ export interface FileRouteTypes {
     | '/change-password'
     | '/dashboard'
     | '/notifications'
-    | '/permission-slips'
     | '/phone-directory'
     | '/profile'
     | '/trip-archive'
@@ -446,15 +483,18 @@ export interface FileRouteTypes {
     | '/hrdo/analytics'
     | '/hrdo/change-password'
     | '/hrdo/coe'
+    | '/hrdo/complete-profile'
     | '/hrdo/dashboard'
     | '/hrdo/forgot-password'
     | '/hrdo/history'
     | '/hrdo/login'
     | '/hrdo/profile'
     | '/hrdo/requests'
+    | '/permission-slips/$id'
+    | '/permission-slips/login'
     | '/service/$slug'
     | '/verify-ticket/$token'
-    | '/permission-slips/$id'
+    | '/permission-slips'
     | '/print/$id'
     | '/requests/$id'
     | '/requests/new'
@@ -471,16 +511,17 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/coe'
+    | '/complete-profile'
     | '/forgot-password'
     | '/hrdo'
     | '/login'
+    | '/permission-slips'
     | '/privacy'
     | '/register'
     | '/terms-of-service'
     | '/_authenticated/change-password'
     | '/_authenticated/dashboard'
     | '/_authenticated/notifications'
-    | '/_authenticated/permission-slips'
     | '/_authenticated/phone-directory'
     | '/_authenticated/profile'
     | '/_authenticated/trip-archive'
@@ -488,15 +529,18 @@ export interface FileRouteTypes {
     | '/hrdo/analytics'
     | '/hrdo/change-password'
     | '/hrdo/coe'
+    | '/hrdo/complete-profile'
     | '/hrdo/dashboard'
     | '/hrdo/forgot-password'
     | '/hrdo/history'
     | '/hrdo/login'
     | '/hrdo/profile'
     | '/hrdo/requests'
+    | '/permission-slips/$id'
+    | '/permission-slips/login'
     | '/service/$slug'
     | '/verify-ticket/$token'
-    | '/_authenticated/permission-slips/$id'
+    | '/permission-slips/'
     | '/_authenticated/print/$id'
     | '/_authenticated/requests/$id'
     | '/_authenticated/requests/new'
@@ -514,9 +558,11 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   CoeRoute: typeof CoeRoute
+  CompleteProfileRoute: typeof CompleteProfileRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   HrdoRoute: typeof HrdoRouteWithChildren
   LoginRoute: typeof LoginRoute
+  PermissionSlipsRoute: typeof PermissionSlipsRouteWithChildren
   PrivacyRoute: typeof PrivacyRoute
   RegisterRoute: typeof RegisterRoute
   TermsOfServiceRoute: typeof TermsOfServiceRoute
@@ -551,6 +597,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CoeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/complete-profile': {
+      id: '/complete-profile'
+      path: '/complete-profile'
+      fullPath: '/complete-profile'
+      preLoaderRoute: typeof CompleteProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/forgot-password': {
       id: '/forgot-password'
       path: '/forgot-password'
@@ -570,6 +623,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/permission-slips': {
+      id: '/permission-slips'
+      path: '/permission-slips'
+      fullPath: '/permission-slips'
+      preLoaderRoute: typeof PermissionSlipsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/privacy': {
@@ -612,13 +672,6 @@ declare module '@tanstack/react-router' {
       path: '/notifications'
       fullPath: '/notifications'
       preLoaderRoute: typeof AuthenticatedNotificationsRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/permission-slips': {
-      id: '/_authenticated/permission-slips'
-      path: '/permission-slips'
-      fullPath: '/permission-slips'
-      preLoaderRoute: typeof AuthenticatedPermissionSlipsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/phone-directory': {
@@ -670,6 +723,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HrdoCoeRouteImport
       parentRoute: typeof HrdoRoute
     }
+    '/hrdo/complete-profile': {
+      id: '/hrdo/complete-profile'
+      path: '/complete-profile'
+      fullPath: '/hrdo/complete-profile'
+      preLoaderRoute: typeof HrdoCompleteProfileRouteImport
+      parentRoute: typeof HrdoRoute
+    }
     '/hrdo/dashboard': {
       id: '/hrdo/dashboard'
       path: '/dashboard'
@@ -712,6 +772,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HrdoRequestsRouteImport
       parentRoute: typeof HrdoRoute
     }
+    '/permission-slips/': {
+      id: '/permission-slips/'
+      path: '/'
+      fullPath: '/permission-slips/'
+      preLoaderRoute: typeof PermissionSlipsIndexRouteImport
+      parentRoute: typeof PermissionSlipsRoute
+    }
+    '/permission-slips/$id': {
+      id: '/permission-slips/$id'
+      path: '/$id'
+      fullPath: '/permission-slips/$id'
+      preLoaderRoute: typeof PermissionSlipsIdRouteImport
+      parentRoute: typeof PermissionSlipsRoute
+    }
+    '/permission-slips/login': {
+      id: '/permission-slips/login'
+      path: '/login'
+      fullPath: '/permission-slips/login'
+      preLoaderRoute: typeof PermissionSlipsLoginRouteImport
+      parentRoute: typeof PermissionSlipsRoute
+    }
     '/service/$slug': {
       id: '/service/$slug'
       path: '/service/$slug'
@@ -725,13 +806,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/verify-ticket/$token'
       preLoaderRoute: typeof VerifyTicketTokenRouteImport
       parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/permission-slips/$id': {
-      id: '/_authenticated/permission-slips/$id'
-      path: '/$id'
-      fullPath: '/permission-slips/$id'
-      preLoaderRoute: typeof AuthenticatedPermissionSlipsIdRouteImport
-      parentRoute: typeof AuthenticatedPermissionSlipsRoute
     }
     '/_authenticated/print/$id': {
       id: '/_authenticated/print/$id'
@@ -813,25 +887,10 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface AuthenticatedPermissionSlipsRouteChildren {
-  AuthenticatedPermissionSlipsIdRoute: typeof AuthenticatedPermissionSlipsIdRoute
-}
-
-const AuthenticatedPermissionSlipsRouteChildren: AuthenticatedPermissionSlipsRouteChildren =
-  {
-    AuthenticatedPermissionSlipsIdRoute: AuthenticatedPermissionSlipsIdRoute,
-  }
-
-const AuthenticatedPermissionSlipsRouteWithChildren =
-  AuthenticatedPermissionSlipsRoute._addFileChildren(
-    AuthenticatedPermissionSlipsRouteChildren,
-  )
-
 interface AuthenticatedRouteChildren {
   AuthenticatedChangePasswordRoute: typeof AuthenticatedChangePasswordRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedNotificationsRoute: typeof AuthenticatedNotificationsRoute
-  AuthenticatedPermissionSlipsRoute: typeof AuthenticatedPermissionSlipsRouteWithChildren
   AuthenticatedPhoneDirectoryRoute: typeof AuthenticatedPhoneDirectoryRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
   AuthenticatedTripArchiveRoute: typeof AuthenticatedTripArchiveRoute
@@ -847,8 +906,6 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedChangePasswordRoute: AuthenticatedChangePasswordRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedNotificationsRoute: AuthenticatedNotificationsRoute,
-  AuthenticatedPermissionSlipsRoute:
-    AuthenticatedPermissionSlipsRouteWithChildren,
   AuthenticatedPhoneDirectoryRoute: AuthenticatedPhoneDirectoryRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
   AuthenticatedTripArchiveRoute: AuthenticatedTripArchiveRoute,
@@ -868,6 +925,7 @@ interface HrdoRouteChildren {
   HrdoAnalyticsRoute: typeof HrdoAnalyticsRoute
   HrdoChangePasswordRoute: typeof HrdoChangePasswordRoute
   HrdoCoeRoute: typeof HrdoCoeRoute
+  HrdoCompleteProfileRoute: typeof HrdoCompleteProfileRoute
   HrdoDashboardRoute: typeof HrdoDashboardRoute
   HrdoForgotPasswordRoute: typeof HrdoForgotPasswordRoute
   HrdoHistoryRoute: typeof HrdoHistoryRoute
@@ -881,6 +939,7 @@ const HrdoRouteChildren: HrdoRouteChildren = {
   HrdoAnalyticsRoute: HrdoAnalyticsRoute,
   HrdoChangePasswordRoute: HrdoChangePasswordRoute,
   HrdoCoeRoute: HrdoCoeRoute,
+  HrdoCompleteProfileRoute: HrdoCompleteProfileRoute,
   HrdoDashboardRoute: HrdoDashboardRoute,
   HrdoForgotPasswordRoute: HrdoForgotPasswordRoute,
   HrdoHistoryRoute: HrdoHistoryRoute,
@@ -891,6 +950,22 @@ const HrdoRouteChildren: HrdoRouteChildren = {
 }
 
 const HrdoRouteWithChildren = HrdoRoute._addFileChildren(HrdoRouteChildren)
+
+interface PermissionSlipsRouteChildren {
+  PermissionSlipsIdRoute: typeof PermissionSlipsIdRoute
+  PermissionSlipsLoginRoute: typeof PermissionSlipsLoginRoute
+  PermissionSlipsIndexRoute: typeof PermissionSlipsIndexRoute
+}
+
+const PermissionSlipsRouteChildren: PermissionSlipsRouteChildren = {
+  PermissionSlipsIdRoute: PermissionSlipsIdRoute,
+  PermissionSlipsLoginRoute: PermissionSlipsLoginRoute,
+  PermissionSlipsIndexRoute: PermissionSlipsIndexRoute,
+}
+
+const PermissionSlipsRouteWithChildren = PermissionSlipsRoute._addFileChildren(
+  PermissionSlipsRouteChildren,
+)
 
 interface ApiAuthGoogleRouteChildren {
   ApiAuthGoogleCallbackRoute: typeof ApiAuthGoogleCallbackRoute
@@ -908,9 +983,11 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   CoeRoute: CoeRoute,
+  CompleteProfileRoute: CompleteProfileRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
   HrdoRoute: HrdoRouteWithChildren,
   LoginRoute: LoginRoute,
+  PermissionSlipsRoute: PermissionSlipsRouteWithChildren,
   PrivacyRoute: PrivacyRoute,
   RegisterRoute: RegisterRoute,
   TermsOfServiceRoute: TermsOfServiceRoute,

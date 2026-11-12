@@ -1,4 +1,4 @@
-import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
@@ -32,7 +32,6 @@ import { SignaturePad, type SignatureValue } from "@/components/app/SignaturePad
 import { ButtonLoading, LoadingScreen } from "@/components/app/LoadingPanel";
 import { ApiError, unwrap } from "@/lib/api";
 import { isPermissionHead } from "@/lib/permission-access";
-import { isPermissionSlipDetailPath } from "@/lib/permission-routing";
 import {
   listMyPermissionSlipsFn,
   listPendingPermissionSlipsFn,
@@ -43,14 +42,9 @@ type PermissionSearch = {
   view?: "history" | "new" | undefined;
 };
 
-export const Route = createFileRoute("/_authenticated/permission-slips")({
+export const Route = createFileRoute("/permission-slips/")({
   validateSearch: (search: Record<string, unknown>): PermissionSearch => ({
-    view:
-      search["view"] === "history"
-        ? "history"
-        : search["view"] === "new"
-          ? "new"
-          : undefined,
+    view: search["view"] === "history" ? "history" : search["view"] === "new" ? "new" : undefined,
   }),
   component: PermissionSlipsPage,
 });
@@ -92,18 +86,67 @@ function formatPhilippineDate(value: string) {
 
 function FieldError({ id, message }: { id: string; message: string | undefined }) {
   return message ? (
-    <p id={id} role="alert" className="mt-1.5 text-xs font-semibold text-destructive">
+    <p id={id} role="alert" className="mt-1.5 text-sm font-semibold text-destructive">
       {message}
     </p>
   ) : null;
 }
 
+type PermissionTab = "history" | "request" | "review";
+
+function PermissionSlipTabs({ isHead, active }: { isHead: boolean; active: PermissionTab }) {
+  const base =
+    "flex h-10 min-w-0 items-center justify-center gap-2 rounded-md px-2 text-sm font-semibold transition-colors sm:px-3";
+  const activeClass = "bg-background text-foreground shadow-sm";
+  const idleClass = "text-muted-foreground hover:text-foreground";
+
+  return (
+    <nav
+      aria-label="Permission slip sections"
+      className="rounded-lg border border-border bg-muted/60 p-1"
+    >
+      <div className={isHead ? "grid grid-cols-3 gap-1" : "grid grid-cols-2 gap-1"}>
+        <Link
+          to="/permission-slips"
+          search={{ view: "history" }}
+          aria-current={active === "history" ? "page" : undefined}
+          className={`${base} ${active === "history" ? activeClass : idleClass}`}
+        >
+          <FileText className="h-4 w-4 shrink-0" aria-hidden />
+          <span className="hidden truncate sm:inline">My Permission Slips</span>
+          <span className="truncate sm:hidden">My Slips</span>
+        </Link>
+        <Link
+          to="/permission-slips"
+          search={{ view: "new" }}
+          aria-current={active === "request" ? "page" : undefined}
+          className={`${base} ${active === "request" ? activeClass : idleClass}`}
+        >
+          <FilePlus2 className="h-4 w-4 shrink-0" aria-hidden />
+          <span className="hidden truncate sm:inline">Request Permission Slip</span>
+          <span className="truncate sm:hidden">Request</span>
+        </Link>
+        {isHead && (
+          <Link
+            to="/permission-slips"
+            search={{}}
+            aria-current={active === "review" ? "page" : undefined}
+            className={`${base} ${active === "review" ? activeClass : idleClass}`}
+          >
+            <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden />
+            <span className="hidden truncate sm:inline">Permission Slip Review</span>
+            <span className="truncate sm:hidden">Review</span>
+          </Link>
+        )}
+      </div>
+    </nav>
+  );
+}
+
 function PermissionSlipsPage() {
-  const pathname = useRouterState({ select: (router) => router.location.pathname });
-  const isDetailRoute = isPermissionSlipDetailPath(pathname);
   const search = Route.useSearch();
-  const { viewer } = Route.useRouteContext();
-  const isHead = isPermissionHead(viewer);
+  const { permissionViewer } = Route.useRouteContext();
+  const isHead = isPermissionHead(permissionViewer);
   const queryClient = useQueryClient();
 
   const isHistoryView = search.view === "history";
@@ -112,13 +155,13 @@ function PermissionSlipsPage() {
   const employeeQuery = useQuery({
     queryKey: ["permission-slips", "mine"],
     queryFn: () => unwrap(listMyPermissionSlipsFn()),
-    enabled: (!isHead || isHistoryView) && !isDetailRoute,
+    enabled: !isHead || isHistoryView,
   });
 
   const pendingQuery = useQuery({
     queryKey: ["permission-slips", "pending"],
     queryFn: () => unwrap(listPendingPermissionSlipsFn()),
-    enabled: isHead && !isHistoryView && !isExplicitNewView && !isDetailRoute,
+    enabled: isHead && !isHistoryView && !isExplicitNewView,
   });
 
   // Multi-step form state
@@ -131,17 +174,13 @@ function PermissionSlipsPage() {
   const [confirmedAgreement, setConfirmedAgreement] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<
-    Partial<Record<"requestedDate" | "timeOut" | "timeIn" | "reason" | "signature" | "form", string>>
+    Partial<
+      Record<"requestedDate" | "timeOut" | "timeIn" | "reason" | "signature" | "form", string>
+    >
   >({});
   const [submittedId, setSubmittedId] = useState<string | null>(null);
   const [emailSent, setEmailSent] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
-
-  // Keep every hook above this route branch. The detail child can replace the
-  // parent outlet while the list view is mounted; returning before the form
-  // state hooks changes hook order and triggers React's conditional-suspension
-  // error during navigation.
-  if (isDetailRoute) return <Outlet />;
 
   const today = new Date().toISOString().slice(0, 10);
   const currentStepConfig = PERMISSION_STEPS[currentStep] ?? PERMISSION_STEPS[0];
@@ -267,6 +306,7 @@ function PermissionSlipsPage() {
   if (isHistoryView) {
     return (
       <div className="mx-auto w-full max-w-5xl space-y-6 py-4 sm:py-6">
+        <PermissionSlipTabs isHead={isHead} active="history" />
         <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-primary">Attendance</p>
@@ -289,6 +329,29 @@ function PermissionSlipsPage() {
         {employeeQuery.isPending ? (
           <LoadingScreen label="Loading your permission slips" mode="inline" />
         ) : null}
+
+        {employeeQuery.isError && (
+          <Card role="alert" className="border-destructive/30">
+            <CardContent className="flex flex-col items-center justify-center p-8 text-center">
+              <p className="text-base font-semibold text-destructive">
+                We couldn&apos;t load your Permission Slips.
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {employeeQuery.error instanceof Error
+                  ? employeeQuery.error.message
+                  : "Please try again."}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-4"
+                onClick={() => void employeeQuery.refetch()}
+              >
+                Try again
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid gap-4">
           {employeeQuery.data?.map((slip) => {
@@ -343,7 +406,7 @@ function PermissionSlipsPage() {
             );
           })}
 
-          {!employeeQuery.data?.length && !employeeQuery.isPending && (
+          {!employeeQuery.data?.length && !employeeQuery.isPending && !employeeQuery.isError && (
             <Card>
               <CardContent className="flex flex-col items-center justify-center p-12 text-center">
                 <FileText className="h-10 w-10 text-muted-foreground/60 mb-3" />
@@ -372,6 +435,7 @@ function PermissionSlipsPage() {
   if (isHead && !isExplicitNewView) {
     return (
       <div className="mx-auto w-full max-w-5xl space-y-6 py-4 sm:py-6">
+        <PermissionSlipTabs isHead={isHead} active="review" />
         <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-primary">HRDO</p>
@@ -379,7 +443,8 @@ function PermissionSlipsPage() {
               Permission Slip Review
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Review, verify, and electronically sign permission slips submitted by school personnel.
+              Review, verify, and electronically sign permission slips submitted by school
+              personnel.
             </p>
           </div>
           <Button asChild variant="outline" className="gap-2 shrink-0">
@@ -407,7 +472,8 @@ function PermissionSlipsPage() {
                   <div className="min-w-0">
                     <p className="text-base font-bold text-foreground">{slip.employeeName}</p>
                     <p className="text-sm text-muted-foreground">
-                      {slip.department} · {formatPhilippineDate(slip.requestedDate)} ({slip.timeOut} — {slip.timeIn})
+                      {slip.department} · {formatPhilippineDate(slip.requestedDate)} ({slip.timeOut}{" "}
+                      — {slip.timeIn})
                     </p>
                     <p className="mt-2 line-clamp-1 text-sm text-foreground/90 font-medium">
                       {slip.reason}
@@ -446,12 +512,7 @@ function PermissionSlipsPage() {
             aria-labelledby="permission-success-title"
           >
             <div className="coe-success-logos" aria-label="Lyceum of Alabang and HRDO">
-              <img
-                src="/lyceum-logo.png.png"
-                alt="Lyceum of Alabang seal"
-                width={72}
-                height={72}
-              />
+              <img src="/loa-logo.png" alt="Lyceum of Alabang seal" width={72} height={72} />
               <img
                 src="/HRDO%20LOGO.png"
                 alt="Human Resources Development Office logo"
@@ -468,8 +529,8 @@ function PermissionSlipsPage() {
             </p>
             <p className="coe-success-message">
               The HRDO Director will review and sign your permission slip. We will send an update to{" "}
-              <strong>{viewer?.email}</strong> once your slip is approved or if additional details
-              are requested.
+              <strong>{permissionViewer?.email}</strong> once your slip is approved or if additional
+              details are requested.
             </p>
             {emailSent === false && (
               <p role="status" className="coe-success-message text-amber-700">
@@ -498,21 +559,18 @@ function PermissionSlipsPage() {
 
   // ── VIEW 4: SPACIOUS STEP-BY-STEP REQUEST FORM (NO AUTO-PLACED NAME/DEPT) ───
   return (
-    <div className="coe-request">
+    <div className="coe-request coe-permission">
       {busy && <LoadingScreen label="Submitting Permission Slip" mode="overlay" immediate />}
 
       <div className="coe-main">
+        <div className="mb-4">
+          <PermissionSlipTabs isHead={isHead} active="request" />
+        </div>
         {/* Intro header with seal & title */}
         <div className="coe-form-intro">
           <div className="coe-form-logos" aria-label="Lyceum of Alabang and HRDO">
-            <img
-              src="/lyceum-logo.png.png"
-              alt="Lyceum of Alabang seal"
-            />
-            <img
-              src="/HRDO%20LOGO.png"
-              alt="HRDO logo"
-            />
+            <img src="/loa-logo.png" alt="Lyceum of Alabang seal" />
+            <img src="/HRDO%20LOGO.png" alt="HRDO logo" />
           </div>
           <h1>Permission Slip Request</h1>
           <p>{currentStepConfig.blurb}</p>
@@ -533,9 +591,7 @@ function PermissionSlipsPage() {
                   <span className="coe-step-circle">
                     {state === "done" ? <Check className="h-4 w-4" aria-hidden /> : index + 1}
                   </span>
-                  <span className="coe-step-name">
-                    {step.title}
-                  </span>
+                  <span className="coe-step-name">{step.title}</span>
                 </div>
                 {index < PERMISSION_STEPS.length - 1 ? <span className="coe-step-line" /> : null}
               </li>
@@ -545,276 +601,264 @@ function PermissionSlipsPage() {
 
         {/* Form Card (Roomy, large inputs, no auto name/department) */}
         <form className="coe-form" onSubmit={(event) => event.preventDefault()}>
-            {/* ── STEP 0: SCHEDULE (Date, Time Out, Time In) ─────────────── */}
-            {currentStep === 0 && (
-              <section aria-labelledby="step-schedule-title" className="coe-section">
+          {/* ── STEP 0: SCHEDULE (Date, Time Out, Time In) ─────────────── */}
+          {currentStep === 0 && (
+            <section aria-labelledby="step-schedule-title" className="coe-section">
+              <div>
+                <h2 id="step-schedule-title" className="coe-section-title">
+                  Off-Campus Schedule
+                </h2>
+                <p className="coe-section-description">
+                  Select the date you will leave campus and your expected departure and return
+                  times.
+                </p>
+              </div>
+
+              <div className="coe-fields coe-fields-schedule">
                 <div>
-                  <h2 id="step-schedule-title" className="coe-section-title">
-                    Off-Campus Schedule
-                  </h2>
-                  <p className="coe-section-description">
-                    Select the date you will leave campus and your expected departure and return
-                    times.
-                  </p>
-                </div>
-
-                <div className="coe-fields coe-fields-schedule">
-                  <div>
-                    <Label htmlFor="permission-date" className="text-sm font-bold text-foreground">
-                      Date Leaving Campus <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="permission-date"
-                      type="date"
-                      min={today}
-                      value={requestedDate}
-                      aria-invalid={Boolean(fieldErrors.requestedDate)}
-                      aria-describedby={
-                        fieldErrors.requestedDate ? "permission-date-error" : undefined
-                      }
-                      onChange={(event) => {
-                        setRequestedDate(event.target.value);
-                        clearFieldError("requestedDate");
-                      }}
-                      className="coe-input text-base font-medium"
-                    />
-                    <FieldError id="permission-date-error" message={fieldErrors.requestedDate} />
-                  </div>
-
-                  <div>
-                    <Label
-                      htmlFor="permission-time-out"
-                      className="text-sm font-bold text-foreground"
-                    >
-                      Time Out (Departure) <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="permission-time-out"
-                      type="time"
-                      value={timeOut}
-                      aria-invalid={Boolean(fieldErrors.timeOut)}
-                      aria-describedby={
-                        fieldErrors.timeOut ? "permission-time-out-error" : undefined
-                      }
-                      onChange={(event) => {
-                        setTimeOut(event.target.value);
-                        clearFieldError("timeOut");
-                      }}
-                      className="coe-input text-base font-medium"
-                    />
-                    <FieldError id="permission-time-out-error" message={fieldErrors.timeOut} />
-                  </div>
-
-                  <div>
-                    <Label
-                      htmlFor="permission-time-in"
-                      className="text-sm font-bold text-foreground"
-                    >
-                      Time In (Expected Return) <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="permission-time-in"
-                      type="time"
-                      value={timeIn}
-                      aria-invalid={Boolean(fieldErrors.timeIn)}
-                      aria-describedby={
-                        fieldErrors.timeIn ? "permission-time-in-error" : "permission-time-help"
-                      }
-                      onChange={(event) => {
-                        setTimeIn(event.target.value);
-                        clearFieldError("timeIn");
-                      }}
-                      className="coe-input text-base font-medium"
-                    />
-                    <FieldError id="permission-time-in-error" message={fieldErrors.timeIn} />
-                  </div>
-                </div>
-
-              </section>
-            )}
-
-            {/* ── STEP 1: REASON ─────────────────────────────────────────── */}
-            {currentStep === 1 && (
-              <section aria-labelledby="step-reason-title" className="coe-section">
-                <div>
-                  <h2 id="step-reason-title" className="coe-section-title">
-                    Reason for Going Out
-                  </h2>
-                  <p className="coe-section-description">
-                    State the specific purpose of your off-campus absence.
-                  </p>
-                </div>
-
-                <div>
-                  <Label
-                    htmlFor="permission-reason"
-                    className="text-sm font-bold text-foreground"
-                  >
-                    Detailed Reason <span className="text-destructive">*</span>
+                  <Label htmlFor="permission-date" className="text-sm font-bold text-foreground">
+                    Date Leaving Campus <span className="text-destructive">*</span>
                   </Label>
-                  <Textarea
-                    id="permission-reason"
-                    name="reason"
-                    value={reason}
-                    maxLength={500}
-                    aria-invalid={Boolean(fieldErrors.reason)}
+                  <Input
+                    id="permission-date"
+                    type="date"
+                    min={today}
+                    value={requestedDate}
+                    aria-invalid={Boolean(fieldErrors.requestedDate)}
                     aria-describedby={
-                      fieldErrors.reason ? "permission-reason-error" : undefined
+                      fieldErrors.requestedDate
+                        ? "permission-date-help permission-date-error"
+                        : "permission-date-help"
                     }
                     onChange={(event) => {
-                      setReason(event.target.value);
-                      clearFieldError("reason");
+                      setRequestedDate(event.target.value);
+                      clearFieldError("requestedDate");
                     }}
-                    placeholder="Provide clear details on where you are going and why…"
-                    rows={6}
-                    className="coe-input text-base leading-relaxed"
+                    className="coe-input text-base font-medium"
                   />
-                  <div className="mt-2 flex justify-between gap-3 text-xs text-muted-foreground">
-                    <span>Minimum 5 characters.</span>
-                    <span>{reason.length}/500</span>
-                  </div>
-                  <FieldError id="permission-reason-error" message={fieldErrors.reason} />
-                </div>
-              </section>
-            )}
-
-            {/* ── STEP 2: SIGNATURE ──────────────────────────────────────── */}
-            {currentStep === 2 && (
-              <section aria-labelledby="step-signature-title" className="coe-section">
-                <div>
-                  <h2
-                    id="step-signature-title"
-                    className="coe-section-title"
-                  >
-                    Employee Signature
-                  </h2>
-                  <p                   className="coe-section-description">
-                    Draw your signature inside the box or upload an existing signature image to
-                    certify this request.
+                  <p id="permission-date-help" className="permission-field-hint">
+                    Choose today or any future date.
                   </p>
+                  <FieldError id="permission-date-error" message={fieldErrors.requestedDate} />
                 </div>
 
-                <div
-                  aria-invalid={Boolean(fieldErrors.signature)}
-                  aria-describedby={
-                    fieldErrors.signature ? "permission-signature-error" : undefined
-                  }
-                  className="space-y-4"
-                >
-                  <SignaturePad
-                    onChange={(value) => {
-                      setSignature(value);
-                      clearFieldError("signature");
-                    }}
-                  />
-                  <FieldError id="permission-signature-error" message={fieldErrors.signature} />
-
-                  <div className="coe-notice text-xs sm:text-sm">
-                    <p>
-                      Signing as <strong className="text-foreground">{viewer?.name}</strong> (
-                      {viewer?.department}). Your signature certifies that you have informed your
-                      immediate supervisor and will follow Lyceum of Alabang policies during your
-                      absence.
-                    </p>
-                  </div>
-                </div>
-              </section>
-            )}
-
-            {/* ── STEP 3: REVIEW & CONFIRMATION ──────────────────────────── */}
-            {currentStep === 3 && (
-              <section aria-labelledby="step-review-title" className="coe-section">
                 <div>
-                  <h2
-                    id="step-review-title"
-                    className="coe-section-title"
-                  >
-                    Review Request Details
-                  </h2>
-                  <p                   className="coe-section-description">
-                    Carefully review your information before submitting to the HRDO Director for
-                    approval.
-                  </p>
-                </div>
-
-                <dl className="coe-summary-grid grid gap-4 sm:grid-cols-2 text-sm">
-                  <div>
-                    <dt className="text-xs font-semibold text-muted-foreground">Employee Name</dt>
-                    <dd className="mt-1 text-base font-bold text-foreground">{viewer?.name}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs font-semibold text-muted-foreground">Department / Office</dt>
-                    <dd className="mt-1 text-base font-bold text-foreground">
-                      {viewer?.department}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs font-semibold text-muted-foreground">Date of Leaving</dt>
-                    <dd className="mt-1 text-base font-bold text-foreground">
-                      {formatPhilippineDate(requestedDate)}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs font-semibold text-muted-foreground">Hours</dt>
-                    <dd className="mt-1 text-base font-bold text-foreground">
-                      {timeOut} — {timeIn}
-                    </dd>
-                  </div>
-                  <div className="sm:col-span-2">
-                    <dt className="text-xs font-semibold text-muted-foreground">
-                      Reason for Going Out
-                    </dt>
-                    <dd className="coe-review-reason mt-1.5 p-4 text-base font-semibold">
-                      {reason}
-                    </dd>
-                  </div>
-                  <div className="sm:col-span-2">
-                    <dt className="text-xs font-semibold text-muted-foreground">
-                      Electronic Signature
-                    </dt>
-                    <dd className="mt-2">
-                      {signature?.image ? (
-                        <div className="flex h-24 max-w-xs items-center justify-center rounded-lg border bg-white p-3">
-                          <img
-                            src={signature.image}
-                            alt="Signature preview"
-                            className="max-h-20 max-w-full object-contain"
-                          />
-                        </div>
-                      ) : (
-                        <span className="text-sm font-semibold text-destructive">
-                          No signature provided
-                        </span>
-                      )}
-                    </dd>
-                  </div>
-                </dl>
-
-                <div className="coe-confirmation flex items-start gap-3 p-4">
-                  <Checkbox
-                    id="confirm-permission-review"
-                    checked={confirmedAgreement}
-                    onCheckedChange={(checked) => {
-                      setConfirmedAgreement(checked === true);
-                      clearFieldError("form");
-                    }}
-                    className="mt-0.5"
-                  />
                   <Label
-                    htmlFor="confirm-permission-review"
-                    className="text-xs sm:text-sm font-medium leading-relaxed text-foreground"
+                    htmlFor="permission-time-out"
+                    className="text-sm font-bold text-foreground"
                   >
-                    I certify that all details above are true and complete, and I submit this
-                    Permission Slip for official HRDO Director review and approval.
+                    Time Out (Departure) <span className="text-destructive">*</span>
                   </Label>
+                  <Input
+                    id="permission-time-out"
+                    type="time"
+                    value={timeOut}
+                    aria-invalid={Boolean(fieldErrors.timeOut)}
+                    aria-describedby={fieldErrors.timeOut ? "permission-time-out-error" : undefined}
+                    onChange={(event) => {
+                      setTimeOut(event.target.value);
+                      clearFieldError("timeOut");
+                    }}
+                    className="coe-input text-base font-medium"
+                  />
+                  <FieldError id="permission-time-out-error" message={fieldErrors.timeOut} />
                 </div>
-                <FieldError id="permission-form-error" message={fieldErrors.form} />
-              </section>
-            )}
 
-            {/* Wizard Navigation Footer */}
-            <div className="coe-footer">
-              <div className="coe-footer-inner">
+                <div>
+                  <Label htmlFor="permission-time-in" className="text-sm font-bold text-foreground">
+                    Time In (Expected Return) <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="permission-time-in"
+                    type="time"
+                    value={timeIn}
+                    aria-invalid={Boolean(fieldErrors.timeIn)}
+                    aria-describedby={
+                      fieldErrors.timeIn ? "permission-time-in-error" : "permission-time-help"
+                    }
+                    onChange={(event) => {
+                      setTimeIn(event.target.value);
+                      clearFieldError("timeIn");
+                    }}
+                    className="coe-input text-base font-medium"
+                  />
+                  <FieldError id="permission-time-in-error" message={fieldErrors.timeIn} />
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* ── STEP 1: REASON ─────────────────────────────────────────── */}
+          {currentStep === 1 && (
+            <section aria-labelledby="step-reason-title" className="coe-section">
+              <div>
+                <h2 id="step-reason-title" className="coe-section-title">
+                  Reason for Going Out
+                </h2>
+                <p className="coe-section-description">
+                  State the specific purpose of your off-campus absence.
+                </p>
+              </div>
+
+              <div>
+                <Label htmlFor="permission-reason" className="text-sm font-bold text-foreground">
+                  Detailed Reason <span className="text-destructive">*</span>
+                </Label>
+                <Textarea
+                  id="permission-reason"
+                  name="reason"
+                  value={reason}
+                  maxLength={500}
+                  aria-invalid={Boolean(fieldErrors.reason)}
+                  aria-describedby={fieldErrors.reason ? "permission-reason-error" : undefined}
+                  onChange={(event) => {
+                    setReason(event.target.value);
+                    clearFieldError("reason");
+                  }}
+                  placeholder="Provide clear details on where you are going and why…"
+                  rows={6}
+                  className="coe-input"
+                />
+                <div className="permission-field-hint flex justify-between gap-3">
+                  <span>Write at least 5 characters.</span>
+                  <span>{reason.length}/500</span>
+                </div>
+                <FieldError id="permission-reason-error" message={fieldErrors.reason} />
+              </div>
+            </section>
+          )}
+
+          {/* ── STEP 2: SIGNATURE ──────────────────────────────────────── */}
+          {currentStep === 2 && (
+            <section aria-labelledby="step-signature-title" className="coe-section">
+              <div>
+                <h2 id="step-signature-title" className="coe-section-title">
+                  Employee Signature
+                </h2>
+                <p className="coe-section-description">
+                  Draw your signature inside the box or upload an existing signature image to
+                  certify this request.
+                </p>
+              </div>
+
+              <div
+                aria-invalid={Boolean(fieldErrors.signature)}
+                aria-describedby={fieldErrors.signature ? "permission-signature-error" : undefined}
+                className="space-y-4"
+              >
+                <SignaturePad
+                  onChange={(value) => {
+                    setSignature(value);
+                    clearFieldError("signature");
+                  }}
+                />
+                <FieldError id="permission-signature-error" message={fieldErrors.signature} />
+
+                <div className="coe-notice text-xs sm:text-sm">
+                  <p>
+                    Signing as <strong className="text-foreground">{permissionViewer?.name}</strong>{" "}
+                    ({permissionViewer?.department}). Your signature certifies that you have
+                    informed your immediate supervisor and will follow Lyceum of Alabang policies
+                    during your absence.
+                  </p>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* ── STEP 3: REVIEW & CONFIRMATION ──────────────────────────── */}
+          {currentStep === 3 && (
+            <section aria-labelledby="step-review-title" className="coe-section">
+              <div>
+                <h2 id="step-review-title" className="coe-section-title">
+                  Review Request Details
+                </h2>
+                <p className="coe-section-description">
+                  Carefully review your information before submitting to the HRDO Director for
+                  approval.
+                </p>
+              </div>
+
+              <dl className="coe-summary-grid grid gap-4 sm:grid-cols-2 text-sm">
+                <div>
+                  <dt className="text-xs font-semibold text-muted-foreground">Employee Name</dt>
+                  <dd className="mt-1 text-base font-bold text-foreground">
+                    {permissionViewer?.name}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-semibold text-muted-foreground">
+                    Department / Office
+                  </dt>
+                  <dd className="mt-1 text-base font-bold text-foreground">
+                    {permissionViewer?.department}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-semibold text-muted-foreground">Date of Leaving</dt>
+                  <dd className="mt-1 text-base font-bold text-foreground">
+                    {formatPhilippineDate(requestedDate)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-semibold text-muted-foreground">Hours</dt>
+                  <dd className="mt-1 text-base font-bold text-foreground">
+                    {timeOut} — {timeIn}
+                  </dd>
+                </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-xs font-semibold text-muted-foreground">
+                    Reason for Going Out
+                  </dt>
+                  <dd className="coe-review-reason mt-1.5 p-4 text-base font-semibold">{reason}</dd>
+                </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-xs font-semibold text-muted-foreground">
+                    Electronic Signature
+                  </dt>
+                  <dd className="mt-2">
+                    {signature?.image ? (
+                      <div className="flex h-24 max-w-xs items-center justify-center rounded-lg border bg-white p-3">
+                        <img
+                          src={signature.image}
+                          alt="Signature preview"
+                          className="max-h-20 max-w-full object-contain"
+                        />
+                      </div>
+                    ) : (
+                      <span className="text-sm font-semibold text-destructive">
+                        No signature provided
+                      </span>
+                    )}
+                  </dd>
+                </div>
+              </dl>
+
+              <div className="coe-confirmation flex items-start gap-3 p-4">
+                <Checkbox
+                  id="confirm-permission-review"
+                  checked={confirmedAgreement}
+                  onCheckedChange={(checked) => {
+                    setConfirmedAgreement(checked === true);
+                    clearFieldError("form");
+                  }}
+                  className="mt-0.5"
+                />
+                <Label
+                  htmlFor="confirm-permission-review"
+                  className="text-xs sm:text-sm font-medium leading-relaxed text-foreground"
+                >
+                  I certify that all details above are true and complete, and I submit this
+                  Permission Slip for official HRDO Director review and approval.
+                </Label>
+              </div>
+              <FieldError id="permission-form-error" message={fieldErrors.form} />
+            </section>
+          )}
+
+          {/* Wizard Navigation Footer */}
+          <div className="coe-footer">
+            <div className="coe-footer-inner">
               <Button
                 type="button"
                 variant="outline"
@@ -852,8 +896,8 @@ function PermissionSlipsPage() {
                   {busy ? <ButtonLoading label="Submitting…" /> : "Submit Permission Slip"}
                 </Button>
               )}
-              </div>
             </div>
+          </div>
         </form>
 
         {/* Confirmation Modal */}
@@ -868,7 +912,7 @@ function PermissionSlipsPage() {
                 </span>
                 <span className="block rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
                   <strong>Notice:</strong> Your request will be forwarded immediately to the HRDO
-                  Director for electronic review and approval.
+                  Director for approval.
                 </span>
               </AlertDialogDescription>
             </AlertDialogHeader>

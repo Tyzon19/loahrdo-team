@@ -47,7 +47,7 @@ type Search = {
   view?: "receipt" | undefined;
 };
 
-export const Route = createFileRoute("/_authenticated/permission-slips/$id")({
+export const Route = createFileRoute("/permission-slips/$id")({
   validateSearch: (search: Record<string, unknown>): Search => ({
     view: search["view"] === "receipt" ? "receipt" : undefined,
   }),
@@ -213,10 +213,10 @@ function PermissionSlipDetailPage() {
   const { id } = Route.useParams();
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
-  const { viewer } = Route.useRouteContext();
+  const { permissionViewer } = Route.useRouteContext();
   const queryClient = useQueryClient();
   const receiptRef = useRef<HTMLDivElement>(null);
-  const isHead = isPermissionHead(viewer);
+  const isHead = isPermissionHead(permissionViewer);
 
   const query = useQuery({
     queryKey: ["permission-slip", id],
@@ -239,7 +239,7 @@ function PermissionSlipDetailPage() {
   const slip = query.data;
   const isApproved = slip?.status === "approved";
   const isPendingReview = isHead && slip?.status === "pending_approval";
-  const hrDirectorName = slip?.departmentHeadName || viewer?.name || "HRDO Director";
+  const hrDirectorName = slip?.departmentHeadName || permissionViewer?.name || "HRDO Director";
 
   const emailAlreadyDelivered =
     receiptEmailedLocally ||
@@ -366,7 +366,9 @@ function PermissionSlipDetailPage() {
         toast.error(`Failed to send email: ${result.emailDelivery.message}`);
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to email permission slip receipt.");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to email permission slip receipt.",
+      );
     } finally {
       setSendingReceipt(false);
     }
@@ -396,7 +398,9 @@ function PermissionSlipDetailPage() {
         className="mx-auto max-w-2xl rounded-lg border border-destructive/30 bg-destructive/5 p-6"
         role="alert"
       >
-        <p className="font-semibold text-destructive">We couldn&apos;t load this Permission Slip.</p>
+        <p className="font-semibold text-destructive">
+          We couldn&apos;t load this Permission Slip.
+        </p>
         <p className="mt-1 text-sm text-muted-foreground">
           {query.error instanceof Error ? query.error.message : "Please try again."}
         </p>
@@ -411,9 +415,12 @@ function PermissionSlipDetailPage() {
   if (receiptSentSuccess) {
     return (
       <div className="coe-success-wrap">
-        <section className="panel coe-success-card" aria-labelledby="permission-receipt-success-title">
+        <section
+          className="panel coe-success-card"
+          aria-labelledby="permission-receipt-success-title"
+        >
           <div className="coe-success-logos" aria-label="Lyceum of Alabang and HRDO">
-            <img src="/lyceum-logo.png.png" alt="Lyceum of Alabang seal" />
+            <img src="/loa-logo.png" alt="Lyceum of Alabang seal" />
             <img src="/HRDO%20LOGO.png" alt="Human Resources Development Office logo" />
           </div>
           <div className="coe-success-icon" aria-hidden="true">
@@ -434,8 +441,12 @@ function PermissionSlipDetailPage() {
               View receipt
             </Button>
             <Button type="button" variant="outline" asChild>
-              <Link to="/permission-slips/$id" params={{ id: slip.id }} search={{ view: undefined }}>
-              Back to request
+              <Link
+                to="/permission-slips/$id"
+                params={{ id: slip.id }}
+                search={{ view: undefined }}
+              >
+                Back to request
               </Link>
             </Button>
           </div>
@@ -454,8 +465,8 @@ function PermissionSlipDetailPage() {
             className="w-fit gap-2"
             onClick={() => setReceiptOpen(false)}
           >
-              <ArrowLeft className="h-4 w-4" />
-              Back to Request Form
+            <ArrowLeft className="h-4 w-4" />
+            Back to Request Form
           </Button>
           <div className="flex flex-wrap items-center gap-2">
             <Button
@@ -476,7 +487,7 @@ function PermissionSlipDetailPage() {
                 disabled={sendingReceipt || emailAlreadyDelivered}
               >
                 <Mail className="h-4 w-4" />
-                {emailAlreadyDelivered ? "Receipt Emailed" : "Send via Gmail"}
+                {emailAlreadyDelivered ? "Receipt Sent" : "Send Receipt"}
               </Button>
             )}
           </div>
@@ -488,17 +499,12 @@ function PermissionSlipDetailPage() {
             icon={CheckCircle2}
             title={`Permission Slip receipt emailed to ${slip.employeeEmail} via Gmail.`}
           >
-            The official permission slip receipt was successfully delivered to{" "}
-            {slip.employeeEmail}.
+            The official permission slip receipt was successfully delivered to {slip.employeeEmail}.
           </Notice>
         ) : (
-          <Notice
-            tone="info"
-            icon={Info}
-            title="Official Permission Slip Receipt"
-          >
+          <Notice tone="info" icon={Info} title="Official Permission Slip Receipt">
             {isHead
-              ? `Review the signed document below. Choose "Send via Gmail" to deliver the softcopy to ${slip.employeeEmail}, or "Download Receipt" for local records.`
+              ? `Review the signed document below. Choose "Send Receipt" to deliver the softcopy to ${slip.employeeEmail}, or "Download Receipt" for local records.`
               : "Here is your official approved Permission Slip receipt. You can download or print it as needed."}
           </Notice>
         )}
@@ -506,7 +512,6 @@ function PermissionSlipDetailPage() {
         <div className="overflow-hidden rounded-xl border bg-card p-2 shadow-sm sm:p-6">
           <PermissionSlipReceipt slip={slip} receiptRef={receiptRef} />
         </div>
-
       </div>
     );
   }
@@ -537,14 +542,21 @@ function PermissionSlipDetailPage() {
               </Link>
             </Button>
             {isApproved && (
-              <Button
-                type="button"
-                className="gap-2"
-                onClick={() => setReceiptOpen(true)}
-              >
-                <FileText className="h-4 w-4" />
-                View Receipt
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" className="gap-2" onClick={() => setReceiptOpen(true)}>
+                  <FileText className="h-4 w-4" />
+                  View Receipt
+                </Button>
+                {!isHead && emailAlreadyDelivered && (
+                  <span
+                    className="inline-flex items-center gap-1.5 rounded-sm border border-success/30 bg-success-soft px-2.5 py-1.5 text-xs font-medium text-success"
+                    role="status"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
+                    Receipt Sent
+                  </span>
+                )}
+              </div>
             )}
           </div>
         }
@@ -553,23 +565,17 @@ function PermissionSlipDetailPage() {
       <PermissionStatusCheck status={slip.status} />
 
       {isApproved && (
-        <Notice
-          tone="success"
-          icon={CheckCircle2}
-          title="Permission Slip has been approved."
-        >
+        <Notice tone="success" icon={CheckCircle2} title="Permission Slip has been approved.">
           {emailAlreadyDelivered
             ? `The official receipt was already emailed to ${slip.employeeEmail}.`
-            : `The official receipt is ready. Use "View Receipt" above, then choose "Send via Gmail" when ready.`}
+            : isHead
+              ? `The official receipt is ready. Use "View Receipt" above, then choose "Send Receipt" when ready.`
+              : 'The official receipt is ready. Use "View Receipt" to open it.'}
         </Notice>
       )}
 
       {slip.status === "rejected" && slip.rejectionReason && (
-        <Notice
-          tone="danger"
-          icon={XCircle}
-          title="This Permission Slip was rejected."
-        >
+        <Notice tone="danger" icon={XCircle} title="This Permission Slip was rejected.">
           <p>
             <strong>Reason:</strong> {slip.rejectionReason}
           </p>
@@ -642,7 +648,7 @@ function PermissionSlipDetailPage() {
           </Field>
           <div className="sm:col-span-2">
             <Field label="Reason for Going Out" comfortable>
-              <div className="mt-1 rounded-md border-l-4 border-l-amber-500 bg-amber-50/70 p-3.5 text-sm font-semibold text-slate-900 whitespace-pre-wrap">
+              <div className="mt-1 rounded-md border-l-4 border-l-amber-500 bg-amber-50/70 p-3.5 text-base font-semibold leading-relaxed text-slate-900 whitespace-pre-wrap">
                 {slip.reason}
               </div>
             </Field>
@@ -764,11 +770,7 @@ function PermissionSlipDetailPage() {
           </div>
 
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              variant="outline"
-              onClick={() => setApproveOpen(false)}
-              disabled={busy}
-            >
+            <Button variant="outline" onClick={() => setApproveOpen(false)} disabled={busy}>
               Cancel
             </Button>
             <Button
@@ -813,11 +815,7 @@ function PermissionSlipDetailPage() {
           </div>
 
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              variant="outline"
-              onClick={() => setRejectOpen(false)}
-              disabled={busy}
-            >
+            <Button variant="outline" onClick={() => setRejectOpen(false)} disabled={busy}>
               Cancel
             </Button>
             <Button

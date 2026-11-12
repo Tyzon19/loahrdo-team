@@ -3,19 +3,27 @@ import { runSafely } from "@/lib/errors";
 
 export const bootstrapFn = createServerFn({ method: "GET" }).handler(async () => {
   try {
-    const [{ viewer }, { hrdoViewer }, { serverEnvOptional }] = await Promise.all([
-      import("./server/auth"),
-      import("./server/hrdo/auth"),
-      import("./server/env"),
-    ]);
+    const [{ viewer }, { hrdoViewer }, { permissionViewer }, { serverEnvOptional }] =
+      await Promise.all([
+        import("./server/auth"),
+        import("./server/hrdo/auth"),
+        import("./server/permission/auth"),
+        import("./server/env"),
+      ]);
     return {
       viewer: await viewer(),
       hrdoViewer: await hrdoViewer(),
+      permissionViewer: await permissionViewer(),
       analytics: { measurementId: serverEnvOptional("GA_MEASUREMENT_ID") ?? null },
     };
   } catch (error) {
     console.error(`[bootstrap] ${error instanceof Error ? error.message : "unknown"}`);
-    return { viewer: null, hrdoViewer: null, analytics: { measurementId: null } };
+    return {
+      viewer: null,
+      hrdoViewer: null,
+      permissionViewer: null,
+      analytics: { measurementId: null },
+    };
   }
 });
 
@@ -69,6 +77,16 @@ export const resetPasswordWithRecoveryCodeFn = createServerFn({ method: "POST" }
 
 export const logoutFn = createServerFn({ method: "POST" }).handler(async () =>
   runSafely(async () => (await import("./server/auth")).logout()),
+);
+
+export const permissionLoginFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/permission/auth")).permissionLogin(data)),
+  );
+
+export const permissionLogoutFn = createServerFn({ method: "POST" }).handler(async () =>
+  runSafely(async () => (await import("./server/permission/auth")).permissionLogout()),
 );
 
 export const submitPermissionSlipFn = createServerFn({ method: "POST" })
@@ -131,10 +149,22 @@ export const updateProfileFn = createServerFn({ method: "POST" })
     runSafely(async () => (await import("./server/auth")).updateProfile(data)),
   );
 
+export const completeProfileNameFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/auth")).completeProfileName(data)),
+  );
+
 export const hrdoUpdateProfileFn = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) =>
     runSafely(async () => (await import("./server/hrdo/auth")).hrdoUpdateProfile(data)),
+  );
+
+export const hrdoCompleteProfileNameFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/hrdo/auth")).hrdoCompleteProfileName(data)),
   );
 
 export const submitCoeRequestFn = createServerFn({ method: "POST" })

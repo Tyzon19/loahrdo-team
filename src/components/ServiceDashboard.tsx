@@ -92,24 +92,28 @@ export function ServiceDashboard({
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-muted/40">
+    <div className="flex min-h-screen w-full min-w-0 max-w-full flex-col bg-muted/40">
       {signingOut && <LoadingScreen label="Signing out" mode="overlay" immediate />}
       <header className="sticky top-0 z-20 border-b border-border bg-background/90 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-            <img src={LOGO_URL} alt="Lyceum of Alabang" className="h-10 w-auto" />
+        <div className="mx-auto flex h-16 w-full min-w-0 max-w-6xl items-center justify-between gap-2 px-3 sm:gap-4 sm:px-6">
+          <div className="flex min-w-0 shrink items-center gap-1.5 sm:shrink-0 sm:gap-3">
+            <img
+              src={LOGO_URL}
+              alt="Lyceum of Alabang"
+              className="h-7 w-auto max-w-[112px] sm:h-10 sm:max-w-none"
+            />
             <img
               src="/HRDO%20LOGO.png"
               alt="Human Resources Development Office"
-              className="h-9 w-9 object-contain"
+              className="hidden h-9 w-9 object-contain sm:block"
             />
             <img
-              src="/lyceum-logo.png.png"
+              src="/loa-logo.png"
               alt="Lyceum of Alabang seal"
-              className="h-10 w-10 object-contain"
+              className="hidden h-10 w-10 object-contain sm:block"
             />
           </div>
-          <nav className="flex items-center gap-1 text-sm font-semibold">
+          <nav className="flex shrink-0 items-center gap-0.5 text-sm font-semibold sm:gap-1">
             <a
               href="#services"
               className="hidden rounded-md px-3 py-2 text-primary hover:bg-muted sm:block"
@@ -133,10 +137,14 @@ export function ServiceDashboard({
               </Button>
             ) : (
               <>
-                <Button asChild variant="ghost" className="ml-2">
+                <Button
+                  asChild
+                  variant="ghost"
+                  className="ml-0 h-11 px-2 text-xs sm:ml-2 sm:h-9 sm:px-4 sm:text-sm"
+                >
                   <Link to="/login">Sign in</Link>
                 </Button>
-                <Button asChild>
+                <Button asChild className="h-11 px-2 text-xs sm:h-9 sm:px-4 sm:text-sm">
                   <Link to="/register">Register</Link>
                 </Button>
               </>
@@ -145,7 +153,7 @@ export function ServiceDashboard({
         </div>
       </header>
 
-      <section className="relative isolate overflow-hidden">
+      <section className="relative isolate w-full min-w-0 overflow-hidden">
         <img
           src="/lyceum-building.png.png"
           alt=""
@@ -153,10 +161,12 @@ export function ServiceDashboard({
         />
         <div className="absolute inset-0 -z-10 bg-overlay mix-blend-multiply" />
         <div className="absolute inset-0 -z-10 bg-gradient-to-r from-primary/90 via-primary/60 to-transparent" />
-        <div className="mx-auto max-w-6xl px-4 pb-28 pt-16 text-primary-foreground sm:px-6 md:pt-24">
+        <div className="mx-auto w-full min-w-0 max-w-6xl px-4 pb-20 pt-12 text-primary-foreground sm:px-6 sm:pb-28 sm:pt-16 md:pt-24">
           <p className="text-sm font-semibold uppercase tracking-[0.25em] opacity-80">Welcome to</p>
-          <h1 className="mt-3 text-4xl font-extrabold tracking-tight md:text-6xl">LOA HRDO Desk</h1>
-          <p className="mt-4 max-w-xl text-base opacity-90 md:text-lg">
+          <h1 className="mt-3 text-3xl font-extrabold leading-tight tracking-tight sm:text-4xl md:text-6xl">
+            LOA HRDO Desk
+          </h1>
+          <p className="mt-4 max-w-xl text-base leading-relaxed opacity-90 md:text-lg">
             Transforming employee services for a faster, convenient, and smarter digital experience
             for staff and stakeholders.
           </p>
@@ -165,15 +175,17 @@ export function ServiceDashboard({
 
       <main
         id="services"
-        className="relative z-10 mx-auto -mt-16 w-full max-w-6xl flex-1 px-4 pb-16 sm:px-6"
+        className="relative z-10 mx-auto -mt-12 w-full min-w-0 max-w-6xl flex-1 px-3 pb-12 sm:-mt-16 sm:px-6 sm:pb-16"
       >
-        <div className="rounded-2xl border border-border bg-background p-5 shadow-xl md:p-8">
+        <div className="min-w-0 rounded-2xl border border-border bg-background p-4 shadow-xl sm:p-5 md:p-8">
           <div className="mb-6 grid gap-4 md:flex md:items-end md:justify-between">
             <div className="min-w-0">
               <p className="text-xs font-bold uppercase tracking-widest text-overlay">
                 Explore our services
               </p>
-              <h2 className="mt-1 text-2xl font-bold text-foreground">What do you need today?</h2>
+              <h2 className="mt-1 text-xl font-bold leading-tight text-foreground sm:text-2xl">
+                What do you need today?
+              </h2>
             </div>
             <label className="flex items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-2 md:w-72">
               <Search className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
@@ -187,11 +199,11 @@ export function ServiceDashboard({
             </label>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {list.map((service) => {
               const Icon = service.icon;
               const className =
-                "group flex min-h-56 flex-col rounded-xl border border-border bg-background p-5 text-left transition-all hover:-translate-y-1 hover:border-primary hover:shadow-lg";
+                "group flex min-h-56 min-w-0 flex-col rounded-xl border border-border bg-background p-4 text-left transition-all hover:-translate-y-1 hover:border-primary hover:shadow-lg sm:p-5";
               return service.to ? (
                 <Link key={service.title} to={service.to} className={className}>
                   <ServiceCardContents service={service} icon={Icon} />
@@ -219,7 +231,11 @@ export function ServiceDashboard({
               <Link to="/requests" className="font-semibold text-primary hover:underline">
                 View my vehicle requests
               </Link>
-              <Link to="/profile" className="font-semibold text-primary hover:underline">
+              <Link
+                to="/profile"
+                search={{ portal: undefined }}
+                className="font-semibold text-primary hover:underline"
+              >
                 Account profile
               </Link>
             </div>
@@ -266,7 +282,6 @@ export function ServiceDashboard({
         <p className="border-t border-primary-foreground/15 py-4 text-center text-xs opacity-70">
           © 2026 Lyceum of Alabang HRDO. All rights reserved.
         </p>
-
       </footer>
     </div>
   );

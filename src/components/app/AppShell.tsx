@@ -30,14 +30,12 @@ import { LoadingScreen } from "@/components/app/LoadingPanel";
 import { cn } from "@/lib/utils";
 import { listNotificationsFn, logoutFn } from "@/server-functions";
 import { unwrap } from "@/lib/api";
-import { isPermissionHead } from "@/lib/permission-access";
 type NavItem = {
   to: string;
   label: string;
   mobileLabel: string;
   icon: typeof Bell;
   exact?: boolean;
-  search?: Record<string, unknown>;
 };
 const ITEMS = {
   dash: {
@@ -74,28 +72,6 @@ const ITEMS = {
     label: "Permission Slips",
     mobileLabel: "Permission",
     icon: ShieldCheck,
-  },
-  permissionNew: {
-    to: "/permission-slips",
-    label: "Request Permission",
-    mobileLabel: "New Slip",
-    icon: FilePlus2,
-    exact: true,
-  },
-  permissionMine: {
-    to: "/permission-slips",
-    search: { view: "history" },
-    label: "My Permission Slips",
-    mobileLabel: "My Slips",
-    icon: ClipboardList,
-    exact: true,
-  },
-  permissionReview: {
-    to: "/permission-slips",
-    label: "Permission Slip Review",
-    mobileLabel: "Review",
-    icon: ShieldCheck,
-    exact: true,
   },
   phoneDirectory: {
     to: "/phone-directory",
@@ -153,16 +129,15 @@ export const NAV: Record<Role, NavItem[]> = {
 };
 
 function permissionNavSearch(permissionPortal: boolean, item: NavItem) {
-  if (item.search) return item.search;
-  return permissionPortal && item.to === "/profile" ? { portal: "permission" as const } : undefined;
+  if (!permissionPortal) return undefined;
+  if (item.to === "/permission-slips") return { view: undefined };
+  if (item.to === "/profile") return { portal: "permission" as const };
+  return undefined;
 }
 
 function navItemsFor(user: Viewer, permissionPortal: boolean) {
   if (permissionPortal) {
-    if (isPermissionHead(user)) {
-      return [ITEMS.permissionReview, ITEMS.permissionNew, ITEMS.permissionMine, ITEMS.profile];
-    }
-    return [ITEMS.permissionNew, ITEMS.permissionMine, ITEMS.profile];
+    return [ITEMS.permission, ITEMS.profile];
   }
   return NAV[user.role] ?? [ITEMS.dash, ITEMS.profile];
 }
@@ -178,7 +153,7 @@ function SideNav({
   permissionPortal: boolean;
   onNavigate?: () => void;
 }) {
-  const location = useRouterState({ select: (r) => ({ pathname: r.location.pathname, searchStr: r.location.searchStr }) });
+  const location = useRouterState({ select: (r) => r.location.pathname });
   const items = navItemsFor(user, permissionPortal);
   return (
     <nav className="flex h-full flex-col bg-sidebar text-sidebar-foreground" aria-label="Main">
@@ -192,12 +167,13 @@ function SideNav({
       </div>
       <ul className="flex-1 py-2">
         {items.map((item) => {
-          const active = isNavItemActive(item, location.pathname, location.searchStr);
+          const active = isNavItemActive(item, location);
+          const search = permissionNavSearch(permissionPortal, item);
           return (
             <li key={item.to + item.label}>
               <Link
                 to={item.to}
-                search={permissionNavSearch(permissionPortal, item)}
+                {...(search ? { search } : {})}
                 onClick={onNavigate}
                 className={cn(
                   "flex min-h-11 items-center gap-2.5 border-l-4 px-4 py-2 text-sm transition-colors",
@@ -232,16 +208,9 @@ function SideNav({
   );
 }
 
-function isNavItemActive(item: NavItem, path: string, searchStr = "") {
+function isNavItemActive(item: NavItem, path: string) {
   if (item.to === "/permission-slips") {
-    const params = new URLSearchParams(searchStr);
-    const currentView = params.get("view");
-    const targetView = item.search?.["view"] as string | undefined;
-
-    if (targetView) {
-      return path === "/permission-slips" && currentView === targetView;
-    }
-    return path === "/permission-slips" && currentView !== "history";
+    return path === "/permission-slips" || path.startsWith("/permission-slips/");
   }
 
   if (item.to === "/requests") {
@@ -259,7 +228,7 @@ function MobileNav({
   unread: number;
   permissionPortal: boolean;
 }) {
-  const location = useRouterState({ select: (r) => ({ pathname: r.location.pathname, searchStr: r.location.searchStr }) });
+  const location = useRouterState({ select: (r) => r.location.pathname });
   const items = navItemsFor(user, permissionPortal).filter(
     (item) => item.to !== "/profile" || item.label === "Profile",
   );
@@ -272,12 +241,13 @@ function MobileNav({
     >
       <ul className="mx-auto grid w-full max-w-lg grid-flow-col auto-cols-fr gap-1">
         {items.map((item) => {
-          const active = isNavItemActive(item, location.pathname, location.searchStr);
+          const active = isNavItemActive(item, location);
+          const search = permissionNavSearch(permissionPortal, item);
           return (
             <li key={item.to + item.label} className="min-w-0">
               <Link
                 to={item.to}
-                search={permissionNavSearch(permissionPortal, item)}
+                {...(search ? { search } : {})}
                 aria-current={active ? "page" : undefined}
                 aria-label={item.label}
                 className={cn(
@@ -392,7 +362,10 @@ export function AppShell({ user, children }: { user: Viewer; children: ReactNode
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link to="/profile" search={permissionPortal ? { portal: "permission" } : undefined}>
+                  <Link
+                    to="/profile"
+                    search={{ portal: permissionPortal ? "permission" : undefined }}
+                  >
                     Profile
                   </Link>
                 </DropdownMenuItem>

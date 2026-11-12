@@ -359,7 +359,7 @@ function CoeRequestPage() {
         <main className="coe-success-wrap">
           <section className="panel coe-success-card" aria-labelledby="coe-success-title">
             <div className="coe-success-logos" aria-label="Lyceum of Alabang and HRDO">
-              <img src="/lyceum-logo.png.png" alt="Lyceum of Alabang seal" />
+              <img src="/loa-logo.png" alt="Lyceum of Alabang seal" />
               <img src="/HRDO%20LOGO.png" alt="Human Resources Development Office logo" />
             </div>
             <div className="coe-success-icon" aria-hidden="true">

@@ -8,10 +8,13 @@ import {
   rejectPermissionSchema,
   sendPermissionReceiptSchema,
 } from "@/lib/permission-schema";
-import type { Viewer } from "@/lib/types";
-import { isPermissionHead, PERMISSION_HEAD_EMAIL } from "@/lib/permission-access";
+import {
+  isPermissionHead,
+  PERMISSION_HEAD_EMAIL,
+  type PermissionViewer,
+} from "@/lib/permission-access";
 import { all, run, withTransaction } from "../db";
-import { requireViewer } from "../auth";
+import { requirePermissionViewer } from "./auth";
 import { sendPermissionSlipEmail } from "../gmail";
 
 export const PERMISSION_HEAD_DEPARTMENT = "Human Resources Development Office";
@@ -73,6 +76,7 @@ interface PermissionRow extends RowDataPacket {
 
 interface PermissionHistoryRow extends RowDataPacket {
   id: string;
+  permission_slip_id: string;
   actor_id: string | null;
   actor_name: string;
   actor_role: PermissionHistoryEntry["actorRole"];
@@ -127,32 +131,49 @@ function mapPermission(row: PermissionRow, history: PermissionHistoryRow[]): Per
 }
 
 async function loadPermission(id: string) {
-  const rows = await all<PermissionRow[]>(
-    "SELECT * FROM permission_slips WHERE id = ? LIMIT 1",
-    [id],
-  );
+  const rows = await all<PermissionRow[]>("SELECT * FROM permission_slips WHERE id = ? LIMIT 1", [
+    id,
+  ]);
   const row = rows[0];
   if (!row) return null;
-  const history = await all<PermissionHistoryRow[]>(
-    "SELECT * FROM permission_history WHERE permission_slip_id = ? ORDER BY happened_at, id",
-    [id],
+  const items = await loadPermissions(rows);
+  return items[0] ?? null;
+}
+
+async function loadPermissions(rows: PermissionRow[]) {
+  if (!rows.length) return [];
+
+  const ids = rows.map((row) => row.id);
+  const placeholders = ids.map(() => "?").join(", ");
+  const historyRows = await all<PermissionHistoryRow[]>(
+    `SELECT * FROM permission_history
+     WHERE permission_slip_id IN (${placeholders})
+     ORDER BY happened_at, id`,
+    ids,
   );
-  return mapPermission(row, history);
+  const historyBySlip = new Map<string, PermissionHistoryRow[]>();
+  for (const history of historyRows) {
+    const entries = historyBySlip.get(history.permission_slip_id) ?? [];
+    entries.push(history);
+    historyBySlip.set(history.permission_slip_id, entries);
+  }
+
+  return rows.map((row) => mapPermission(row, historyBySlip.get(row.id) ?? []));
 }
 
-function canView(viewer: Viewer, slip: PermissionSlip) {
-  return isPermissionHead(viewer) || viewer.role === "admin" || viewer.id === slip.employeeId;
+function canView(viewer: PermissionViewer, slip: PermissionSlip) {
+  return isPermissionHead(viewer) || viewer.id === slip.employeeId;
 }
 
-function requireDepartmentHead(viewer: Viewer) {
+function requireDepartmentHead(viewer: PermissionViewer) {
   if (!isPermissionHead(viewer)) {
     throw new AppError("Only the HRDO Department Head can approve permission slips.");
   }
 }
 
 export async function submitPermissionSlip(input: unknown) {
-  const viewer = await requireViewer();
-  if (viewer.role !== "requisitioner") {
+  const viewer = await requirePermissionViewer();
+  if (viewer.role !== "employee") {
     throw new AppError("Only employees can submit permission slips.");
   }
   const data = parseInput(createPermissionSchema, input);
@@ -217,29 +238,25 @@ export async function submitPermissionSlip(input: unknown) {
 }
 
 export async function listMyPermissionSlips() {
-  const viewer = await requireViewer();
+  const viewer = await requirePermissionViewer();
   const rows = await all<PermissionRow[]>(
-    "SELECT * FROM permission_slips WHERE employee_id = ? ORDER BY requested_at DESC",
-    [viewer.id],
+    "SELECT * FROM permission_slips WHERE employee_id = ? OR employee_email = ? ORDER BY requested_at DESC",
+    [viewer.id, viewer.email],
   );
-  return Promise.all(rows.map((row) => loadPermission(row.id))).then((items) =>
-    items.filter((item): item is PermissionSlip => Boolean(item)),
-  );
+  return loadPermissions(rows);
 }
 
 export async function listPendingPermissionSlips() {
-  const viewer = await requireViewer();
+  const viewer = await requirePermissionViewer();
   requireDepartmentHead(viewer);
   const rows = await all<PermissionRow[]>(
     "SELECT * FROM permission_slips WHERE status = 'pending_approval' ORDER BY requested_at ASC",
   );
-  return Promise.all(rows.map((row) => loadPermission(row.id))).then((items) =>
-    items.filter((item): item is PermissionSlip => Boolean(item)),
-  );
+  return loadPermissions(rows);
 }
 
 export async function getPermissionSlip(input: unknown) {
-  const viewer = await requireViewer();
+  const viewer = await requirePermissionViewer();
   const id = parseInput(permissionIdSchema, input);
   const slip = await loadPermission(id);
   if (!slip) throw new AppError("Permission slip not found.");
@@ -248,7 +265,7 @@ export async function getPermissionSlip(input: unknown) {
 }
 
 export async function approvePermissionSlip(input: unknown) {
-  const viewer = await requireViewer();
+  const viewer = await requirePermissionViewer();
   requireDepartmentHead(viewer);
   const data = parseInput(approvePermissionSchema, input);
   const slip = await loadPermission(data.id);
@@ -269,7 +286,13 @@ export async function approvePermissionSlip(input: unknown) {
       `INSERT INTO permission_history
         (id, permission_slip_id, actor_id, actor_name, actor_role, type, message)
        VALUES (?, ?, ?, ?, 'department_head', 'approved', ?)`,
-      [randomUUID(), data.id, viewer.id, viewer.name, "Permission slip approved by HRDO Department Head."],
+      [
+        randomUUID(),
+        data.id,
+        viewer.id,
+        viewer.name,
+        "Permission slip approved by HRDO Department Head.",
+      ],
       conn,
     );
   });
@@ -306,7 +329,7 @@ export async function approvePermissionSlip(input: unknown) {
 }
 
 export async function rejectPermissionSlip(input: unknown) {
-  const viewer = await requireViewer();
+  const viewer = await requirePermissionViewer();
   requireDepartmentHead(viewer);
   const data = parseInput(rejectPermissionSchema, input);
   const slip = await loadPermission(data.id);
@@ -345,7 +368,7 @@ export async function rejectPermissionSlip(input: unknown) {
 }
 
 export async function sendPermissionSlipReceipt(input: unknown) {
-  const viewer = await requireViewer();
+  const viewer = await requirePermissionViewer();
   requireDepartmentHead(viewer);
   const data = parseInput(sendPermissionReceiptSchema, input);
   const slip = await loadPermission(data.id);

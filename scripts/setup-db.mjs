@@ -83,6 +83,18 @@ try {
   await conn.query("FLUSH PRIVILEGES");
 
   await conn.query("USE ??", [dbName]);
+  // Permission Slips sign in with the shared institutional accounts, so the
+  // short-lived per-system account store from the first iteration is removed.
+  const [legacyPermissionStore] = await conn.query(
+    `SELECT COUNT(*) AS count
+     FROM information_schema.TABLES
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'permission_users'`,
+    [dbName],
+  );
+  if (Number(legacyPermissionStore[0]?.count ?? 0) > 0) {
+    await conn.query("DROP TABLE IF EXISTS permission_sessions");
+    await conn.query("DROP TABLE IF EXISTS permission_users");
+  }
   await conn.query(readFileSync(schemaPath, "utf8"));
   for (const [table, column] of [
     ["users", "role"],
@@ -101,6 +113,36 @@ try {
   await conn.query(
     "ALTER TABLE hrdo_coe_history MODIFY actor_role ENUM('employee','hrdo_staff','hrdo_admin','system') NOT NULL",
   );
+  // Permission Slip rows keep their own employee and approver snapshot, so the
+  // old constraints that tied them to the vehicle trip ticket users table are
+  // removed on databases that still have them.
+  for (const [table, constraint] of [
+    ["permission_slips", "permission_employee_fk"],
+    ["permission_slips", "permission_head_fk"],
+    ["permission_history", "permission_history_actor_fk"],
+  ]) {
+    const [constraintRows] = await conn.query(
+      `SELECT COUNT(*) AS count
+       FROM information_schema.TABLE_CONSTRAINTS
+       WHERE CONSTRAINT_SCHEMA = ? AND TABLE_NAME = ? AND CONSTRAINT_NAME = ?`,
+      [dbName, table, constraint],
+    );
+    if (Number(constraintRows[0]?.count ?? 0) > 0) {
+      await conn.query(`ALTER TABLE \`${table}\` DROP FOREIGN KEY \`${constraint}\``);
+    }
+  }
+  const [permissionEmailIndex] = await conn.query(
+    `SELECT COUNT(*) AS count
+     FROM information_schema.STATISTICS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'permission_slips'
+       AND INDEX_NAME = 'permission_employee_email_idx'`,
+    [dbName],
+  );
+  if (Number(permissionEmailIndex[0]?.count ?? 0) === 0) {
+    await conn.query(
+      "ALTER TABLE permission_slips ADD KEY permission_employee_email_idx (employee_email, requested_at)",
+    );
+  }
   await conn.query("ALTER TABLE vehicles MODIFY capacity INT NOT NULL DEFAULT 1");
   const [coeDocumentMimeColumn] = await conn.query(
     `SELECT CHARACTER_MAXIMUM_LENGTH AS maxLength
