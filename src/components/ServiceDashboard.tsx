@@ -203,7 +203,7 @@ export function ServiceDashboard({
             {list.map((service) => {
               const Icon = service.icon;
               const className =
-                "group flex min-h-56 min-w-0 flex-col rounded-xl border border-border bg-background p-4 text-left transition-all hover:-translate-y-1 hover:border-primary hover:shadow-lg sm:p-5";
+                "group flex min-h-52 min-w-0 w-full touch-manipulation flex-col items-start rounded-xl border border-border bg-background p-6 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary hover:bg-primary/[0.03] hover:shadow-md active:translate-y-0 active:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2";
               return service.to ? (
                 <Link key={service.title} to={service.to} className={className}>
                   <ServiceCardContents service={service} icon={Icon} />
@@ -290,19 +290,19 @@ function ServiceCardContents({ service, icon: Icon }: { service: Service; icon: 
   return (
     <>
       <div className="flex w-full items-center justify-between">
-        <span className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
-          <Icon className="h-6 w-6" aria-hidden />
+        <span className="grid h-16 w-16 place-items-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+          <Icon className="h-8 w-8" aria-hidden />
         </span>
         <span className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
           {service.tag}
         </span>
       </div>
-      <h3 className="mt-5 font-bold text-foreground">{service.title}</h3>
-      <p className="mt-1 flex-1 text-sm text-muted-foreground">{service.desc}</p>
-      <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-primary">
+      <h3 className="mt-5 text-lg font-bold text-foreground">{service.title}</h3>
+      <p className="mt-2 flex-1 text-sm leading-6 text-muted-foreground">{service.desc}</p>
+      <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-primary">
         {service.to ? "Open" : "Coming soon"}
         <ArrowRight
-          className="h-4 w-4 transition-transform group-hover:translate-x-1"
+          className="h-5 w-5 transition-transform group-hover:translate-x-1"
           aria-hidden
         />
       </span>
