@@ -12,6 +12,7 @@ describe("Permission Slip Approval & Receipt Schemas", () => {
 
   it("validates createPermissionSchema with valid date, times, reason and signature", () => {
     const valid = createPermissionSchema.safeParse({
+      department: "College of Computer Studies",
       requestedDate: "2026-11-12",
       timeOut: "10:30",
       timeIn: "14:00",
@@ -19,6 +20,18 @@ describe("Permission Slip Approval & Receipt Schemas", () => {
       employeeSignature: dummySignature,
     });
     expect(valid.success).toBe(true);
+  });
+
+  it("rejects createPermissionSchema when the department is missing", () => {
+    const invalid = createPermissionSchema.safeParse({
+      department: "",
+      requestedDate: "2026-11-12",
+      timeOut: "10:30",
+      timeIn: "14:00",
+      reason: "Official school errand at Department of Education",
+      employeeSignature: dummySignature,
+    });
+    expect(invalid.success).toBe(false);
   });
 
   it("rejects createPermissionSchema when reason is shorter than 5 chars", () => {

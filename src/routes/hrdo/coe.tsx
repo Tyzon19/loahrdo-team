@@ -1023,7 +1023,7 @@ function CoeRequestPage() {
                                 onChange={(event) => setVerifierEmail(event.target.value)}
                                 type="email"
                                 autoComplete="email"
-                                placeholder="company or personal email"
+                                placeholder="personal email"
                               />
                             </div>
                             <div>

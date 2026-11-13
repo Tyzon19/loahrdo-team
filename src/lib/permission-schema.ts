@@ -13,6 +13,11 @@ const receiptImage = z
   .optional();
 
 export const createPermissionSchema = z.object({
+  department: z
+    .string()
+    .trim()
+    .min(2, "Enter your department or office.")
+    .max(190, "The department or office name is too long."),
   requestedDate: z
     .string()
     .trim()

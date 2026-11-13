@@ -3,6 +3,8 @@ import { ArrowUpRight } from "lucide-react";
 import { EmptyState } from "@/components/app/PageHeader";
 import { CoeStatusBadge } from "./CoeStatusBadge";
 import { CoeDeadlineBadge } from "./CoeDeadline";
+import { Table01 } from "@/components/shadcn-studio/table/table-01";
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   COE_COPY_TYPE_LABELS,
   coeReference,
@@ -88,128 +90,120 @@ export function CoeRequestTable({
           </li>
         ))}
       </ul>
-      <div className="hidden 2xl:block">
-        <div className="overflow-x-auto rounded-lg border bg-card shadow-xs">
-          <table className="w-full min-w-[840px] table-fixed text-left text-xs 2xl:text-[13px]">
-            {staff && (
-              <colgroup>
-                <col style={{ width: "7%" }} />
-                <col style={{ width: "14%" }} />
-                <col style={{ width: "6%" }} />
-                <col style={{ width: "10%" }} />
-                <col style={{ width: "7%" }} />
-                <col style={{ width: "8%" }} />
-                <col style={{ width: "14%" }} />
-                <col style={{ width: "10%" }} />
-                <col style={{ width: "14%" }} />
-                <col style={{ width: "10%" }} />
-              </colgroup>
-            )}
-            {!staff && (
-              <colgroup>
-                <col style={{ width: "14%" }} />
-                <col style={{ width: "13%" }} />
-                <col style={{ width: "30%" }} />
-                <col style={{ width: "18%" }} />
-                <col style={{ width: "15%" }} />
-                <col style={{ width: "10%" }} />
-              </colgroup>
-            )}
-            <thead className="border-b bg-muted/70 text-[11px] uppercase tracking-wide text-muted-foreground">
-              <tr>
-                <th className="px-3 py-3 font-medium">Request ID</th>
+      <div className="hidden lg:block">
+        <Table01 label={staff ? "COE staff requests" : "My COE requests"}>
+          <TableHeader className="bg-muted/60">
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="w-[140px] text-xs font-semibold uppercase tracking-wide">
+                Request ID
+              </TableHead>
+              {staff ? (
+                <>
+                  <TableHead className="w-[220px] text-xs font-semibold uppercase tracking-wide">
+                    Requestor
+                  </TableHead>
+                  <TableHead className="w-[130px] text-xs font-semibold uppercase tracking-wide">
+                    Employee ID
+                  </TableHead>
+                  <TableHead className="w-[180px] text-xs font-semibold uppercase tracking-wide">
+                    Department
+                  </TableHead>
+                  <TableHead className="w-[120px] text-xs font-semibold uppercase tracking-wide">
+                    Date
+                  </TableHead>
+                  <TableHead className="w-[140px] text-xs font-semibold uppercase tracking-wide">
+                    Copy
+                  </TableHead>
+                </>
+              ) : (
+                <>
+                  <TableHead className="w-[120px] text-xs font-semibold uppercase tracking-wide">
+                    Date
+                  </TableHead>
+                  <TableHead className="min-w-[280px] text-xs font-semibold uppercase tracking-wide">
+                    Purpose
+                  </TableHead>
+                </>
+              )}
+              <TableHead className="w-[165px] text-xs font-semibold uppercase tracking-wide">
+                Deadline
+              </TableHead>
+              <TableHead className="w-[160px] text-xs font-semibold uppercase tracking-wide">
+                Status
+              </TableHead>
+              <TableHead className="w-[135px] text-right text-xs font-semibold uppercase tracking-wide">
+                Action
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {requests.map((request) => (
+              <TableRow key={request.id} className="align-top">
+                <TableCell
+                  className="font-mono text-xs font-medium text-foreground"
+                  title={request.id}
+                >
+                  {coeReference(request.id)}
+                </TableCell>
                 {staff ? (
                   <>
-                    <th className="px-3 py-3 font-medium">Requestor</th>
-                    <th className="px-3 py-3 font-medium">Employee ID</th>
-                    <th className="px-3 py-3 font-medium">Dept.</th>
-                    <th className="px-3 py-3 font-medium">Date</th>
-                    <th className="px-3 py-3 font-medium">Copy</th>
-                    <th className="px-3 py-3 font-medium">Last handled by</th>
+                    <TableCell className="font-medium">
+                      <span className="block break-words" title={request.employeeName}>
+                        {request.employeeName}
+                      </span>
+                      <RequestorTypeBadge
+                        thirdParty={isThirdPartyCoeRequest(request.note)}
+                        className="mt-1"
+                      />
+                    </TableCell>
+                    <TableCell>{request.employeeNumber || "—"}</TableCell>
+                    <TableCell className="break-words" title={request.department || undefined}>
+                      {request.department || "—"}
+                    </TableCell>
+                    <TableCell>{fmtDate(request.requestedAt)}</TableCell>
+                    <TableCell className="break-words">
+                      {COE_COPY_TYPE_LABELS[request.copyType]}
+                    </TableCell>
                   </>
                 ) : (
                   <>
-                    <th className="px-3 py-3 font-medium">Date</th>
-                    <th className="px-3 py-3 font-medium">Purpose</th>
+                    <TableCell>{fmtDate(request.requestedAt)}</TableCell>
+                    <TableCell
+                      className="max-w-[360px] break-words font-medium"
+                      title={request.purpose}
+                    >
+                      {request.purpose}
+                    </TableCell>
                   </>
                 )}
-                <th className="px-3 py-3 font-medium">Deadline</th>
-                <th className="px-3 py-3 text-right font-medium">Status</th>
-                <th className="px-3 py-3 text-right font-medium">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {requests.map((request) => (
-                <tr
-                  key={request.id}
-                  className="border-b bg-card align-top transition-colors last:border-0 hover:bg-muted/40"
-                >
-                  <td
-                    className="break-words px-3 py-3 font-mono text-[11px] font-medium"
-                    title={request.id}
+                <TableCell>
+                  <CoeDeadlineBadge
+                    deadlineAt={request.deadlineAt}
+                    status={request.status}
+                    className="whitespace-nowrap px-2 py-1 text-xs"
+                  />
+                </TableCell>
+                <TableCell>
+                  <CoeStatusBadge
+                    status={request.status}
+                    audience={audience}
+                    className="px-2 py-1 text-xs"
+                  />
+                </TableCell>
+                <TableCell className="text-right">
+                  <Link
+                    to="/hrdo/coe/$id"
+                    params={{ id: request.id }}
+                    className="inline-flex min-h-9 items-center gap-1 whitespace-nowrap font-medium text-primary hover:underline"
                   >
-                    {coeReference(request.id)}
-                  </td>
-                  {staff ? (
-                    <>
-                      <td className="break-words px-3 py-3 font-medium">
-                        <span className="block" title={request.employeeName}>
-                          {request.employeeName}
-                        </span>
-                        <RequestorTypeBadge
-                          thirdParty={isThirdPartyCoeRequest(request.note)}
-                          className="mt-1"
-                        />
-                      </td>
-                      <td className="break-words px-3 py-3">{request.employeeNumber || "—"}</td>
-                      <td className="break-words px-3 py-3" title={request.department || undefined}>
-                        {request.department || "—"}
-                      </td>
-                      <td className="break-words px-3 py-3">{fmtDate(request.requestedAt)}</td>
-                      <td className="break-words px-3 py-3">
-                        {COE_COPY_TYPE_LABELS[request.copyType]}
-                      </td>
-                      <td className="break-words px-3 py-3">
-                        {request.processedByName || "No HRDO action yet"}
-                      </td>
-                    </>
-                  ) : (
-                    <>
-                      <td className="break-words px-3 py-3">{fmtDate(request.requestedAt)}</td>
-                      <td className="break-words px-3 py-3 font-medium" title={request.purpose}>
-                        {request.purpose}
-                      </td>
-                    </>
-                  )}
-                  <td className="break-words px-3 py-3">
-                    <CoeDeadlineBadge
-                      deadlineAt={request.deadlineAt}
-                      status={request.status}
-                      className="px-1 py-0.5 text-xs 2xl:text-[13px] sm:whitespace-normal"
-                    />
-                  </td>
-                  <td className="px-3 py-3 text-right font-medium">
-                    <CoeStatusBadge
-                      status={request.status}
-                      audience={audience}
-                      className="px-1 py-0.5 text-[13px] leading-tight 2xl:text-sm sm:whitespace-normal"
-                    />
-                  </td>
-                  <td className="px-3 py-3 text-right font-medium">
-                    <Link
-                      to="/hrdo/coe/$id"
-                      params={{ id: request.id }}
-                      className="inline-flex items-center gap-1 whitespace-nowrap text-primary hover:underline"
-                    >
-                      {staff ? "View / Process" : "View details"}{" "}
-                      <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    {staff ? "View / Process" : "View details"}{" "}
+                    <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
+                  </Link>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table01>
       </div>
     </>
   );

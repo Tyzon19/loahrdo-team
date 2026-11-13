@@ -22,6 +22,9 @@ export const Route = createFileRoute("/_authenticated")({
         search: { redirect: location.pathname },
       });
     }
+    if (context.viewer.needsProfileCompletion && location.pathname !== "/complete-profile") {
+      throw redirect({ to: "/complete-profile" });
+    }
     if (context.viewer.mustChangePassword && location.pathname !== "/change-password") {
       throw redirect({ to: "/change-password" });
     }

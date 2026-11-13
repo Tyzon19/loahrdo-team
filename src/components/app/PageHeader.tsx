@@ -56,7 +56,9 @@ export function Field({
         {label}
       </dt>
       <dd
-        className={`mt-0.5 break-words [overflow-wrap:anywhere] text-foreground ${comfortable ? "text-[15px]" : "text-sm"}`}
+        className={`mt-0.5 break-words [overflow-wrap:anywhere] text-foreground ${
+          comfortable ? "text-base font-semibold leading-6 sm:text-[17px]" : "text-sm"
+        }`}
       >
         {children}
       </dd>

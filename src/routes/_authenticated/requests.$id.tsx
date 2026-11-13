@@ -630,31 +630,44 @@ function ActionPanel({
           </p>
         ) : detail.assistantNames[stageKey] ? (
           <p className="rounded-sm border p-3 text-sm">
-            <strong>Alternate signatory:</strong>{" "}
-            {detail.assistantNames[stageKey]}{" "}
-            If you are unavailable, the assigned alternate signatory must use their own account to
-            complete this stage.
+            <strong>Alternate signatory:</strong> {detail.assistantNames[stageKey]} If you are
+            unavailable, the assigned alternate signatory must use their own account to complete
+            this stage.
           </p>
         ) : null}
         {stageKey === "approve" && (
           <dl className="grid min-w-0 gap-3 text-sm sm:grid-cols-2">
             <Field label="Requisitioner">
-              {r.requisitionerName} · {r.department}
+              <span className="text-base font-semibold leading-6 sm:text-[17px]">
+                {r.requisitionerName} · {r.department}
+              </span>
             </Field>
-            <Field label="Purpose">{r.purpose}</Field>
-            <Field label="Destination">{r.destinations.join("; ")}</Field>
+            <Field label="Purpose">
+              <span className="text-base font-semibold leading-6 sm:text-[17px]">{r.purpose}</span>
+            </Field>
+            <Field label="Destination">
+              <span className="text-base font-semibold leading-6 sm:text-[17px]">
+                {r.destinations.join("; ")}
+              </span>
+            </Field>
             <Field label="Passengers · Date · Time">
-              {r.passengers} · {fmtRange(r.dateStart, r.dateEnd)} · {fmtTime(r.timeNeeded)}
+              <span className="text-base font-semibold leading-6 sm:text-[17px]">
+                {r.passengers} · {fmtRange(r.dateStart, r.dateEnd)} · {fmtTime(r.timeNeeded)}
+              </span>
             </Field>
             <Field label="Vehicle">
-              {r.vehicleType
-                ? `${r.vehicleType} · ${r.plateNo ?? "No plate recorded"}`
-                : "Not yet assigned"}
+              <span className="text-base font-semibold leading-6 sm:text-[17px]">
+                {r.vehicleType
+                  ? `${r.vehicleType} · ${r.plateNo ?? "No plate recorded"}`
+                  : "Not yet assigned"}
+              </span>
             </Field>
             <Field label="Recommendation">
-              {previous
-                ? `Recommended by ${previous.signerName}, ${fmtDateTime(previous.at)}`
-                : "—"}
+              <span className="text-base font-semibold leading-6 sm:text-[17px]">
+                {previous
+                  ? `Recommended by ${previous.signerName}, ${fmtDateTime(previous.at)}`
+                  : "—"}
+              </span>
             </Field>
           </dl>
         )}
@@ -681,29 +694,33 @@ function ActionPanel({
             <dl className="grid min-w-0 gap-x-5 gap-y-3 border-y py-3 text-sm sm:grid-cols-2">
               <div>
                 <dt className="text-xs text-muted-foreground">Requestor</dt>
-                <dd className="font-medium">{r.requisitionerName}</dd>
+                <dd className="text-base font-semibold leading-6 sm:text-[17px]">
+                  {r.requisitionerName}
+                </dd>
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground">Department</dt>
-                <dd className="font-medium">{r.department}</dd>
+                <dd className="text-base font-semibold leading-6 sm:text-[17px]">{r.department}</dd>
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground">Destination</dt>
-                <dd className="font-medium">{r.destinations.join("; ")}</dd>
+                <dd className="text-base font-semibold leading-6 sm:text-[17px]">
+                  {r.destinations.join("; ")}
+                </dd>
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground">Passengers</dt>
-                <dd className="font-medium">{r.passengers}</dd>
+                <dd className="text-base font-semibold leading-6 sm:text-[17px]">{r.passengers}</dd>
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground">Date and time</dt>
-                <dd className="font-medium">
+                <dd className="text-base font-semibold leading-6 sm:text-[17px]">
                   {fmtRange(r.dateStart, r.dateEnd)} · {fmtTime(r.timeNeeded)}
                 </dd>
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground">Purpose</dt>
-                <dd className="font-medium">{r.purpose}</dd>
+                <dd className="text-base font-semibold leading-6 sm:text-[17px]">{r.purpose}</dd>
               </div>
             </dl>
             <Button size="lg" className="w-full sm:w-auto" onClick={() => setReviewStep("vehicle")}>
@@ -732,7 +749,9 @@ function ActionPanel({
               </Button>
             </div>
             <div className="min-w-0 sm:col-span-2">
-              <Label htmlFor="vehicle" className="text-sm font-medium">Vehicle</Label>
+              <Label htmlFor="vehicle" className="text-sm font-medium">
+                Vehicle
+              </Label>
               <div className="mt-1 flex items-center gap-3 border-b border-primary px-2 py-1">
                 <CarFront className="h-5 w-5 shrink-0 text-primary" aria-hidden />
                 <Select
@@ -752,9 +771,7 @@ function ActionPanel({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">
-                      Enter vehicle details manually
-                    </SelectItem>
+                    <SelectItem value="none">Enter vehicle details manually</SelectItem>
                     {detail.vehicles.map((v) => (
                       <SelectItem key={v.id} value={v.id}>
                         {v.driverName} · {v.type} · {v.plateNo}
@@ -860,22 +877,22 @@ function ActionPanel({
 
         {stageKey !== "review" || reviewStep === "vehicle" ? (
           <div className="flex flex-col gap-2 border-t pt-4 sm:flex-row">
-          <Button
-            size="lg"
-            className="w-full whitespace-normal leading-snug sm:w-auto sm:min-w-64"
-            onClick={() => setApproveOpen(true)}
-          >
-            <CheckCircle2 className="h-4 w-4" aria-hidden /> {ACTION_LABEL[stageKey]}
-          </Button>
-          <Button
-            size="lg"
-            variant="outline"
-            className="w-full whitespace-normal leading-snug border-destructive/50 text-destructive hover:bg-danger-soft hover:text-destructive sm:w-auto"
-            onClick={() => setRejectOpen(true)}
-          >
-            <CornerUpLeft className="h-4 w-4" aria-hidden />{" "}
-            {stageKey === "approve" ? "Reject & Return" : "Reject & Return to Requisitioner"}
-          </Button>
+            <Button
+              size="lg"
+              className="w-full whitespace-normal leading-snug sm:w-auto sm:min-w-64"
+              onClick={() => setApproveOpen(true)}
+            >
+              <CheckCircle2 className="h-4 w-4" aria-hidden /> {ACTION_LABEL[stageKey]}
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="w-full whitespace-normal leading-snug border-destructive/50 text-destructive hover:bg-danger-soft hover:text-destructive sm:w-auto"
+              onClick={() => setRejectOpen(true)}
+            >
+              <CornerUpLeft className="h-4 w-4" aria-hidden />{" "}
+              {stageKey === "approve" ? "Reject & Return" : "Reject & Return to Requisitioner"}
+            </Button>
           </div>
         ) : null}
         <p className="flex min-w-0 items-start gap-1.5 break-words text-xs text-muted-foreground">

@@ -357,7 +357,6 @@ function PermissionSlipDetailPage() {
       if (result.emailDelivery.sent) {
         setReceiptEmailedLocally(true);
         setReceiptSentSuccess(true);
-        toast.success(`Permission Slip receipt emailed to ${slip.employeeEmail} via Gmail.`);
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: ["permission-slip", id] }),
           queryClient.invalidateQueries({ queryKey: ["permission-slips"] }),
@@ -458,6 +457,9 @@ function PermissionSlipDetailPage() {
   if (search.view === "receipt" || receiptOpen) {
     return (
       <div className="mx-auto w-full max-w-5xl space-y-6 relative z-0">
+        {sendingReceipt && (
+          <LoadingScreen label="Sending Permission Slip receipt" mode="overlay" immediate />
+        )}
         <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-center sm:justify-between">
           <Button
             type="button"
@@ -651,7 +653,7 @@ function PermissionSlipDetailPage() {
           </Field>
           <div className="sm:col-span-2">
             <Field label="Reason for Going Out" comfortable>
-              <div className="mt-1 rounded-md border-l-4 border-l-amber-500 bg-amber-50/70 p-3.5 text-base font-semibold leading-relaxed text-slate-900 whitespace-pre-wrap">
+              <div className="mt-1 rounded-md border border-amber-200 bg-amber-50/70 p-3.5 text-base font-semibold leading-relaxed text-amber-950 whitespace-pre-wrap">
                 {slip.reason}
               </div>
             </Field>
@@ -666,7 +668,7 @@ function PermissionSlipDetailPage() {
                 />
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                Electronically signed by <strong>{slip.employeeName}</strong>
+                Signature over Printed Name <strong>{slip.employeeName}</strong>
               </p>
             </Field>
           </div>
@@ -690,7 +692,6 @@ function PermissionSlipDetailPage() {
         </dl>
       </Section>
 
-      {/* Activity History Section */}
       <Section title="Activity History">
         {slip.history && slip.history.length > 0 ? (
           <div className="space-y-3">
@@ -711,7 +712,6 @@ function PermissionSlipDetailPage() {
         )}
       </Section>
 
-      {/* Approve Dialog (vehicle trip ticket style ApproveDialog) */}
       <Dialog
         open={approveOpen}
         onOpenChange={(open) => {

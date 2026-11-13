@@ -42,11 +42,7 @@ function SignatureBlock({
       </p>
       <div className="mt-2 flex h-24 items-center justify-center sm:h-28">
         {image ? (
-          <img
-            src={image}
-            alt={imageAlt}
-            className="h-full w-full max-w-[92%] object-contain"
-          />
+          <img src={image} alt={imageAlt} className="h-full w-full max-w-[92%] object-contain" />
         ) : (
           <span className="text-[11px] italic text-slate-400">{emptyNote}</span>
         )}
@@ -115,10 +111,10 @@ export function PermissionSlipReceipt({
         {/* Document metadata strip */}
         <dl className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-md border border-slate-200 bg-slate-200 text-[9px] sm:mt-5 sm:grid-cols-4 sm:text-[10px]">
           {[
-            ["Document No.", "HRD-AF-002"],
-            ["Revision No.", "1"],
-            ["Effective Date", "June 2018"],
-            ["Page", "1 of 1 · HR Copy"],
+            ["Document No:", "HRD-AF-002"],
+            ["Revision No:", "1"],
+            ["Effective Date:", "June 2018"],
+            ["Page:", "1 of 1 · HR Copy"],
           ].map(([label, value]) => (
             <div key={label} className="bg-slate-50 px-2.5 py-1.5 sm:px-3 sm:py-2">
               <dt className="font-semibold uppercase tracking-wide text-slate-500">{label}</dt>
@@ -168,10 +164,10 @@ export function PermissionSlipReceipt({
 
       <section className="px-4 pb-4 sm:px-8 sm:pb-5">
         <div className="overflow-hidden rounded-md border border-slate-200">
-          <p className="border-b border-slate-200 bg-slate-50 px-3 py-2 text-[9px] font-bold uppercase tracking-[0.12em] text-slate-600 sm:px-4 sm:text-[10.5px]">
+          <p className="border-b border-slate-200 bg-slate-50 px-3 py-2 text-[9px] font-bold uppercase tracking-[0.12em] text-primary sm:px-4 sm:text-[10.5px]">
             Reason for Going Out
           </p>
-          <div className="min-h-[64px] whitespace-pre-wrap px-3 py-3 text-[13px] leading-relaxed text-slate-900 sm:min-h-[78px] sm:px-4 sm:py-4 sm:text-sm">
+          <div className="min-h-[64px] whitespace-pre-wrap bg-slate-50/60 px-3 py-3 font-serif text-[15px] font-medium leading-7 text-slate-950 sm:min-h-[78px] sm:px-4 sm:py-4 sm:text-base">
             {slip.reason}
           </div>
         </div>
@@ -205,7 +201,8 @@ export function PermissionSlipReceipt({
       <footer className="flex flex-col gap-1 border-t border-slate-200 bg-slate-50 px-4 py-2.5 text-[9px] text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-8">
         <span className="font-semibold uppercase tracking-wide">HRD-AF-002 · Permission Slip</span>
         <span className="sm:text-center">
-          This is a controlled document and subject to revision control requirement. User should verify latest version.
+          This is a controlled document and subject to revision control requirement. User should
+          verify latest version.
         </span>
         <span className="uppercase tracking-wide">ISO 9001:2015</span>
       </footer>

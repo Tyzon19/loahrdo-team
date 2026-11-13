@@ -89,6 +89,20 @@ export const permissionLogoutFn = createServerFn({ method: "POST" }).handler(asy
   runSafely(async () => (await import("./server/permission/auth")).permissionLogout()),
 );
 
+export const permissionUpdateProfileFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/permission/auth")).permissionUpdateProfile(data)),
+  );
+
+export const permissionChangePasswordFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () =>
+      (await import("./server/permission/auth")).permissionChangePassword(data),
+    ),
+  );
+
 export const submitPermissionSlipFn = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) =>

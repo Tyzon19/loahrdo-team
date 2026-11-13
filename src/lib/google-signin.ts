@@ -9,6 +9,7 @@ export type GoogleSignInErrorCode =
   | "google_unavailable"
   | "google_denied"
   | "google_domain"
+  | "google_external_domain"
   | "google_no_account"
   | "google_role"
   | "google_session"
@@ -24,6 +25,8 @@ const MESSAGES: Record<GoogleSignInErrorCode, string> = {
   google_denied:
     "Google sign-in was cancelled. Try again, or use your institutional email and password.",
   google_domain: `Use your @${INSTITUTIONAL_EMAIL_DOMAIN} Google account. Other accounts cannot sign in here.`,
+  google_external_domain:
+    "Use a personal Google account. Institutional accounts are for current employees.",
   google_no_account:
     "Your institutional Google account is valid. The requisitioner profile will be created automatically on first sign-in. Please try again.",
   google_role: "This is not a requisitioner account. Use the HRDO staff sign-in instead.",
@@ -49,8 +52,11 @@ export function googleSignInErrorMessage(code: string | null | undefined): strin
 export function googleAccountProblem(
   email: string,
   role: Role | null,
+  mode: "institutional" | "external" = "institutional",
 ): GoogleSignInErrorCode | null {
-  if (!institutionalEmailAllowed(normaliseEmail(email))) return "google_domain";
+  const isInstitutional = institutionalEmailAllowed(normaliseEmail(email));
+  if (mode === "external") return isInstitutional ? "google_external_domain" : null;
+  if (!isInstitutional) return "google_domain";
   if (role && role !== "requisitioner") return "google_role";
   return null;
 }
@@ -77,4 +83,23 @@ export function safeSignInNext(value: string | null | undefined): string {
   }
 
   return trimmed;
+}
+
+export function requiresProfileCompletion(profileComplete: boolean | number) {
+  return !profileComplete;
+}
+
+export function hasUserSetPassword(passwordHash: string, placeholderPasswordHash: string) {
+  return passwordHash !== placeholderPasswordHash;
+}
+
+export function googleSignInDestination(
+  account: { needsProfileCompletion: boolean; mustChangePassword: boolean },
+  safeNext: string,
+) {
+  if (account.needsProfileCompletion) {
+    return `/complete-profile?redirect=${encodeURIComponent(safeNext)}`;
+  }
+  if (account.mustChangePassword) return "/change-password";
+  return safeNext;
 }

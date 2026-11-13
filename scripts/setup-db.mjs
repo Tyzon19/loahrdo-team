@@ -107,6 +107,20 @@ try {
        ENUM('requisitioner','department_head','transport_head','director','president','transport_staff','assistant','guard','driver','admin') NOT NULL`,
     );
   }
+  const [profileCompleteColumn] = await conn.query(
+    `SELECT COUNT(*) AS count
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'users' AND COLUMN_NAME = 'profile_complete'`,
+    [dbName],
+  );
+  if (Number(profileCompleteColumn[0]?.count ?? 0) === 0) {
+    await conn.query(
+      "ALTER TABLE users ADD COLUMN profile_complete TINYINT(1) NOT NULL DEFAULT 1 AFTER must_change_password",
+    );
+    await conn.query(
+      "UPDATE users SET profile_complete = 0 WHERE role = 'requisitioner' AND must_change_password = 1",
+    );
+  }
   await conn.query(
     "ALTER TABLE hrdo_users MODIFY role ENUM('employee','hrdo_staff','hrdo_admin') NOT NULL DEFAULT 'employee'",
   );

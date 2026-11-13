@@ -109,9 +109,14 @@ function PermissionLoginPage() {
           </SubmitButton>
 
           <p className="mt-4 text-sm text-muted-foreground">
-            Use the same institutional account you use in the other LOA systems.{" "}
+            Use your institutional account.{" "}
             <Link to="/register" className="font-semibold text-primary hover:underline">
               Need an account?
+            </Link>
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            <Link to="/forgot-password" className="font-semibold text-primary hover:underline">
+              Forgot password?
             </Link>
           </p>
           <p className="mt-2 text-sm text-muted-foreground">

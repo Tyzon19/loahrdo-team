@@ -1,10 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, FileBadge, Mail } from "lucide-react";
 import { AuthLayout } from "@/components/AuthLayout";
+import { googleSignInErrorMessage } from "@/lib/google-signin";
 import { HRDO } from "@/lib/hrdo";
 import { canonical } from "@/lib/site";
 
 export const Route = createFileRoute("/coe")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    error:
+      typeof search["error"] === "string" && /^google_[a-z_]+$/.test(search["error"])
+        ? search["error"]
+        : undefined,
+  }),
   head: () => ({
     meta: [
       { title: `COE request · ${HRDO.shortName}` },
@@ -25,8 +32,15 @@ export const Route = createFileRoute("/coe")({
 });
 
 function CoeEntryPage() {
+  const error = googleSignInErrorMessage(Route.useSearch().error);
+
   return (
     <AuthLayout title="COE REQUEST" back backTo="/login" centered showImage={false}>
+      {error && (
+        <p role="alert" className="mb-4 text-sm text-destructive">
+          {error}
+        </p>
+      )}
       <h2 className="mb-2 text-3xl font-bold tracking-tight text-foreground">
         How can we help you today?
       </h2>
@@ -70,11 +84,11 @@ function CoeEntryPage() {
               Former employee or verifier
             </span>
             <span className="mt-2 block text-sm leading-6 text-muted-foreground">
-              No school email? Continue with any personal Gmail or other Google account.
+              Use your personal Google account, not your institutional email.
             </span>
           </span>
           <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-primary">
-            Continue with Gmail
+            Continue with Google
             <ArrowRight
               className="h-5 w-5 transition-transform group-hover:translate-x-1"
               aria-hidden

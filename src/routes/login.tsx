@@ -42,7 +42,11 @@ export const Route = createFileRoute("/login")({
   beforeLoad: ({ context }) => {
     if (context.viewer) {
       throw routerRedirect({
-        to: context.viewer.mustChangePassword ? "/change-password" : "/dashboard",
+        to: context.viewer.needsProfileCompletion
+          ? "/complete-profile"
+          : context.viewer.mustChangePassword
+            ? "/change-password"
+            : "/dashboard",
       });
     }
   },

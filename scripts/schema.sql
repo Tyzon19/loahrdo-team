@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
   role ENUM('requisitioner','department_head','transport_head','director','president','transport_staff','assistant','guard','driver','admin') NOT NULL,
   department VARCHAR(190) NOT NULL DEFAULT '',
   must_change_password TINYINT(1) NOT NULL DEFAULT 0,
+  profile_complete TINYINT(1) NOT NULL DEFAULT 1,
   failed_attempts INT NOT NULL DEFAULT 0,
   locked_until DATETIME NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

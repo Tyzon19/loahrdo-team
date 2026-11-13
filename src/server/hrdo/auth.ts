@@ -175,6 +175,11 @@ export async function ensureHrdoGoogleAccount(
   allowExternal = false,
 ): Promise<HrdoGoogleSignInResult> {
   const normalised = normaliseEmail(email);
+  if (allowExternal && institutionalEmailAllowed(normalised)) {
+    throw new AppError(
+      "Use a personal Google account. Institutional accounts are for current employees.",
+    );
+  }
   const existing = await hrdoGoogleSignInAccount(normalised);
   if (existing) {
     const linkedUsers = await all<Array<RowDataPacket & { name: string; department: string }>>(

@@ -16,6 +16,7 @@ import {
 import type { RowDataPacket } from "mysql2/promise";
 import type { Role, Viewer } from "@/lib/types";
 import { joinFullName } from "@/lib/name";
+import { hasUserSetPassword, requiresProfileCompletion } from "@/lib/google-signin";
 import {
   changePasswordSchema,
   institutionalEmailAllowed,
@@ -67,6 +68,7 @@ interface UserRow extends RowDataPacket {
   role: Role;
   department: string;
   must_change_password: number;
+  profile_complete: number;
   is_locked?: number;
   lock_minutes?: number | null;
 }
@@ -115,6 +117,7 @@ function mapViewer(row: UserRow): Viewer {
     role: row.role === "department_head" ? "requisitioner" : row.role,
     department: row.department,
     mustChangePassword: Boolean(row.must_change_password),
+    needsProfileCompletion: requiresProfileCompletion(row.profile_complete),
   };
 }
 
@@ -123,6 +126,17 @@ function lockError(row: { lock_minutes?: number | null }) {
   return new AppError(
     `Too many failed sign-in attempts. Try again in ${minutes} minute${minutes === 1 ? "" : "s"}.`,
   );
+}
+
+async function verifyLoginPassword(
+  password: string,
+  storedHash: string,
+  mustChangePassword: number,
+) {
+  if (!hasUserSetPassword(storedHash, DUMMY_HASH)) return false;
+  if (await verifyPassword(password, storedHash)) return true;
+  if (!mustChangePassword || !/\s/.test(password)) return false;
+  return verifyPassword(password.replace(/\s+/g, ""), storedHash);
 }
 
 function cookieOptions(maxAge: number) {
@@ -163,31 +177,32 @@ export interface GoogleSignInAccount {
   id: string;
   role: Role;
   mustChangePassword: boolean;
-}
-
-export interface GoogleRequisitionerSignInAccount extends GoogleSignInAccount {
-  /** True when this sign-in created the account, so the name must be completed. */
-  isNew: boolean;
+  needsProfileCompletion: boolean;
 }
 
 /** Looks up an account for Google sign-in without starting a session. */
 export async function googleSignInAccount(email: string): Promise<GoogleSignInAccount | null> {
   const rows = await all<UserRow[]>(
-    "SELECT id, role, must_change_password FROM users WHERE email = ? LIMIT 1",
+    "SELECT id, role, must_change_password, profile_complete FROM users WHERE email = ? LIMIT 1",
     [normaliseEmail(email)],
   );
   const row = rows[0];
   return row
-    ? { id: row.id, role: row.role, mustChangePassword: Boolean(row.must_change_password) }
+    ? {
+        id: row.id,
+        role: row.role,
+        mustChangePassword: Boolean(row.must_change_password),
+        needsProfileCompletion: requiresProfileCompletion(row.profile_complete),
+      }
     : null;
 }
 
 export async function ensureGoogleRequisitionerAccount(
   email: string,
-): Promise<GoogleRequisitionerSignInAccount> {
+): Promise<GoogleSignInAccount> {
   const normalised = normaliseEmail(email);
   const existing = await googleSignInAccount(normalised);
-  if (existing) return { ...existing, isNew: false };
+  if (existing) return existing;
 
   if (!institutionalEmailAllowed(normalised)) {
     throw new AppError("Use your official Lyceum of Alabang email address.");
@@ -200,12 +215,18 @@ export async function ensureGoogleRequisitionerAccount(
   const name = localName || "Institutional User";
   const id = randomUUID();
   await run(
-    `INSERT INTO users (id, name, email, password_hash, role, department, must_change_password)
-     VALUES (?, ?, ?, ?, 'requisitioner', 'General', 1)`,
+    `INSERT INTO users
+      (id, name, email, password_hash, role, department, must_change_password, profile_complete)
+     VALUES (?, ?, ?, ?, 'requisitioner', 'General', 0, 0)`,
     [id, name, normalised, DUMMY_HASH],
   );
 
-  return { id, role: "requisitioner", mustChangePassword: true, isNew: true };
+  return {
+    id,
+    role: "requisitioner",
+    mustChangePassword: false,
+    needsProfileCompletion: true,
+  };
 }
 
 function clearSessionCookie() {
@@ -221,7 +242,8 @@ export async function viewer(): Promise<Viewer | null> {
   }
   const hash = sha256(token);
   const rows = await all<UserRow[]>(
-    `SELECT u.id, u.name, u.email, u.role, u.department, u.must_change_password
+    `SELECT u.id, u.name, u.email, u.password_hash, u.role, u.department,
+           u.must_change_password, u.profile_complete
      FROM sessions s
      JOIN users u ON u.id = s.user_id
      WHERE s.token_hash = ? AND s.expires_at > NOW()
@@ -278,7 +300,9 @@ export async function login(input: unknown): Promise<{ mustChangePassword: boole
 
     if (linked.is_locked) throw lockError(linked);
 
-    if (!(await verifyPassword(data.password, linked.password_hash))) {
+    if (
+      !(await verifyLoginPassword(data.password, linked.password_hash, linked.must_change_password))
+    ) {
       await recordLinkedFailure(linked);
       throw invalid;
     }
@@ -299,7 +323,11 @@ export async function login(input: unknown): Promise<{ mustChangePassword: boole
     );
   }
 
-  const valid = await verifyPassword(data.password, user.password_hash);
+  const valid = await verifyLoginPassword(
+    data.password,
+    user.password_hash,
+    user.must_change_password,
+  );
   if (!valid) {
     // The same institutional account may also live in the COE store. Accept
     // that password here as well and keep this profile as a requester.
@@ -307,7 +335,7 @@ export async function login(input: unknown): Promise<{ mustChangePassword: boole
     if (
       linked &&
       !linked.is_locked &&
-      (await verifyPassword(data.password, linked.password_hash))
+      (await verifyLoginPassword(data.password, linked.password_hash, linked.must_change_password))
     ) {
       const userId = await linkUserProfile(linked);
       await clearLinkedLock(linked);
@@ -638,13 +666,20 @@ export async function logout(): Promise<{ ok: true }> {
 
 export async function changePassword(input: unknown): Promise<{ ok: true }> {
   const current = await requireViewer();
+  if (current.needsProfileCompletion) {
+    throw new AppError("Complete your name before setting a password.");
+  }
   const data = parseInput(changePasswordSchema, input);
 
   const rows = await all<UserRow[]>("SELECT password_hash FROM users WHERE id = ? LIMIT 1", [
     current.id,
   ]);
   const stored = rows[0]?.password_hash;
-  if (!stored || !(await verifyPassword(data.currentPassword, stored))) {
+  if (
+    !stored ||
+    !hasUserSetPassword(stored, DUMMY_HASH) ||
+    !(await verifyPassword(data.currentPassword, stored))
+  ) {
     throw new AppError("Your current password is incorrect.", {
       currentPassword: "Your current password is incorrect.",
     });
@@ -711,13 +746,25 @@ export async function updateProfile(input: unknown): Promise<Viewer> {
  */
 export async function completeProfileName(input: unknown): Promise<Viewer> {
   const current = await requireViewer();
+  if (!current.needsProfileCompletion) {
+    throw new AppError("Your profile does not need completion. Continue to your account.");
+  }
   const data = parseInput(namePartsSchema, input);
   const name = joinFullName(data);
   if (name.length < 2) throw new AppError("Enter your full name.");
   if (name.length > 120) throw new AppError("Names must be 120 characters or fewer.");
 
   await withTransaction(async (conn) => {
-    await run("UPDATE users SET name = ? WHERE id = ?", [name, current.id], conn);
+    const updated = await run(
+      `UPDATE users
+       SET name = ?, profile_complete = 1
+       WHERE id = ? AND profile_complete = 0`,
+      [name, current.id],
+      conn,
+    );
+    if (!updated.affectedRows) {
+      throw new AppError("Your profile completion session expired. Sign in again to continue.");
+    }
     if (current.role === "requisitioner") {
       await run(
         "UPDATE hrdo_users SET name = ? WHERE email = ? AND role = 'employee'",
@@ -726,5 +773,9 @@ export async function completeProfileName(input: unknown): Promise<Viewer> {
       );
     }
   });
-  return { ...current, name };
+  return {
+    ...current,
+    name,
+    needsProfileCompletion: false,
+  };
 }

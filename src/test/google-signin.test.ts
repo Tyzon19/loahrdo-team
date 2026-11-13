@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  hasUserSetPassword,
+  googleSignInDestination,
   googleAccountProblem,
   googleSignInErrorMessage,
+  requiresProfileCompletion,
   safeSignInNext,
 } from "@/lib/google-signin";
 import { googleSignInCredentials, googleSignInRedirectUri } from "@/server/google-signin";
@@ -31,6 +34,16 @@ describe("Google sign-in eligibility", () => {
     expect(googleAccountProblem("teacher@lyceumalabang.edu.ph", null)).toBeNull();
   });
 
+  it("blocks institutional accounts in the former employee and verifier flow", () => {
+    expect(googleAccountProblem("teacher@lyceumalabang.edu.ph", null, "external")).toBe(
+      "google_external_domain",
+    );
+    expect(googleAccountProblem("former@gmail.com", null, "external")).toBeNull();
+    expect(googleSignInErrorMessage("google_external_domain")).toContain(
+      "Use a personal Google account",
+    );
+  });
+
   it("refuses staff accounts", () => {
     expect(googleAccountProblem("staff@lyceumalabang.edu.ph", "admin")).toBe("google_role");
     expect(googleAccountProblem("staff@lyceumalabang.edu.ph", "transport_head")).toBe(
@@ -49,6 +62,37 @@ describe("Google sign-in redirect target", () => {
     expect(safeSignInNext("/bad%0Apath")).toBe("/dashboard");
     expect(safeSignInNext("")).toBe("/dashboard");
     expect(safeSignInNext(undefined)).toBe("/dashboard");
+  });
+
+  it("sends new Google-only accounts to full-name completion before password setup", () => {
+    expect(requiresProfileCompletion(0)).toBe(true);
+    expect(hasUserSetPassword("google-placeholder", "google-placeholder")).toBe(false);
+    expect(
+      googleSignInDestination(
+        { needsProfileCompletion: true, mustChangePassword: false },
+        "/requests/new",
+      ),
+    ).toBe("/complete-profile?redirect=%2Frequests%2Fnew");
+  });
+
+  it("keeps temporary-password accounts on the required password-change step", () => {
+    expect(requiresProfileCompletion(1)).toBe(false);
+    expect(
+      googleSignInDestination(
+        { needsProfileCompletion: false, mustChangePassword: true },
+        "/requests/new",
+      ),
+    ).toBe("/change-password");
+  });
+
+  it("returns completed Google accounts to their safe requested page", () => {
+    expect(
+      googleSignInDestination(
+        { needsProfileCompletion: false, mustChangePassword: false },
+        "/requests/new",
+      ),
+    ).toBe("/requests/new");
+    expect(hasUserSetPassword("user-selected-password-hash", "google-placeholder")).toBe(true);
   });
 
   describe("Google sign-in credentials", () => {

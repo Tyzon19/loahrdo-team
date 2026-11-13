@@ -28,6 +28,7 @@ export interface SignatoryContact {
 /** Server-verified account for the current session. Never built from client input. */
 export interface Viewer extends User {
   mustChangePassword: boolean;
+  needsProfileCompletion: boolean;
 }
 
 /** Minimal, non-sensitive row used by request lists. */

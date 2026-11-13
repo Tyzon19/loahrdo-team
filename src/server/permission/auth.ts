@@ -13,11 +13,11 @@ import {
   type PermissionRole,
   type PermissionViewer,
 } from "@/lib/permission-access";
-import { loginSchema, normaliseEmail } from "@/lib/validation";
+import { changePasswordSchema, loginSchema, normaliseEmail, profileSchema } from "@/lib/validation";
 import { AppError, parseInput } from "@/lib/errors";
 import { encryptedCookieRequired } from "../env";
-import { all, run } from "../db";
-import { DUMMY_HASH, verifyPassword } from "../password";
+import { all, run, withTransaction } from "../db";
+import { DUMMY_HASH, hashPassword, verifyPassword } from "../password";
 import {
   clearLinkedLock,
   findLinkedAccount,
@@ -168,6 +168,95 @@ export async function requirePermissionViewer(): Promise<PermissionViewer> {
   const current = await permissionViewer();
   if (!current) throw new AppError("Please sign in to continue.");
   return current;
+}
+
+export async function permissionUpdateProfile(input: unknown): Promise<PermissionViewer> {
+  const current = await requirePermissionViewer();
+  const data = parseInput(profileSchema, input);
+  const token = getCookie(sessionCookieName());
+
+  await withTransaction(async (conn) => {
+    await run(
+      "UPDATE users SET name = ?, department = ? WHERE id = ?",
+      [data.name, data.department, current.id],
+      conn,
+    );
+    await run(
+      `UPDATE hrdo_users h
+       JOIN users u ON u.email = h.email
+       SET h.name = ?, h.department = ?
+       WHERE u.id = ? AND h.role = 'employee'`,
+      [data.name, data.department, current.id],
+      conn,
+    );
+  });
+
+  if (token) {
+    const hash = sha256(token);
+    await run(
+      `UPDATE permission_sessions
+       SET last_seen_at = NOW(),
+           expires_at = DATE_ADD(NOW(), INTERVAL ? HOUR)
+       WHERE token_hash = ?`,
+      [sessionHours(), hash],
+    );
+  }
+
+  return { ...current, name: data.name, department: data.department };
+}
+
+export async function permissionChangePassword(input: unknown): Promise<{ ok: true }> {
+  const current = await requirePermissionViewer();
+  const data = parseInput(changePasswordSchema, input);
+  const rows = await all<Array<RowDataPacket & { password_hash: string; role: Role }>>(
+    "SELECT password_hash, role FROM users WHERE id = ? LIMIT 1",
+    [current.id],
+  );
+  const account = rows[0];
+  if (!account || !(await verifyPassword(data.currentPassword, account.password_hash))) {
+    throw new AppError("Your current password is incorrect.", {
+      currentPassword: "Your current password is incorrect.",
+    });
+  }
+  if (data.newPassword === data.currentPassword) {
+    throw new AppError("Choose a password different from your current one.", {
+      newPassword: "Choose a password different from your current one.",
+    });
+  }
+
+  const passwordHash = await hashPassword(data.newPassword);
+  const token = getCookie(sessionCookieName());
+  await withTransaction(async (conn) => {
+    await run(
+      "UPDATE users SET password_hash = ?, must_change_password = 0, failed_attempts = 0, locked_until = NULL WHERE id = ?",
+      [passwordHash, current.id],
+      conn,
+    );
+    if (account.role === "requisitioner") {
+      await run(
+        "UPDATE hrdo_users SET password_hash = ?, must_change_password = 0, failed_attempts = 0, locked_until = NULL WHERE email = ? AND role = 'employee'",
+        [passwordHash, current.email],
+        conn,
+      );
+    }
+
+    await run("DELETE FROM sessions WHERE user_id = ?", [current.id], conn);
+    await run(
+      "DELETE FROM hrdo_sessions WHERE user_id IN (SELECT id FROM hrdo_users WHERE email = ? AND role = 'employee')",
+      [current.email],
+      conn,
+    );
+    if (token) {
+      await run(
+        "DELETE FROM permission_sessions WHERE user_id = ? AND token_hash <> ?",
+        [current.id, sha256(token)],
+        conn,
+      );
+    } else {
+      await run("DELETE FROM permission_sessions WHERE user_id = ?", [current.id], conn);
+    }
+  });
+  return { ok: true };
 }
 
 /**

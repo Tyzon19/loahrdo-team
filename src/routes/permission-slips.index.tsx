@@ -52,23 +52,23 @@ export const Route = createFileRoute("/permission-slips/")({
 const PERMISSION_STEPS = [
   {
     key: "schedule",
-    title: "Schedule",
-    blurb: "Indicate the date and specific departure & return times for leaving campus.",
+    title: "Department & Schedule",
+    blurb: "Enter your department or office, date, departure time, and return time.",
   },
   {
     key: "reason",
     title: "Reason",
-    blurb: "Provide the reason for leaving campus during working hours.",
+    blurb: "State why you are leaving campus.",
   },
   {
     key: "signature",
     title: "Signature",
-    blurb: "Provide your electronic signature to certify this permission slip.",
+    blurb: "Add your electronic signature.",
   },
   {
     key: "review",
     title: "Review",
-    blurb: "Review your information and confirm submission for HRDO Director approval.",
+    blurb: "Review your details and submit for approval.",
   },
 ] as const;
 
@@ -166,6 +166,13 @@ function PermissionSlipsPage() {
 
   // Multi-step form state
   const [currentStep, setCurrentStep] = useState(0);
+  // New accounts start with a placeholder "General" department, so only prefill
+  // when the profile holds a real department. Employees can always change it.
+  const defaultDepartment = (() => {
+    const department = permissionViewer?.department?.trim() ?? "";
+    return department.toLowerCase() === "general" ? "" : department;
+  })();
+  const [department, setDepartment] = useState(defaultDepartment);
   const [requestedDate, setRequestedDate] = useState("");
   const [timeOut, setTimeOut] = useState("");
   const [timeIn, setTimeIn] = useState("");
@@ -175,7 +182,10 @@ function PermissionSlipsPage() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<
     Partial<
-      Record<"requestedDate" | "timeOut" | "timeIn" | "reason" | "signature" | "form", string>
+      Record<
+        "department" | "requestedDate" | "timeOut" | "timeIn" | "reason" | "signature" | "form",
+        string
+      >
     >
   >({});
   const [submittedId, setSubmittedId] = useState<string | null>(null);
@@ -199,11 +209,14 @@ function PermissionSlipsPage() {
     const errors: typeof fieldErrors = {};
 
     if (step === 0) {
+      if (department.trim().length < 2) {
+        errors.department = "Enter your department or office.";
+      }
       if (!requestedDate) errors.requestedDate = "Choose the date you will leave campus.";
       else if (requestedDate < today) errors.requestedDate = "Choose today or a future date.";
 
       if (!timeOut) errors.timeOut = "Enter the time you will leave campus.";
-      if (!timeIn) errors.timeIn = "Enter your expected return time.";
+      if (!timeIn) errors.timeIn = "Enter the return time.";
       if (timeOut && timeIn && timeIn <= timeOut) {
         errors.timeIn = "Time In must be later than Time Out.";
       }
@@ -255,6 +268,7 @@ function PermissionSlipsPage() {
       const result = await unwrap(
         submitPermissionSlipFn({
           data: {
+            department: department.trim(),
             requestedDate,
             timeOut,
             timeIn,
@@ -271,6 +285,9 @@ function PermissionSlipsPage() {
     } catch (error) {
       if (error instanceof ApiError && error.fieldErrors) {
         setFieldErrors({
+          ...(error.fieldErrors["department"]
+            ? { department: error.fieldErrors["department"] }
+            : {}),
           ...(error.fieldErrors["requestedDate"]
             ? { requestedDate: error.fieldErrors["requestedDate"] }
             : {}),
@@ -292,6 +309,7 @@ function PermissionSlipsPage() {
   function submitAnotherRequest() {
     setSubmittedId(null);
     setEmailSent(null);
+    setDepartment(defaultDepartment);
     setRequestedDate("");
     setTimeOut("");
     setTimeIn("");
@@ -525,17 +543,17 @@ function PermissionSlipsPage() {
             </div>
             <h1 id="permission-success-title">Permission Slip Submitted</h1>
             <p className="coe-success-lead">
-              Your request has been submitted to the Human Resources Development Office (HRDO).
+              Your request was sent to the Human Resources Development Office (HRDO).
             </p>
             <p className="coe-success-message">
-              The HRDO Director will review and sign your permission slip. We will send an update to{" "}
-              <strong>{permissionViewer?.email}</strong> once your slip is approved or if additional
-              details are requested.
+              The HRDO Director will review it. We’ll email{" "}
+              <strong>{permissionViewer?.email}</strong> when it is approved or needs more
+              information.
             </p>
             {emailSent === false && (
               <p role="status" className="coe-success-message text-amber-700">
-                Your request was recorded in the database, but the HRDO notification email could not
-                be dispatched immediately. You can still track your request below.
+                The request was saved, but the HRDO notification email was not sent. You can still
+                track it below.
               </p>
             )}
             <p className="coe-success-reference">
@@ -606,18 +624,47 @@ function PermissionSlipsPage() {
             <section aria-labelledby="step-schedule-title" className="coe-section">
               <div>
                 <h2 id="step-schedule-title" className="coe-section-title">
-                  Off-Campus Schedule
+                  Department &amp; Schedule
                 </h2>
                 <p className="coe-section-description">
-                  Select the date you will leave campus and your expected departure and return
-                  times.
+                  Enter your department or office, date, departure time, and return time.
                 </p>
+              </div>
+
+              <div>
+                <Label
+                  htmlFor="permission-department"
+                  className="text-sm font-bold text-foreground"
+                >
+                  Department / Office <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="permission-department"
+                  value={department}
+                  maxLength={190}
+                  placeholder="e.g. College of Computer Studies"
+                  aria-invalid={Boolean(fieldErrors.department)}
+                  aria-describedby={
+                    fieldErrors.department
+                      ? "permission-department-help permission-department-error"
+                      : "permission-department-help"
+                  }
+                  onChange={(event) => {
+                    setDepartment(event.target.value);
+                    clearFieldError("department");
+                  }}
+                  className="coe-input text-base font-medium"
+                />
+                <p id="permission-department-help" className="permission-field-hint">
+                  Enter your current department or office.
+                </p>
+                <FieldError id="permission-department-error" message={fieldErrors.department} />
               </div>
 
               <div className="coe-fields coe-fields-schedule">
                 <div>
                   <Label htmlFor="permission-date" className="text-sm font-bold text-foreground">
-                    Date Leaving Campus <span className="text-destructive">*</span>
+                    Date Leaving <span className="text-destructive">*</span>
                   </Label>
                   <Input
                     id="permission-date"
@@ -637,7 +684,7 @@ function PermissionSlipsPage() {
                     className="coe-input text-base font-medium"
                   />
                   <p id="permission-date-help" className="permission-field-hint">
-                    Choose today or any future date.
+                    Choose today or a future date.
                   </p>
                   <FieldError id="permission-date-error" message={fieldErrors.requestedDate} />
                 </div>
@@ -647,7 +694,7 @@ function PermissionSlipsPage() {
                     htmlFor="permission-time-out"
                     className="text-sm font-bold text-foreground"
                   >
-                    Time Out (Departure) <span className="text-destructive">*</span>
+                    Time Out <span className="text-destructive">*</span>
                   </Label>
                   <Input
                     id="permission-time-out"
@@ -666,7 +713,7 @@ function PermissionSlipsPage() {
 
                 <div>
                   <Label htmlFor="permission-time-in" className="text-sm font-bold text-foreground">
-                    Time In (Expected Return) <span className="text-destructive">*</span>
+                    Time In <span className="text-destructive">*</span>
                   </Label>
                   <Input
                     id="permission-time-in"
@@ -693,16 +740,14 @@ function PermissionSlipsPage() {
             <section aria-labelledby="step-reason-title" className="coe-section">
               <div>
                 <h2 id="step-reason-title" className="coe-section-title">
-                  Reason for Going Out
+                  Reason
                 </h2>
-                <p className="coe-section-description">
-                  State the specific purpose of your off-campus absence.
-                </p>
+                <p className="coe-section-description">State why you are leaving campus.</p>
               </div>
 
               <div>
                 <Label htmlFor="permission-reason" className="text-sm font-bold text-foreground">
-                  Detailed Reason <span className="text-destructive">*</span>
+                  Reason <span className="text-destructive">*</span>
                 </Label>
                 <Textarea
                   id="permission-reason"
@@ -715,12 +760,12 @@ function PermissionSlipsPage() {
                     setReason(event.target.value);
                     clearFieldError("reason");
                   }}
-                  placeholder="Provide clear details on where you are going and why…"
+                  placeholder="Where are you going and why?"
                   rows={6}
                   className="coe-input"
                 />
                 <div className="permission-field-hint flex justify-between gap-3">
-                  <span>Write at least 5 characters.</span>
+                  <span>Minimum 5 characters.</span>
                   <span>{reason.length}/500</span>
                 </div>
                 <FieldError id="permission-reason-error" message={fieldErrors.reason} />
@@ -733,12 +778,9 @@ function PermissionSlipsPage() {
             <section aria-labelledby="step-signature-title" className="coe-section">
               <div>
                 <h2 id="step-signature-title" className="coe-section-title">
-                  Employee Signature
+                  Signature
                 </h2>
-                <p className="coe-section-description">
-                  Draw your signature inside the box or upload an existing signature image to
-                  certify this request.
-                </p>
+                <p className="coe-section-description">Draw your signature or upload an image.</p>
               </div>
 
               <div
@@ -756,10 +798,8 @@ function PermissionSlipsPage() {
 
                 <div className="coe-notice text-xs sm:text-sm">
                   <p>
-                    Signing as <strong className="text-foreground">{permissionViewer?.name}</strong>{" "}
-                    ({permissionViewer?.department}). Your signature certifies that you have
-                    informed your immediate supervisor and will follow Lyceum of Alabang policies
-                    during your absence.
+                    By signing, you confirm that you informed your immediate supervisor and will
+                    follow Lyceum of Alabang policies.
                   </p>
                 </div>
               </div>
@@ -771,17 +811,16 @@ function PermissionSlipsPage() {
             <section aria-labelledby="step-review-title" className="coe-section">
               <div>
                 <h2 id="step-review-title" className="coe-section-title">
-                  Review Request Details
+                  Review
                 </h2>
                 <p className="coe-section-description">
-                  Carefully review your information before submitting to the HRDO Director for
-                  approval.
+                  Check your details before submitting for HRDO Director approval.
                 </p>
               </div>
 
               <dl className="coe-summary-grid grid gap-4 sm:grid-cols-2 text-sm">
                 <div>
-                  <dt className="text-xs font-semibold text-muted-foreground">Employee Name</dt>
+                  <dt className="text-xs font-semibold text-muted-foreground">Name</dt>
                   <dd className="mt-1 text-base font-bold text-foreground">
                     {permissionViewer?.name}
                   </dd>
@@ -791,11 +830,11 @@ function PermissionSlipsPage() {
                     Department / Office
                   </dt>
                   <dd className="mt-1 text-base font-bold text-foreground">
-                    {permissionViewer?.department}
+                    {department.trim() || "Not provided"}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs font-semibold text-muted-foreground">Date of Leaving</dt>
+                  <dt className="text-xs font-semibold text-muted-foreground">Date</dt>
                   <dd className="mt-1 text-base font-bold text-foreground">
                     {formatPhilippineDate(requestedDate)}
                   </dd>
@@ -807,15 +846,11 @@ function PermissionSlipsPage() {
                   </dd>
                 </div>
                 <div className="sm:col-span-2">
-                  <dt className="text-xs font-semibold text-muted-foreground">
-                    Reason for Going Out
-                  </dt>
+                  <dt className="text-xs font-semibold text-muted-foreground">Reason</dt>
                   <dd className="coe-review-reason mt-1.5 p-4 text-base font-semibold">{reason}</dd>
                 </div>
                 <div className="sm:col-span-2">
-                  <dt className="text-xs font-semibold text-muted-foreground">
-                    Electronic Signature
-                  </dt>
+                  <dt className="text-xs font-semibold text-muted-foreground">Signature</dt>
                   <dd className="mt-2">
                     {signature?.image ? (
                       <div className="flex h-24 max-w-xs items-center justify-center rounded-lg border bg-white p-3">
@@ -848,8 +883,8 @@ function PermissionSlipsPage() {
                   htmlFor="confirm-permission-review"
                   className="text-xs sm:text-sm font-medium leading-relaxed text-foreground"
                 >
-                  I certify that all details above are true and complete, and I submit this
-                  Permission Slip for official HRDO Director review and approval.
+                  I certify that the details are true and complete and submit this Permission Slip
+                  for HRDO Director approval.
                 </Label>
               </div>
               <FieldError id="permission-form-error" message={fieldErrors.form} />
@@ -904,22 +939,21 @@ function PermissionSlipsPage() {
         <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Confirm Permission Slip Submission</AlertDialogTitle>
+              <AlertDialogTitle>Submit Permission Slip?</AlertDialogTitle>
               <AlertDialogDescription className="space-y-2">
                 <span className="block">
-                  Are you sure you want to submit this permission slip for{" "}
-                  <strong>{formatPhilippineDate(requestedDate)}</strong> ({timeOut} — {timeIn})?
+                  Submit this request for <strong>{formatPhilippineDate(requestedDate)}</strong> (
+                  {timeOut} — {timeIn})?
                 </span>
                 <span className="block rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
-                  <strong>Notice:</strong> Your request will be forwarded immediately to the HRDO
-                  Director for approval.
+                  It will be sent to the HRDO Director for approval.
                 </span>
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
               <AlertDialogAction onClick={() => void handleFinalSubmit()} disabled={busy}>
-                {busy ? <ButtonLoading label="Submitting…" /> : "Yes, Submit Request"}
+                {busy ? <ButtonLoading label="Submitting…" /> : "Submit Request"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

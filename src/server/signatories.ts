@@ -40,6 +40,10 @@ const STAGE_ROLES: Partial<Record<StageKey, Role>> = {
   approve: "president",
 };
 
+function createTemporaryPassword() {
+  return `${randomBytes(12).toString("base64url")}Aa1!`;
+}
+
 interface AssistantAccountRow extends RowDataPacket {
   id: string;
   name: string;
@@ -257,7 +261,7 @@ export async function createAssistantAccount(input: unknown) {
     throw new AppError("Use an official institutional email address.");
   }
 
-  const temporaryPassword = `${randomBytes(24).toString("base64url")}Aa1!`;
+  const temporaryPassword = createTemporaryPassword();
   try {
     await run(
       `INSERT INTO users
@@ -303,7 +307,7 @@ export async function createMainSignatoryAccount(input: unknown) {
   const role = STAGE_ROLES[data.stage];
   if (!role) throw new AppError("Choose a valid signatory stage.");
   const id = randomUUID();
-  const temporaryPassword = `${randomBytes(24).toString("base64url")}Aa1!`;
+  const temporaryPassword = createTemporaryPassword();
   const passwordHash = await hashPassword(temporaryPassword);
   try {
     await withTransaction(async (conn) => {
@@ -369,7 +373,7 @@ export async function resetUserPassword(input: unknown) {
   const user = users[0];
   if (!user) throw new AppError("Choose a valid non-administrator account.");
 
-  const temporaryPassword = `${randomBytes(24).toString("base64url")}Aa1!`;
+  const temporaryPassword = createTemporaryPassword();
   const passwordHash = await hashPassword(temporaryPassword);
   await withTransaction(async (conn) => {
     await run(

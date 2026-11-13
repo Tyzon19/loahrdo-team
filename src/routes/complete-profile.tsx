@@ -4,12 +4,21 @@ import { toast } from "sonner";
 import { User } from "lucide-react";
 import { AuthLayout, Field, SubmitButton } from "@/components/AuthLayout";
 import { joinFullName } from "@/lib/name";
+import { safeSignInNext } from "@/lib/google-signin";
 import { completeProfileNameFn } from "@/server-functions";
 import { SITE } from "@/lib/site";
 
 export const Route = createFileRoute("/complete-profile")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    redirect: typeof search["redirect"] === "string" ? search["redirect"] : undefined,
+  }),
   beforeLoad: ({ context }) => {
     if (!context.viewer) throw redirect({ to: "/login" });
+    if (!context.viewer.needsProfileCompletion) {
+      throw redirect({
+        to: context.viewer.mustChangePassword ? "/change-password" : "/dashboard",
+      });
+    }
   },
   head: () => ({
     meta: [
@@ -26,6 +35,7 @@ export const Route = createFileRoute("/complete-profile")({
 
 function CompleteProfilePage() {
   const { viewer } = Route.useRouteContext();
+  const search = Route.useSearch();
   const router = useRouter();
   const navigate = useNavigate();
   const [form, setForm] = useState({ firstName: "", middleName: "", lastName: "" });
@@ -35,7 +45,6 @@ function CompleteProfilePage() {
 
   if (!viewer) return null;
 
-  const passwordPending = viewer.mustChangePassword;
   const set = (key: keyof typeof form, value: string) =>
     setForm((current) => ({ ...current, [key]: value }));
 
@@ -67,7 +76,9 @@ function CompleteProfilePage() {
 
     await router.invalidate();
     toast.success("Your details are saved.");
-    await navigate({ to: passwordPending ? "/change-password" : "/dashboard" });
+    await navigate({
+      href: result.data.mustChangePassword ? "/change-password" : safeSignInNext(search.redirect),
+    });
   }
 
   return (

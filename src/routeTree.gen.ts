@@ -40,6 +40,7 @@ import { Route as HrdoRequestsRouteImport } from './routes/hrdo/requests'
 import { Route as PermissionSlipsIndexRouteImport } from './routes/permission-slips.index'
 import { Route as PermissionSlipsIdRouteImport } from './routes/permission-slips.$id'
 import { Route as PermissionSlipsLoginRouteImport } from './routes/permission-slips.login'
+import { Route as PermissionSlipsProfileRouteImport } from './routes/permission-slips.profile'
 import { Route as ServiceSlugRouteImport } from './routes/service.$slug'
 import { Route as VerifyTicketTokenRouteImport } from './routes/verify-ticket.$token'
 import { Route as AuthenticatedPrintIdRouteImport } from './routes/_authenticated/print.$id'
@@ -212,6 +213,11 @@ const PermissionSlipsLoginRoute = PermissionSlipsLoginRouteImport.update({
   path: '/login',
   getParentRoute: () => PermissionSlipsRoute,
 } as any)
+const PermissionSlipsProfileRoute = PermissionSlipsProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => PermissionSlipsRoute,
+} as any)
 const ServiceSlugRoute = ServiceSlugRouteImport.update({
   id: '/service/$slug',
   path: '/service/$slug',
@@ -310,6 +316,7 @@ export interface FileRoutesByFullPath {
   '/hrdo/requests': typeof HrdoRequestsRoute
   '/permission-slips/$id': typeof PermissionSlipsIdRoute
   '/permission-slips/login': typeof PermissionSlipsLoginRoute
+  '/permission-slips/profile': typeof PermissionSlipsProfileRoute
   '/service/$slug': typeof ServiceSlugRoute
   '/verify-ticket/$token': typeof VerifyTicketTokenRoute
   '/permission-slips/': typeof PermissionSlipsIndexRoute
@@ -354,6 +361,7 @@ export interface FileRoutesByTo {
   '/hrdo/requests': typeof HrdoRequestsRoute
   '/permission-slips/$id': typeof PermissionSlipsIdRoute
   '/permission-slips/login': typeof PermissionSlipsLoginRoute
+  '/permission-slips/profile': typeof PermissionSlipsProfileRoute
   '/service/$slug': typeof ServiceSlugRoute
   '/verify-ticket/$token': typeof VerifyTicketTokenRoute
   '/permission-slips': typeof PermissionSlipsIndexRoute
@@ -401,6 +409,7 @@ export interface FileRoutesById {
   '/hrdo/requests': typeof HrdoRequestsRoute
   '/permission-slips/$id': typeof PermissionSlipsIdRoute
   '/permission-slips/login': typeof PermissionSlipsLoginRoute
+  '/permission-slips/profile': typeof PermissionSlipsProfileRoute
   '/service/$slug': typeof ServiceSlugRoute
   '/verify-ticket/$token': typeof VerifyTicketTokenRoute
   '/permission-slips/': typeof PermissionSlipsIndexRoute
@@ -448,6 +457,7 @@ export interface FileRouteTypes {
     | '/hrdo/requests'
     | '/permission-slips/$id'
     | '/permission-slips/login'
+    | '/permission-slips/profile'
     | '/service/$slug'
     | '/verify-ticket/$token'
     | '/permission-slips/'
@@ -492,6 +502,7 @@ export interface FileRouteTypes {
     | '/hrdo/requests'
     | '/permission-slips/$id'
     | '/permission-slips/login'
+    | '/permission-slips/profile'
     | '/service/$slug'
     | '/verify-ticket/$token'
     | '/permission-slips'
@@ -538,6 +549,7 @@ export interface FileRouteTypes {
     | '/hrdo/requests'
     | '/permission-slips/$id'
     | '/permission-slips/login'
+    | '/permission-slips/profile'
     | '/service/$slug'
     | '/verify-ticket/$token'
     | '/permission-slips/'
@@ -793,6 +805,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PermissionSlipsLoginRouteImport
       parentRoute: typeof PermissionSlipsRoute
     }
+    '/permission-slips/profile': {
+      id: '/permission-slips/profile'
+      path: '/profile'
+      fullPath: '/permission-slips/profile'
+      preLoaderRoute: typeof PermissionSlipsProfileRouteImport
+      parentRoute: typeof PermissionSlipsRoute
+    }
     '/service/$slug': {
       id: '/service/$slug'
       path: '/service/$slug'
@@ -954,12 +973,14 @@ const HrdoRouteWithChildren = HrdoRoute._addFileChildren(HrdoRouteChildren)
 interface PermissionSlipsRouteChildren {
   PermissionSlipsIdRoute: typeof PermissionSlipsIdRoute
   PermissionSlipsLoginRoute: typeof PermissionSlipsLoginRoute
+  PermissionSlipsProfileRoute: typeof PermissionSlipsProfileRoute
   PermissionSlipsIndexRoute: typeof PermissionSlipsIndexRoute
 }
 
 const PermissionSlipsRouteChildren: PermissionSlipsRouteChildren = {
   PermissionSlipsIdRoute: PermissionSlipsIdRoute,
   PermissionSlipsLoginRoute: PermissionSlipsLoginRoute,
+  PermissionSlipsProfileRoute: PermissionSlipsProfileRoute,
   PermissionSlipsIndexRoute: PermissionSlipsIndexRoute,
 }
 

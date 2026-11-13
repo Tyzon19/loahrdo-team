@@ -28,8 +28,10 @@ export const Route = createFileRoute("/privacy")({
   component: PrivacyPage,
 });
 function PrivacyPage() {
+  const { viewer, hrdoViewer, permissionViewer } = Route.useRouteContext();
+
   return (
-    <PublicShell>
+    <PublicShell signedIn={Boolean(viewer || hrdoViewer || permissionViewer)}>
       <article className="mx-auto w-full max-w-3xl px-4 py-12">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
           Lyceum of Alabang · Human Resources Development Office (HRDO)
@@ -42,12 +44,12 @@ function PrivacyPage() {
             <h2 className="font-serif text-xl font-semibold">Who we are</h2>
             <p className="mt-2 text-muted-foreground">
               This system is operated by the Lyceum of Alabang Human Resources Development Office
-              (HRDO) to manage Certificate of Employment (COE) requests and employment
-              verification. It is intended to handle personal
-              information in line with Republic Act No. 10173, the Data Privacy Act of 2012, its
-              Implementing Rules and Regulations, and the Lyceum of Alabang Data Privacy Statement.
-              This notice explains how information is used in this system; it does not replace the
-              institution-wide statement. Questions about this policy or your data can be sent to{" "}
+              (HRDO) to manage Certificate of Employment (COE) requests and employment verification.
+              It is intended to handle personal information in line with Republic Act No. 10173, the
+              Data Privacy Act of 2012, its Implementing Rules and Regulations, and the Lyceum of
+              Alabang Data Privacy Statement. This notice explains how information is used in this
+              system; it does not replace the institution-wide statement. Questions about this
+              policy or your data can be sent to{" "}
               <a href={`mailto:${SITE.contactEmail}`} className="text-primary underline">
                 {SITE.contactEmail}
               </a>
@@ -73,10 +75,10 @@ function PrivacyPage() {
                 store your password in readable form.
               </li>
               <li>
-                <strong className="text-foreground">Request details:</strong> employee and
-                verifier information, employment details, COE type, copy and delivery preference,
-                purpose, consent records, uploaded authorization documents, remarks, returns and
-                approval history.
+                <strong className="text-foreground">Request details:</strong> employee and verifier
+                information, employment details, COE type, copy and delivery preference, purpose,
+                consent records, uploaded authorization documents, remarks, returns and approval
+                history.
               </li>
               <li>
                 <strong className="text-foreground">In-app notifications:</strong> alerts addressed
@@ -94,9 +96,9 @@ function PrivacyPage() {
               </li>
             </ul>
             <p className="mt-3 text-muted-foreground">
-              Please provide only information needed to process a COE or verification request. Avoid entering
-              sensitive personal information about yourself or others in the purpose or remarks
-              fields unless it is necessary for the request.
+              Please provide only information needed to process a COE or verification request. Avoid
+              entering sensitive personal information about yourself or others in the purpose or
+              remarks fields unless it is necessary for the request.
             </p>
           </section>
 
@@ -105,9 +107,9 @@ function PrivacyPage() {
             <p className="mt-2 text-muted-foreground">
               Information is used only as needed to verify accounts, process and approve COE and
               employment verification requests, prepare official employment documents, maintain
-              required administrative records, protect the system, and support HRDO operations. It is
-              processed for these stated purposes on a lawful basis under applicable law. Consent is
-              requested for optional analytics. We do not sell personal information or use it for
+              required administrative records, protect the system, and support HRDO operations. It
+              is processed for these stated purposes on a lawful basis under applicable law. Consent
+              is requested for optional analytics. We do not sell personal information or use it for
               advertising.
             </p>
             <p className="mt-2 text-muted-foreground">
@@ -163,11 +165,11 @@ function PrivacyPage() {
           <section>
             <h2 className="font-serif text-xl font-semibold">How long we keep it</h2>
             <p className="mt-2 text-muted-foreground">
-              COE, verification, uploaded document and approval records are retained as part of the office&apos;s
-              administrative record in line with the institution&apos;s applicable retention
-              requirements. Sessions expire automatically and expired sessions are removed.
-              Aggregate analytics counts are retained for service improvement and do not identify
-              you in this system.
+              COE, verification, uploaded document and approval records are retained as part of the
+              office&apos;s administrative record in line with the institution&apos;s applicable
+              retention requirements. Sessions expire automatically and expired sessions are
+              removed. Aggregate analytics counts are retained for service improvement and do not
+              identify you in this system.
             </p>
           </section>
 

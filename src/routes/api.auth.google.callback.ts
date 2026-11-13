@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { createFileRoute } from "@tanstack/react-router";
-import { googleAccountProblem, safeSignInNext } from "@/lib/google-signin";
+import { googleAccountProblem, googleSignInDestination, safeSignInNext } from "@/lib/google-signin";
 import { normaliseEmail } from "@/lib/validation";
 import {
   GOOGLE_MODE_COOKIE,
@@ -163,6 +163,10 @@ export const Route = createFileRoute("/api/auth/google/callback")({
           const email = normaliseEmail(identity.email);
 
           if (mode === "hrdo" || mode === "external") {
+            if (mode === "external") {
+              const accountProblem = googleAccountProblem(email, null, "external");
+              if (accountProblem) return failure(accountProblem, cleared, mode);
+            }
             if (mode === "hrdo") {
               const accountProblem = googleAccountProblem(email, null);
               if (accountProblem) return failure(accountProblem, cleared, mode);
@@ -227,11 +231,7 @@ export const Route = createFileRoute("/api/auth/google/callback")({
             encryptedCookieRequired() || secure ? "; Secure" : ""
           }`;
 
-          const target = requisitionerAccount.isNew
-            ? "/complete-profile"
-            : requisitionerAccount.mustChangePassword
-              ? "/change-password"
-              : next;
+          const target = googleSignInDestination(requisitionerAccount, next);
 
           return redirect(target, [...cleared, sessionCookie2]);
         } catch (error) {

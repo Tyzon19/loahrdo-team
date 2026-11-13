@@ -1,8 +1,16 @@
-import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, redirect } from "@tanstack/react-router";
 import { useState } from "react";
-import { LogOut } from "lucide-react";
+import { ChevronDown, LogOut, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { unwrap } from "@/lib/api";
 import { permissionLogoutFn } from "@/server-functions";
 
@@ -51,11 +59,36 @@ function PermissionSlipsLayout() {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <span className="hidden text-right text-xs leading-tight sm:block">
-              <span className="block font-semibold text-foreground">{permissionViewer.name}</span>
-              <span className="block text-muted-foreground">{permissionViewer.email}</span>
-            </span>
-            <SignOutButton />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="min-h-11 gap-1.5 px-2"
+                  aria-label="Open account menu"
+                >
+                  <UserRound className="h-4 w-4" aria-hidden />
+                  <span className="hidden max-w-[160px] truncate text-xs sm:inline">
+                    {permissionViewer.name}
+                  </span>
+                  <ChevronDown className="h-3.5 w-3.5" aria-hidden />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuLabel>
+                  <span className="block truncate text-sm">{permissionViewer.name}</span>
+                  <span className="block truncate text-xs font-normal text-muted-foreground">
+                    {permissionViewer.email}
+                  </span>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link to="/permission-slips/profile">Profile &amp; account</Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <SignOutMenuItem />
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>
@@ -66,7 +99,7 @@ function PermissionSlipsLayout() {
   );
 }
 
-function SignOutButton() {
+function SignOutMenuItem() {
   const [signingOut, setSigningOut] = useState(false);
 
   async function signOut() {
@@ -84,16 +117,8 @@ function SignOutButton() {
   }
 
   return (
-    <Button
-      type="button"
-      variant="outline"
-      size="sm"
-      className="gap-2"
-      disabled={signingOut}
-      onClick={() => void signOut()}
-    >
-      <LogOut className="h-4 w-4" aria-hidden />
-      {signingOut ? "Signing out" : "Sign out"}
-    </Button>
+    <DropdownMenuItem disabled={signingOut} onSelect={() => void signOut()}>
+      <LogOut className="h-4 w-4" aria-hidden /> {signingOut ? "Signing out" : "Sign out"}
+    </DropdownMenuItem>
   );
 }

@@ -20,8 +20,10 @@ export const Route = createFileRoute("/terms-of-service")({
 });
 
 function TermsOfServicePage() {
+  const { viewer, hrdoViewer, permissionViewer } = Route.useRouteContext();
+
   return (
-    <PublicShell>
+    <PublicShell signedIn={Boolean(viewer || hrdoViewer || permissionViewer)}>
       <article className="mx-auto w-full max-w-3xl px-4 py-12">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
           Lyceum of Alabang · Online Services
