@@ -108,12 +108,10 @@ CREATE TABLE IF NOT EXISTS vehicles (
   driver_name VARCHAR(120) NOT NULL,
   type VARCHAR(80) NOT NULL,
   plate_no VARCHAR(32) NOT NULL,
-  capacity INT NOT NULL DEFAULT 1,
   status ENUM('in_service','maintenance') NOT NULL DEFAULT 'in_service',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  UNIQUE KEY vehicles_plate_uq (plate_no),
-  CONSTRAINT vehicles_capacity_ck CHECK (capacity > 0)
+  UNIQUE KEY vehicles_plate_uq (plate_no)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS request_sequences (

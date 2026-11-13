@@ -13,6 +13,7 @@ import {
   SubmitButton,
 } from "@/components/AuthLayout";
 import { institutionalEmailAllowed, registerSchema } from "@/lib/validation";
+import { validationIssueMessage } from "@/lib/validation-messages";
 import { joinFullName } from "@/lib/name";
 import { requestRegistrationOtpFn, verifyRegistrationOtpFn } from "@/server-functions";
 import { SITE, canonical } from "@/lib/site";
@@ -53,16 +54,8 @@ export const Route = createFileRoute("/register")({
 });
 
 type Errors = {
-  [
-    K in
-      | "firstName"
-      | "middleName"
-      | "lastName"
-      | "email"
-      | "password"
-      | "confirm"
-      | "code"
-  ]?: string | undefined;
+  [K in "firstName" | "middleName" | "lastName" | "email" | "password" | "confirm" | "code"]?:
+    string | undefined;
 };
 
 function RegisterPage() {
@@ -176,7 +169,7 @@ function RegisterPage() {
       for (const issue of parsed.error.issues) {
         const key = issue.path[0];
         if (typeof key === "string" && !nextErrors[key as keyof Errors]) {
-          nextErrors[key as keyof Errors] = issue.message;
+          nextErrors[key as keyof Errors] = validationIssueMessage(issue);
         }
       }
     }

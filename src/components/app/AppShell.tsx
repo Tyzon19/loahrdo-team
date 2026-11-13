@@ -162,7 +162,7 @@ function SideNav({
           Lyceum of Alabang
         </p>
         <p className="text-xs opacity-80">
-          {permissionPortal ? "Permission Slip System" : "Vehicle Reservation &amp; Trip Ticket"}
+          {permissionPortal ? "Permission Slip System" : "Vehicle Reservation & Trip Ticket"}
         </p>
       </div>
       <ul className="flex-1 py-2">

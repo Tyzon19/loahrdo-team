@@ -770,10 +770,19 @@ function ActionPanel({
                   >
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Enter vehicle details manually</SelectItem>
+                  <SelectContent className="w-[var(--radix-select-trigger-width)] max-w-[calc(100vw-2rem)]">
+                    <SelectItem
+                      value="none"
+                      className="h-auto whitespace-normal break-words leading-5"
+                    >
+                      Enter vehicle details manually
+                    </SelectItem>
                     {detail.vehicles.map((v) => (
-                      <SelectItem key={v.id} value={v.id}>
+                      <SelectItem
+                        key={v.id}
+                        value={v.id}
+                        className="h-auto whitespace-normal break-words leading-5"
+                      >
                         {v.driverName} · {v.type} · {v.plateNo}
                         {v.status === "maintenance" ? " (maintenance)" : ""}
                       </SelectItem>

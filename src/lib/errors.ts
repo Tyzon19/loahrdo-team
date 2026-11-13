@@ -1,5 +1,6 @@
 import type { output, ZodType } from "zod";
 import type { ApiResult } from "@/lib/types";
+import { validationIssueMessage } from "@/lib/validation-messages";
 
 /** An error whose message is safe to show to the signed-in user. */
 export class AppError extends Error {
@@ -19,9 +20,12 @@ export function parseInput<Schema extends ZodType>(schema: Schema, input: unknow
   const fieldErrors: Record<string, string> = {};
   for (const issue of result.error.issues) {
     const key = issue.path.length ? issue.path.join(".") : "form";
-    if (!fieldErrors[key]) fieldErrors[key] = issue.message;
+    if (!fieldErrors[key]) fieldErrors[key] = validationIssueMessage(issue);
   }
-  const first = result.error.issues[0]?.message ?? "Please check the information you entered.";
+  const firstIssue = result.error.issues[0];
+  const first = firstIssue
+    ? validationIssueMessage(firstIssue)
+    : "Please check the information you entered.";
   throw new AppError(first, fieldErrors);
 }
 

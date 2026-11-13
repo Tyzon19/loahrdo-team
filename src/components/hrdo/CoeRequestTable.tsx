@@ -90,7 +90,7 @@ export function CoeRequestTable({
           </li>
         ))}
       </ul>
-      <div className="hidden lg:block">
+      <div className="hidden 2xl:block">
         <Table01 label={staff ? "COE staff requests" : "My COE requests"}>
           <TableHeader className="bg-muted/60">
             <TableRow className="hover:bg-transparent">

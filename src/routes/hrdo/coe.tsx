@@ -111,7 +111,7 @@ function localDateValue(date: Date) {
     day: "2-digit",
   }).formatToParts(date);
   const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
-  return `${values.year}-${values.month}-${values.day}`;
+  return `${values["year"]}-${values["month"]}-${values["day"]}`;
 }
 
 function formatPhilippineDate(value: string) {
@@ -135,7 +135,7 @@ function addWorkingDays(start: Date, count: number) {
   }).formatToParts(start);
   const values = Object.fromEntries(startParts.map(({ type, value }) => [type, value]));
   const date = new Date(
-    Date.UTC(Number(values.year), Number(values.month) - 1, Number(values.day)),
+    Date.UTC(Number(values["year"]), Number(values["month"]) - 1, Number(values["day"])),
   );
   let remaining = count;
   while (remaining > 0) {
@@ -1127,7 +1127,7 @@ function CoeRequestPage() {
                       className="mt-1 min-h-20"
                       value={note}
                       onChange={(event) => setNote(event.target.value)}
-                      placeholder="Add any instructions HRDO should know"
+                      placeholder="Add any instructions HRDO should know about your request."
                       maxLength={2000}
                     />
                   </div>
@@ -1347,6 +1347,14 @@ function CoeRequestPage() {
                         to the processing of this data for verification/certification purposes.
                       </span>
                     </label>
+                  </div>
+                </Section>
+
+                <Section title="Notice">
+                  <div className="coe-confirmation">
+                    <p>
+                      <strong>Important Notice:</strong>
+                    </p>
                   </div>
                 </Section>
 
