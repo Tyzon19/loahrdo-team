@@ -1,8 +1,28 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { HrdoShell } from "@/components/hrdo/HrdoShell";
+import { AppShell } from "@/components/app/AppShell";
+import { canAccessAdminPortal } from "@/lib/access";
 
 export const Route = createFileRoute("/hrdo")({
   beforeLoad: ({ context, location }) => {
+    if (context.viewer && canAccessAdminPortal(context.viewer.role, context.viewer.isSuperAdmin)) {
+      if (context.viewer.needsProfileCompletion) {
+        throw redirect({ to: "/complete-profile", search: { redirect: "/admin" } });
+      }
+      if (context.viewer.mustChangePassword) {
+        throw redirect({ to: "/change-password" });
+      }
+      if (location.pathname === "/hrdo/login" || location.pathname === "/hrdo/forgot-password") {
+        throw redirect({ to: "/admin" });
+      }
+      if (location.pathname === "/hrdo/change-password") {
+        throw redirect({ to: "/change-password" });
+      }
+      if (location.pathname === "/hrdo/profile") {
+        throw redirect({ to: "/profile", search: { portal: undefined } });
+      }
+    }
+
     if (
       location.pathname === "/hrdo/login" ||
       location.pathname === "/hrdo/forgot-password" ||
@@ -35,8 +55,15 @@ export const Route = createFileRoute("/hrdo")({
 });
 
 function HrdoLayout() {
-  const { hrdoViewer } = Route.useRouteContext();
+  const { hrdoViewer, viewer } = Route.useRouteContext();
 
+  if (viewer && canAccessAdminPortal(viewer.role, viewer.isSuperAdmin)) {
+    return (
+      <AppShell user={viewer}>
+        <Outlet />
+      </AppShell>
+    );
+  }
   if (!hrdoViewer) {
     return <Outlet />;
   }

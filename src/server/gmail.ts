@@ -779,7 +779,7 @@ export async function sendTemporaryPasswordEmail(input: {
   temporaryPassword: string;
   signatoryTitle: string;
   accountAction?: "created" | "password-reset";
-  loginPath?: "/login" | "/hrdo/login";
+  loginPath?: "/login" | "/hrdo/login" | "/permission-slips/login";
   systemName?: string;
 }): Promise<EmailDeliveryResult> {
   try {
@@ -889,7 +889,7 @@ export async function sendPermissionSlipEmail(input: {
       input.kind === "head_review"
         ? `A Permission Slip from ${input.employeeName} is waiting for your review and signature.`
         : input.kind === "employee_approved"
-          ? "Your Permission Slip has been approved by the HRDO Department Head. The softcopy is attached."
+          ? "Your Permission Slip has been approved by an assigned HRDO signatory. The softcopy is attached."
           : `Your Permission Slip was rejected. Reason: ${input.rejectionReason ?? "Please review the request."}`;
     const safe = {
       recipientName: escapeHtml(input.recipientName),

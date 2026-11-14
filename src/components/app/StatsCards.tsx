@@ -4,15 +4,17 @@ export function StatsCards({
   stats,
   loading,
   role,
+  isSuperAdmin = false,
 }: {
   stats: DashboardStats | undefined;
   loading: boolean;
   role: Role;
+  isSuperAdmin?: boolean;
 }) {
   if (loading || !stats) return <LoadingStats />;
 
   const cards =
-    role === "admin"
+    role === "admin" || isSuperAdmin
       ? [
           { label: "Total requests", value: stats.total, hint: "Across all request statuses" },
           { label: "In approval", value: stats.pending, hint: "Waiting at an approval stage" },

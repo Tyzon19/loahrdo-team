@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { institutionalEmailAllowed } from "./validation";
 
 const signatureImage = z
   .string()
@@ -50,3 +51,28 @@ export const sendPermissionReceiptSchema = z.object({
 });
 
 export const permissionIdSchema = z.string().uuid("Invalid permission slip reference.");
+
+export const createPermissionSignatorySchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(2, "Enter the signatory's full name.")
+    .max(120, "Names must be 120 characters or fewer.")
+    .regex(/^[\p{L}\p{M}.'\-\s]+$/u, "Use letters, spaces, periods, apostrophes or hyphens only."),
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .email("Enter a valid institutional email.")
+    .max(190)
+    .refine(institutionalEmailAllowed, "Use your @lyceumalabang.edu.ph address."),
+  department: z
+    .string()
+    .trim()
+    .min(2, "Enter the signatory's department or office.")
+    .max(190, "Department must be 190 characters or fewer."),
+});
+
+export const permissionSignatoryIdSchema = z
+  .string()
+  .uuid("Invalid Permission Slip signatory reference.");

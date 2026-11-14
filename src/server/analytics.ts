@@ -5,6 +5,7 @@ import type { RowDataPacket } from "mysql2/promise";
 import { aggregateDestinationTrips } from "@/lib/destination-analytics";
 import { all, likePattern, run } from "./db";
 import { requireViewer } from "./auth";
+import { canViewSiteAnalytics } from "@/lib/access";
 
 const recent = new Map<string, number>();
 
@@ -56,7 +57,9 @@ interface CountRow extends RowDataPacket {
 
 export async function getTripArchive(input: unknown) {
   const viewer = await requireViewer();
-  if (viewer.role !== "admin") throw new AppError("Only administrators can view trip analytics.");
+  if (!canViewSiteAnalytics(viewer.role, viewer.isSuperAdmin)) {
+    throw new AppError("Only administrators can view trip analytics.");
+  }
 
   const filter = parseInput(tripArchiveFilterSchema, input ?? {});
   const page = filter.page ?? 0;

@@ -108,7 +108,7 @@ export function RequestsTable({
                   >
                     {r.destinations.join("; ")}
                   </td>
-                  <td className="px-3 py-2 font-medium whitespace-nowrap">
+                  <td className="px-3 py-2 font-medium whitespace-normal break-words">
                     {fmtRange(r.dateStart, r.dateEnd)}
                   </td>
                   <td className="px-3 py-2 font-medium">

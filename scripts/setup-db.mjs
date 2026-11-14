@@ -107,6 +107,16 @@ try {
        ENUM('requisitioner','department_head','transport_head','director','president','transport_staff','assistant','guard','driver','admin') NOT NULL`,
     );
   }
+  const [permissionSignatoryCount] = await conn.query(
+    "SELECT COUNT(*) AS count FROM permission_slip_signatories",
+  );
+  if (Number(permissionSignatoryCount[0]?.count ?? 0) === 0) {
+    await conn.query(
+      `INSERT IGNORE INTO permission_slip_signatories (user_id)
+       SELECT id FROM users
+       WHERE email = 'hrdirector@lyceumalabang.edu.ph' AND role = 'department_head'`,
+    );
+  }
   const [profileCompleteColumn] = await conn.query(
     `SELECT COUNT(*) AS count
      FROM information_schema.COLUMNS
@@ -120,6 +130,26 @@ try {
     await conn.query(
       "UPDATE users SET profile_complete = 0 WHERE role = 'requisitioner' AND must_change_password = 1",
     );
+  }
+  const [superAdminColumn] = await conn.query(
+    `SELECT COUNT(*) AS count
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'users' AND COLUMN_NAME = 'is_super_admin'`,
+    [dbName],
+  );
+  if (Number(superAdminColumn[0]?.count ?? 0) === 0) {
+    await conn.query(
+      "ALTER TABLE users ADD COLUMN is_super_admin TINYINT(1) NOT NULL DEFAULT 0 AFTER profile_complete",
+    );
+  }
+  const [superAdminIndex] = await conn.query(
+    `SELECT COUNT(*) AS count
+     FROM information_schema.STATISTICS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'users' AND INDEX_NAME = 'users_super_admin_idx'`,
+    [dbName],
+  );
+  if (Number(superAdminIndex[0]?.count ?? 0) === 0) {
+    await conn.query("ALTER TABLE users ADD KEY users_super_admin_idx (is_super_admin, id)");
   }
   await conn.query(
     "ALTER TABLE hrdo_users MODIFY role ENUM('employee','hrdo_staff','hrdo_admin') NOT NULL DEFAULT 'employee'",
@@ -157,7 +187,6 @@ try {
       "ALTER TABLE permission_slips ADD KEY permission_employee_email_idx (employee_email, requested_at)",
     );
   }
-  await conn.query("ALTER TABLE vehicles MODIFY capacity INT NOT NULL DEFAULT 1");
   const [coeDocumentMimeColumn] = await conn.query(
     `SELECT CHARACTER_MAXIMUM_LENGTH AS maxLength
      FROM information_schema.COLUMNS

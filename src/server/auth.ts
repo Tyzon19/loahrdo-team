@@ -15,6 +15,7 @@ import {
 } from "@tanstack/react-start/server";
 import type { RowDataPacket } from "mysql2/promise";
 import type { Role, Viewer } from "@/lib/types";
+import { canAccessAdminPortal } from "@/lib/access";
 import { joinFullName } from "@/lib/name";
 import { hasUserSetPassword, requiresProfileCompletion } from "@/lib/google-signin";
 import {
@@ -69,9 +70,11 @@ interface UserRow extends RowDataPacket {
   department: string;
   must_change_password: number;
   profile_complete: number;
+  is_super_admin: number;
   is_locked?: number;
   lock_minutes?: number | null;
 }
+
 
 const loginAttempts = new Map<string, { count: number; resetAt: number }>();
 
@@ -84,7 +87,6 @@ function isLocalEnvironmentIp(ip: string | null | undefined) {
     ip.startsWith("172.")
   );
 }
-
 function checkIpRateLimit(ip: string) {
   if (isLocalEnvironmentIp(ip) || process.env["NODE_ENV"] !== "production") {
     return;
@@ -112,12 +114,11 @@ function mapViewer(row: UserRow): Viewer {
     id: row.id,
     name: row.name,
     email: row.email,
-    // `department_head` is a Permission Slip role. The vehicle trip ticket has
-    // no duty for it, so the same account acts as an ordinary requester here.
     role: row.role === "department_head" ? "requisitioner" : row.role,
     department: row.department,
     mustChangePassword: Boolean(row.must_change_password),
     needsProfileCompletion: requiresProfileCompletion(row.profile_complete),
+    isSuperAdmin: Boolean(row.is_super_admin),
   };
 }
 
@@ -149,7 +150,6 @@ function cookieOptions(maxAge: number) {
   };
 }
 
-/** Creates a database session and returns the raw token for the response cookie. */
 export async function createSession(userId: string): Promise<{ token: string; maxAge: number }> {
   const cookieName = sessionCookieName();
   const previous = getCookie(cookieName);
@@ -180,7 +180,6 @@ export interface GoogleSignInAccount {
   needsProfileCompletion: boolean;
 }
 
-/** Looks up an account for Google sign-in without starting a session. */
 export async function googleSignInAccount(email: string): Promise<GoogleSignInAccount | null> {
   const rows = await all<UserRow[]>(
     "SELECT id, role, must_change_password, profile_complete FROM users WHERE email = ? LIMIT 1",
@@ -243,6 +242,7 @@ export async function viewer(): Promise<Viewer | null> {
   const hash = sha256(token);
   const rows = await all<UserRow[]>(
     `SELECT u.id, u.name, u.email, u.password_hash, u.role, u.department,
+           u.is_super_admin,
            u.must_change_password, u.profile_complete
      FROM sessions s
      JOIN users u ON u.id = s.user_id
@@ -274,7 +274,9 @@ export async function requireViewer(): Promise<Viewer> {
   return current;
 }
 
-export async function login(input: unknown): Promise<{ mustChangePassword: boolean }> {
+export async function login(
+  input: unknown,
+): Promise<{ mustChangePassword: boolean; isAdminPortal: boolean }> {
   const data = parseInput(loginSchema, input);
   const email = normaliseEmail(data.email);
 
@@ -282,6 +284,7 @@ export async function login(input: unknown): Promise<{ mustChangePassword: boole
 
   const rows = await all<UserRow[]>(
     `SELECT id, name, email, password_hash, role, department, must_change_password,
+            is_super_admin,
             (locked_until IS NOT NULL AND locked_until > NOW()) AS is_locked,
             TIMESTAMPDIFF(MINUTE, NOW(), locked_until) AS lock_minutes
      FROM users WHERE email = ? LIMIT 1`,
@@ -307,13 +310,10 @@ export async function login(input: unknown): Promise<{ mustChangePassword: boole
       throw invalid;
     }
 
-    // The account belongs to another LOA system. Signing in here links it to a
-    // plain requester profile because the vehicle trip ticket has no duty for
-    // that role.
     const userId = await linkUserProfile(linked);
     await clearLinkedLock(linked);
     await startSession(userId);
-    return { mustChangePassword: Boolean(linked.must_change_password) };
+    return { mustChangePassword: Boolean(linked.must_change_password), isAdminPortal: false };
   }
 
   if (user.is_locked) {
@@ -329,8 +329,6 @@ export async function login(input: unknown): Promise<{ mustChangePassword: boole
     user.must_change_password,
   );
   if (!valid) {
-    // The same institutional account may also live in the COE store. Accept
-    // that password here as well and keep this profile as a requester.
     const linked = await findLinkedAccount(email);
     if (
       linked &&
@@ -340,7 +338,7 @@ export async function login(input: unknown): Promise<{ mustChangePassword: boole
       const userId = await linkUserProfile(linked);
       await clearLinkedLock(linked);
       await startSession(userId);
-      return { mustChangePassword: Boolean(linked.must_change_password) };
+      return { mustChangePassword: Boolean(linked.must_change_password), isAdminPortal: false };
     }
 
     await run(
@@ -354,7 +352,10 @@ export async function login(input: unknown): Promise<{ mustChangePassword: boole
 
   await run("UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?", [user.id]);
   await startSession(user.id);
-  return { mustChangePassword: Boolean(user.must_change_password) };
+  return {
+    mustChangePassword: Boolean(user.must_change_password),
+    isAdminPortal: canAccessAdminPortal(user.role, Boolean(user.is_super_admin)),
+  };
 }
 
 export async function requestPasswordRecovery(input: unknown): Promise<{ sent: true }> {
@@ -740,10 +741,6 @@ export async function updateProfile(input: unknown): Promise<Viewer> {
   return { ...current, name: data.name, department: data.department };
 }
 
-/**
- * Saves the split name collected from first-time Google sign-ins. The joined
- * value is what receipts and official documents print.
- */
 export async function completeProfileName(input: unknown): Promise<Viewer> {
   const current = await requireViewer();
   if (!current.needsProfileCompletion) {
@@ -773,6 +770,7 @@ export async function completeProfileName(input: unknown): Promise<Viewer> {
       );
     }
   });
+
   return {
     ...current,
     name,

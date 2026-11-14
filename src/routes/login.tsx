@@ -17,6 +17,7 @@ import {
   SubmitButton,
 } from "@/components/AuthLayout";
 import { googleSignInErrorMessage } from "@/lib/google-signin";
+import { canAccessAdminPortal } from "@/lib/access";
 import { SITE, canonical } from "@/lib/site";
 import { loginFn } from "@/server-functions";
 
@@ -46,7 +47,9 @@ export const Route = createFileRoute("/login")({
           ? "/complete-profile"
           : context.viewer.mustChangePassword
             ? "/change-password"
-            : "/dashboard",
+            : canAccessAdminPortal(context.viewer.role, context.viewer.isSuperAdmin)
+              ? "/admin"
+              : "/dashboard",
       });
     }
   },
@@ -94,7 +97,9 @@ function LoginPage() {
         ? "/change-password"
         : search.redirect && search.redirect !== "/login"
           ? search.redirect
-          : "/dashboard";
+          : result.data.isAdminPortal
+            ? "/admin"
+            : "/dashboard";
       await router.navigate({ href: target });
     } catch {
       setError("We couldn't sign you in. Check your connection and try again.");

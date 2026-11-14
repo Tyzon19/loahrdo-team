@@ -33,7 +33,7 @@ export const Route = createFileRoute("/_authenticated/vehicles")({
 function Vehicles() {
   const { viewer } = Route.useRouteContext();
   const queryClient = useQueryClient();
-  const allowed = Boolean(viewer && canManageVehicles(viewer.role));
+  const allowed = Boolean(viewer && canManageVehicles(viewer.role, viewer.isSuperAdmin));
   const query = useQuery({
     queryKey: ["vehicles"],
     queryFn: () => unwrap(listVehiclesFn()),
@@ -51,6 +51,7 @@ function Vehicles() {
   const [savingEdit, setSavingEdit] = useState(false);
 
   if (!viewer) return null;
+  const canEditVehicles = viewer.role === "admin" || viewer.isSuperAdmin;
   if (!allowed) {
     return (
       <Section title="Not available">
@@ -89,7 +90,7 @@ function Vehicles() {
   }
 
   async function deleteVehicle(id: string, driverName: string, plateNo: string) {
-    if (viewer.role !== "admin" || deletingId) return;
+    if (!canEditVehicles || deletingId) return;
     if (
       !window.confirm(
         `Delete ${driverName}'s vehicle record (${plateNo})? Existing request history will be preserved.`,
@@ -165,7 +166,7 @@ function Vehicles() {
                     <th className="px-3 py-2 font-medium">Plate No.</th>
                     <th className="px-3 py-2 font-medium">Status</th>
                     <th className="px-3 py-2 font-medium">Upcoming reservations</th>
-                    {viewer.role === "admin" && <th className="px-3 py-2 font-medium">Actions</th>}
+                    {canEditVehicles && <th className="px-3 py-2 font-medium">Actions</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -185,7 +186,7 @@ function Vehicles() {
                             <span className="text-warning">Under maintenance</span>
                           )}
                         </td>
-                        {viewer.role === "admin" && (
+                        {canEditVehicles && (
                           <td className="px-3 py-2">
                             <div className="flex flex-wrap gap-2">
                               <Button
@@ -247,7 +248,7 @@ function Vehicles() {
                   })}
                   {(data?.vehicles.length ?? 0) === 0 && (
                     <tr>
-                      <td colSpan={viewer.role === "admin" ? 6 : 5} className="font-medium text-center py-6">
+                      <td colSpan={canEditVehicles ? 6 : 5} className="font-medium text-center py-6">
                         No vehicles recorded yet. Add the first vehicle below.
                       </td>
                     </tr>
@@ -258,7 +259,7 @@ function Vehicles() {
           )}
         </Section>
 
-        {viewer.role === "admin" && editingVehicle && (
+        {canEditVehicles && editingVehicle && (
           <Section title="Edit vehicle">
             <form className="grid gap-3 sm:grid-cols-4 sm:items-end" onSubmit={saveVehicleEdit}>
               <div>

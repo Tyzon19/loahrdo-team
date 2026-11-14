@@ -164,6 +164,15 @@ function PermissionProfilePage() {
         </form>
       </section>
 
+      {permissionViewer.mustChangePassword && (
+        <p
+          role="alert"
+          className="rounded-md border border-warning/40 bg-warning-soft p-3 text-sm text-warning"
+        >
+          Change your temporary password before continuing to Permission Slip.
+        </p>
+      )}
+
       <section className="rounded-xl border border-border bg-background p-4 shadow-sm sm:p-6">
         <div className="flex items-start gap-3">
           <KeyRound className="mt-0.5 h-5 w-5 text-primary" aria-hidden />

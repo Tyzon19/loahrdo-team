@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   approvePermissionSchema,
+  createPermissionSignatorySchema,
   createPermissionSchema,
+  permissionSignatoryIdSchema,
   sendPermissionReceiptSchema,
 } from "@/lib/permission-schema";
 import { fmtTime } from "@/lib/format";
@@ -19,6 +21,7 @@ describe("Permission Slip Approval & Receipt Schemas", () => {
       reason: "Official school errand at Department of Education",
       employeeSignature: dummySignature,
     });
+
     expect(valid.success).toBe(true);
   });
 
@@ -85,5 +88,29 @@ describe("Permission Slip Approval & Receipt Schemas", () => {
     expect(fmtTime("10:30")).toBe("10:30 AM");
     expect(fmtTime("14:00")).toBe("2:00 PM");
     expect(fmtTime("23:45")).toBe("11:45 PM");
+  });
+});
+
+describe("Permission Slip signatory management schemas", () => {
+  it("accepts institutional signatory accounts and rejects non-institutional emails", () => {
+    const account = {
+      name: "Alex Signatory",
+      email: "alex.signatory@lyceumalabang.edu.ph",
+      department: "Human Resources Development Office",
+    };
+    expect(createPermissionSignatorySchema.safeParse(account).success).toBe(true);
+    expect(
+      createPermissionSignatorySchema.safeParse({
+        ...account,
+        email: "alex@example.com",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("requires a UUID when removing signatory access", () => {
+    expect(
+      permissionSignatoryIdSchema.safeParse("2a2a95a1-7916-4baf-8d00-3682eec149b5").success,
+    ).toBe(true);
+    expect(permissionSignatoryIdSchema.safeParse("not-a-uuid").success).toBe(false);
   });
 });

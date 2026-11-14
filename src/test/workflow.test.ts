@@ -82,7 +82,7 @@ describe("approval workflow", () => {
       toUserId: "p",
       stage: "approve",
       subject: "[LOA Vehicle Request] Action Needed: Trip Ticket Not Sent — VR-1",
-      heading: "The official trip ticket has not been sent to the requisitioner yet.",
+      heading: "The official trip ticket has not been sent to the requestor yet.",
       ctaLabel: "Prepare Trip Ticket",
     });
     expect(out.emails.find((email) => email.kind === "trip_ticket_reminder")?.body).toContain(

@@ -298,7 +298,7 @@ export async function listRequests(input: unknown): Promise<RequestRow[]> {
 
   // Requisitioners can only ever see their own records; this is enforced here,
   // not in the browser.
-  if (!canViewAllRequests(viewer.role)) {
+  if (!canViewAllRequests(viewer.role, viewer.isSuperAdmin)) {
     where.push("r.requisitioner_id = ?");
     params.push(viewer.id);
   }
@@ -388,7 +388,7 @@ async function requestDetail(
   includeSignatureImages: boolean,
 ): Promise<RequestDetail | null> {
   const viewer = await requireViewer();
-  if (includeSignatureImages && viewer.role === "requisitioner") {
+  if (includeSignatureImages && viewer.role === "requisitioner" && !viewer.isSuperAdmin) {
     throw new AppError("The official trip ticket image is required.");
   }
   const parsed = requestIdSchema.safeParse(id);
@@ -421,7 +421,7 @@ async function requestDetail(
 
   const canSeeFleet =
     isApproverRole(viewer.role) ||
-    canManageVehicles(viewer.role) ||
+    canManageVehicles(viewer.role, viewer.isSuperAdmin) ||
     approverUserIds.review === viewer.id;
   const vehicles = canSeeFleet ? await loadVehicles(pool) : [];
   const conflicts = canSeeFleet
@@ -457,10 +457,10 @@ async function requestDetail(
       : {}),
     doc,
     approverNames,
-    approverUserIds: canViewAllRequests(viewer.role) ? approverUserIds : {},
+    approverUserIds: canViewAllRequests(viewer.role, viewer.isSuperAdmin) ? approverUserIds : {},
     vehicles,
     assistantNames,
-    assistantUserIds: canViewAllRequests(viewer.role) ? assistantUserIds : {},
+    assistantUserIds: canViewAllRequests(viewer.role, viewer.isSuperAdmin) ? assistantUserIds : {},
     conflictCandidates: conflicts.map((row) => ({
       id: String(row["id"]),
       number: String(row["number"]),
@@ -939,7 +939,7 @@ export async function sendTripTicket(input: unknown): Promise<{
   emailDelivery: Awaited<ReturnType<typeof sendTripTicketEmail>>;
 }> {
   const viewer = await requireViewer();
-  if (!canViewAllRequests(viewer.role)) {
+  if (!canViewAllRequests(viewer.role, viewer.isSuperAdmin)) {
     throw new AppError("Only staff in the approval workflow can send the trip ticket.");
   }
   const data = parseInput(sendTripTicketSchema, input);
@@ -1040,7 +1040,7 @@ export async function listVehicles(): Promise<{
   reservations: VehicleReservation[];
 }> {
   const viewer = await requireViewer();
-  if (!canManageVehicles(viewer.role)) {
+  if (!canManageVehicles(viewer.role, viewer.isSuperAdmin)) {
     throw new AppError("Vehicle records are managed by Transport Services.");
   }
   const pool = await getPool();
@@ -1066,7 +1066,7 @@ export async function listVehicles(): Promise<{
 
 export async function addVehicle(input: unknown): Promise<Vehicle> {
   const viewer = await requireViewer();
-  if (!canManageVehicles(viewer.role)) {
+  if (!canManageVehicles(viewer.role, viewer.isSuperAdmin)) {
     throw new AppError("Only Transport Services can add vehicles.");
   }
   const data = parseInput(vehicleSchema, input);
@@ -1096,7 +1096,7 @@ export async function addVehicle(input: unknown): Promise<Vehicle> {
 
 export async function deleteVehicle(input: unknown) {
   const viewer = await requireViewer();
-  if (viewer.role !== "admin") {
+  if (viewer.role !== "admin" && !viewer.isSuperAdmin) {
     throw new AppError("Only administrators can delete vehicles.");
   }
   const { id } = parseInput(deleteVehicleSchema, input);
@@ -1114,7 +1114,7 @@ export async function deleteVehicle(input: unknown) {
 
 export async function updateVehicle(input: unknown) {
   const viewer = await requireViewer();
-  if (viewer.role !== "admin") {
+  if (viewer.role !== "admin" && !viewer.isSuperAdmin) {
     throw new AppError("Only administrators can edit vehicles.");
   }
   const data = parseInput(updateVehicleSchema, input);
@@ -1145,7 +1145,7 @@ export async function updateVehicle(input: unknown) {
 
 export async function dashboardStats(): Promise<DashboardStats> {
   const viewer = await requireViewer();
-  const scoped = !canViewAllRequests(viewer.role);
+  const scoped = !canViewAllRequests(viewer.role, viewer.isSuperAdmin);
   const where = scoped ? "WHERE requisitioner_id = ?" : "";
   const params = scoped ? [viewer.id] : [];
 
@@ -1161,7 +1161,7 @@ export async function dashboardStats(): Promise<DashboardStats> {
     params,
   );
 
-  if (viewer.role === "admin") {
+  if (viewer.role === "admin" || viewer.isSuperAdmin) {
     try {
       pageViewRows = await all<RowDataPacket[]>(
         "SELECT COUNT(*) AS n FROM analytics_pageviews WHERE viewed_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)",
@@ -1199,7 +1199,7 @@ export async function dashboardStats(): Promise<DashboardStats> {
     (byStatus.get("completed") ?? 0);
 
   let pageViews30d: number | null = null;
-  if (viewer.role === "admin") {
+  if (viewer.role === "admin" || viewer.isSuperAdmin) {
     pageViews30d = Number(pageViewRows[0]?.["n"] ?? 0);
   }
 

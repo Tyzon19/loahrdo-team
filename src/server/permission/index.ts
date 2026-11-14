@@ -1,21 +1,27 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import type { RowDataPacket } from "mysql2/promise";
-import { AppError, parseInput } from "@/lib/errors";
+import { AppError, isDuplicateKey, parseInput } from "@/lib/errors";
 import {
   approvePermissionSchema,
+  createPermissionSignatorySchema,
   createPermissionSchema,
   permissionIdSchema,
+  permissionSignatoryIdSchema,
   rejectPermissionSchema,
   sendPermissionReceiptSchema,
 } from "@/lib/permission-schema";
+import { emailDomainAllowed, INSTITUTIONAL_EMAIL_DOMAIN } from "@/lib/validation";
 import {
+  canManagePermissionSignatories,
+  canViewPermissionQueue,
   isPermissionHead,
-  PERMISSION_HEAD_EMAIL,
   type PermissionViewer,
 } from "@/lib/permission-access";
 import { all, run, withTransaction } from "../db";
 import { requirePermissionViewer } from "./auth";
-import { sendPermissionSlipEmail } from "../gmail";
+import { requireViewer } from "../auth";
+import { hashPassword } from "../password";
+import { sendPermissionSlipEmail, sendTemporaryPasswordEmail } from "../gmail";
 
 export const PERMISSION_HEAD_DEPARTMENT = "Human Resources Development Office";
 
@@ -91,6 +97,39 @@ interface HeadRow extends RowDataPacket {
   email: string;
 }
 
+interface PermissionSignatoryRow extends RowDataPacket {
+  id: string;
+  name: string;
+  email: string;
+  department: string;
+  must_change_password: number;
+}
+
+interface PermissionSignatoryIdRow extends RowDataPacket {
+  user_id: string;
+}
+
+interface PermissionSignatoryCandidateRow extends RowDataPacket {
+  id: string;
+  name: string;
+  email: string;
+  department: string;
+  role: string;
+  is_super_admin: number;
+}
+
+function createTemporaryPassword() {
+  return `${randomBytes(12).toString("base64url")}Aa1!`;
+}
+
+async function requirePermissionSignatoryManager() {
+  const current = await requireViewer();
+  if (!canManagePermissionSignatories(current)) {
+    throw new AppError("Only Super Admins can manage Permission Slip signatories.");
+  }
+  return current;
+}
+
 function timeToMinutes(value: string) {
   const [hours, minutes] = value.split(":").map(Number);
   return (hours ?? 0) * 60 + (minutes ?? 0);
@@ -162,13 +201,153 @@ async function loadPermissions(rows: PermissionRow[]) {
 }
 
 function canView(viewer: PermissionViewer, slip: PermissionSlip) {
-  return isPermissionHead(viewer) || viewer.id === slip.employeeId;
+  return canViewPermissionQueue(viewer) || viewer.id === slip.employeeId;
 }
 
 function requireDepartmentHead(viewer: PermissionViewer) {
   if (!isPermissionHead(viewer)) {
-    throw new AppError("Only the HRDO Department Head can approve permission slips.");
+    throw new AppError("Only an assigned Permission Slip signatory can approve or reject slips.");
   }
+}
+
+export async function listPermissionSignatories() {
+  await requirePermissionSignatoryManager();
+  const rows = await all<PermissionSignatoryRow[]>(
+    `SELECT u.id, u.name, u.email, u.department, u.must_change_password
+     FROM permission_slip_signatories p
+     JOIN users u ON u.id = p.user_id
+     ORDER BY u.name ASC, u.email ASC`,
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    department: row.department,
+    mustChangePassword: Boolean(row.must_change_password),
+  }));
+}
+
+export async function listPermissionSignatoryCandidates() {
+  await requirePermissionSignatoryManager();
+  const rows = await all<PermissionSignatoryCandidateRow[]>(
+    `SELECT u.id, u.name, u.email, u.department, u.role, u.is_super_admin
+     FROM users u
+     WHERE u.role <> 'admin'
+       AND u.is_super_admin = 0
+       AND LOWER(SUBSTRING_INDEX(u.email, '@', -1)) = ?
+       AND NOT EXISTS (
+         SELECT 1 FROM permission_slip_signatories p WHERE p.user_id = u.id
+       )
+     ORDER BY u.name ASC, u.email ASC`,
+    [INSTITUTIONAL_EMAIL_DOMAIN],
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    department: row.department,
+  }));
+}
+
+export async function assignPermissionSignatory(input: unknown) {
+  const actor = await requirePermissionSignatoryManager();
+  const userId = parseInput(permissionSignatoryIdSchema, input);
+  const user = await withTransaction(async (conn) => {
+    const rows = await all<PermissionSignatoryCandidateRow[]>(
+      `SELECT id, name, email, department, role, is_super_admin
+       FROM users
+       WHERE id = ? AND role <> 'admin' AND is_super_admin = 0
+       LIMIT 1
+       FOR UPDATE`,
+      [userId],
+      conn,
+    );
+    const account = rows[0];
+    if (!account) throw new AppError("Choose an eligible institutional account.");
+    if (!emailDomainAllowed(account.email, [INSTITUTIONAL_EMAIL_DOMAIN])) {
+      throw new AppError("Permission Slip signatories must use an @lyceumalabang.edu.ph account.");
+    }
+    await run(
+      "INSERT INTO permission_slip_signatories (user_id, assigned_by) VALUES (?, ?)",
+      [userId, actor.id],
+      conn,
+    );
+    return account;
+  }).catch((error: unknown) => {
+    if (isDuplicateKey(error)) {
+      throw new AppError("That account is already a Permission Slip signatory.");
+    }
+    throw error;
+  });
+  return { id: user.id, name: user.name, email: user.email };
+}
+
+export async function createPermissionSignatory(input: unknown) {
+  const actor = await requirePermissionSignatoryManager();
+  const data = parseInput(createPermissionSignatorySchema, input);
+  const id = randomUUID();
+  const temporaryPassword = createTemporaryPassword();
+  const passwordHash = await hashPassword(temporaryPassword);
+  try {
+    await withTransaction(async (conn) => {
+      await run(
+        `INSERT INTO users
+          (id, name, email, password_hash, role, department, must_change_password)
+         VALUES (?, ?, ?, ?, 'requisitioner', ?, 1)`,
+        [id, data.name, data.email, passwordHash, data.department],
+        conn,
+      );
+      await run(
+        "INSERT INTO permission_slip_signatories (user_id, assigned_by) VALUES (?, ?)",
+        [id, actor.id],
+        conn,
+      );
+    });
+  } catch (error) {
+    if (isDuplicateKey(error)) {
+      throw new AppError(
+        "This email already has an account. Assign it from the existing accounts list.",
+      );
+    }
+    throw error;
+  }
+
+  const emailDelivery = await sendTemporaryPasswordEmail({
+    recipientName: data.name,
+    recipientEmail: data.email,
+    temporaryPassword,
+    signatoryTitle: "Permission Slip Signatory",
+    loginPath: "/permission-slips/login",
+    systemName: "LOA Permission Slip",
+  });
+  return {
+    id,
+    name: data.name,
+    email: data.email,
+    emailDelivery,
+    ...(!emailDelivery.sent ? { temporaryPassword } : {}),
+  };
+}
+
+export async function removePermissionSignatory(input: unknown) {
+  await requirePermissionSignatoryManager();
+  const userId = parseInput(permissionSignatoryIdSchema, input);
+  await withTransaction(async (conn) => {
+    const signatories = await all<PermissionSignatoryIdRow[]>(
+      "SELECT user_id FROM permission_slip_signatories FOR UPDATE",
+      [],
+      conn,
+    );
+    if (!signatories.some((row) => row.user_id === userId)) {
+      throw new AppError("That account is not an active Permission Slip signatory.");
+    }
+    if (signatories.length <= 1) {
+      throw new AppError("At least one Permission Slip signatory must remain assigned.");
+    }
+    await run("DELETE FROM permission_slip_signatories WHERE user_id = ?", [userId], conn);
+    await run("DELETE FROM permission_sessions WHERE user_id = ?", [userId], conn);
+  });
+  return { ok: true as const };
 }
 
 export async function submitPermissionSlip(input: unknown) {
@@ -189,12 +368,15 @@ export async function submitPermissionSlip(input: unknown) {
     });
   }
 
-  const head = await all<HeadRow[]>(
-    "SELECT id, name, email FROM users WHERE email = ? AND role = 'department_head' LIMIT 1",
-    [PERMISSION_HEAD_EMAIL],
+  const signatories = await all<HeadRow[]>(
+    `SELECT u.id, u.name, u.email
+     FROM permission_slip_signatories p
+     JOIN users u ON u.id = p.user_id
+     ORDER BY u.name ASC, u.email ASC`,
   );
-  const headUser = head[0];
-  if (!headUser) throw new AppError("The HRDO Department Head account is not configured yet.");
+  if (!signatories.length) {
+    throw new AppError("No Permission Slip signatories are configured.");
+  }
 
   const id = randomUUID();
   await run(
@@ -222,18 +404,33 @@ export async function submitPermissionSlip(input: unknown) {
     [randomUUID(), id, viewer.id, viewer.name, "Permission slip submitted for HRDO approval."],
   );
 
-  const emailDelivery = await sendPermissionSlipEmail({
-    kind: "head_review",
-    recipientName: headUser.name,
-    recipientEmail: headUser.email,
-    permissionId: id,
-    employeeName: viewer.name,
-    department: data.department,
-    requestedDate: data.requestedDate,
-    timeOut: data.timeOut,
-    timeIn: data.timeIn,
-    reason: data.reason,
-  });
+  const deliveries = await Promise.all(
+    signatories.map((signatory) =>
+      sendPermissionSlipEmail({
+        kind: "head_review",
+        recipientName: signatory.name,
+        recipientEmail: signatory.email,
+        permissionId: id,
+        employeeName: viewer.name,
+        department: data.department,
+        requestedDate: data.requestedDate,
+        timeOut: data.timeOut,
+        timeIn: data.timeIn,
+        reason: data.reason,
+      }),
+    ),
+  );
+  const delivered = deliveries.reduce((total, result) => total + result.delivered, 0);
+  const failed = deliveries.reduce((total, result) => total + result.failed, 0);
+  const emailDelivery =
+    failed > 0
+      ? {
+          sent: false as const,
+          delivered,
+          failed,
+          message: `The Permission Slip was saved, but email delivery failed for ${failed} signatory recipient(s).`,
+        }
+      : { sent: true as const, delivered, failed: 0 as const };
   return { id, emailDelivery };
 }
 
@@ -248,7 +445,9 @@ export async function listMyPermissionSlips() {
 
 export async function listPendingPermissionSlips() {
   const viewer = await requirePermissionViewer();
-  requireDepartmentHead(viewer);
+  if (!canViewPermissionQueue(viewer)) {
+    throw new AppError("You don't have permission to view the Permission Slip queue.");
+  }
   const rows = await all<PermissionRow[]>(
     "SELECT * FROM permission_slips WHERE status = 'pending_approval' ORDER BY requested_at ASC",
   );
@@ -274,7 +473,7 @@ export async function approvePermissionSlip(input: unknown) {
   }
 
   await withTransaction(async (conn) => {
-    await run(
+    const update = await run(
       `UPDATE permission_slips
        SET status = 'approved', department_head_id = ?, department_head_name = ?,
            department_head_signature = ?, approved_at = NOW(), updated_at = NOW()
@@ -282,6 +481,9 @@ export async function approvePermissionSlip(input: unknown) {
       [viewer.id, viewer.name, data.signature, data.id],
       conn,
     );
+    if (update.affectedRows !== 1) {
+      throw new AppError("This Permission Slip was already decided by another signatory.");
+    }
     await run(
       `INSERT INTO permission_history
         (id, permission_slip_id, actor_id, actor_name, actor_role, type, message)
@@ -291,7 +493,7 @@ export async function approvePermissionSlip(input: unknown) {
         data.id,
         viewer.id,
         viewer.name,
-        "Permission slip approved by HRDO Department Head.",
+        "Permission slip approved by an assigned signatory.",
       ],
       conn,
     );
@@ -337,12 +539,15 @@ export async function rejectPermissionSlip(input: unknown) {
     throw new AppError("This permission slip is no longer awaiting approval.");
   }
   await withTransaction(async (conn) => {
-    await run(
+    const update = await run(
       `UPDATE permission_slips SET status = 'rejected', rejection_reason = ?, rejected_at = NOW(), updated_at = NOW()
        WHERE id = ? AND status = 'pending_approval'`,
       [data.reason, data.id],
       conn,
     );
+    if (update.affectedRows !== 1) {
+      throw new AppError("This Permission Slip was already decided by another signatory.");
+    }
     await run(
       `INSERT INTO permission_history
         (id, permission_slip_id, actor_id, actor_name, actor_role, type, message)

@@ -90,11 +90,11 @@ function TripArchive() {
   const archive = useQuery({
     queryKey: ["trip-archive", search, from, to, page],
     queryFn: () => unwrap(getTripArchiveFn({ data: { q: search, from, to, page } })),
-    enabled: viewer?.role === "admin",
+    enabled: Boolean(viewer && (viewer.role === "admin" || viewer.isSuperAdmin)),
   });
 
   if (!viewer) return null;
-  if (viewer.role !== "admin") {
+  if (viewer.role !== "admin" && !viewer.isSuperAdmin) {
     return (
       <Section title="Not available">
         <EmptyState title="Trip analytics are available to administrators only." />

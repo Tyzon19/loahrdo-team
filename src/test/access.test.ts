@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   canManageVehicles,
   canSubmitRequests,
+  canActOnStage,
+  canAccessAdminPortal,
   canViewAllRequests,
+  canViewSiteAnalytics,
   canViewRequest,
 } from "@/lib/access";
 import type { Role } from "@/lib/types";
@@ -33,7 +36,14 @@ describe("access rules", () => {
 
   it("keeps request submission and fleet management role-specific", () => {
     expect(canSubmitRequests("requisitioner")).toBe(true);
-    for (const role of ["director", "president", "assistant", "guard", "driver", "admin"] as Role[]) {
+    for (const role of [
+      "director",
+      "president",
+      "assistant",
+      "guard",
+      "driver",
+      "admin",
+    ] as Role[]) {
       expect(canSubmitRequests(role)).toBe(false);
     }
     expect(canManageVehicles("transport_head")).toBe(true);
@@ -41,5 +51,23 @@ describe("access rules", () => {
     expect(canManageVehicles("assistant")).toBe(false);
     expect(canManageVehicles("requisitioner")).toBe(false);
     expect(canManageVehicles("director")).toBe(false);
+  });
+
+  it("grants Super Admin system access without granting workflow signatory roles", () => {
+    const rootViewer = { id: "root", role: "requisitioner" as const, isSuperAdmin: true };
+
+    expect(canAccessAdminPortal(rootViewer.role, rootViewer.isSuperAdmin)).toBe(true);
+    expect(canViewAllRequests(rootViewer.role, rootViewer.isSuperAdmin)).toBe(true);
+    expect(canViewRequest(rootViewer, "someone-else")).toBe(true);
+    expect(canManageVehicles(rootViewer.role, rootViewer.isSuperAdmin)).toBe(true);
+    expect(canSubmitRequests(rootViewer.role)).toBe(true);
+    expect(canActOnStage(rootViewer.role, "transport_head")).toBe(false);
+    expect(canViewSiteAnalytics(rootViewer.role, rootViewer.isSuperAdmin)).toBe(true);
+  });
+
+  it("allows central Admins into the portal without granting it to ordinary employees", () => {
+    expect(canAccessAdminPortal("admin")).toBe(true);
+    expect(canAccessAdminPortal("requisitioner")).toBe(false);
+    expect(canAccessAdminPortal("requisitioner", true)).toBe(true);
   });
 });

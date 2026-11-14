@@ -20,11 +20,13 @@ import { Route as PermissionSlipsRouteImport } from './routes/permission-slips'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as TermsOfServiceRouteImport } from './routes/terms-of-service'
+import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedChangePasswordRouteImport } from './routes/_authenticated/change-password'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedNotificationsRouteImport } from './routes/_authenticated/notifications'
 import { Route as AuthenticatedPhoneDirectoryRouteImport } from './routes/_authenticated/phone-directory'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
+import { Route as AuthenticatedReceiptsRouteImport } from './routes/_authenticated/receipts'
 import { Route as AuthenticatedTripArchiveRouteImport } from './routes/_authenticated/trip-archive'
 import { Route as AuthenticatedVehiclesRouteImport } from './routes/_authenticated/vehicles'
 import { Route as HrdoAnalyticsRouteImport } from './routes/hrdo/analytics'
@@ -109,6 +111,11 @@ const TermsOfServiceRoute = TermsOfServiceRouteImport.update({
   path: '/terms-of-service',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedChangePasswordRoute =
   AuthenticatedChangePasswordRouteImport.update({
     id: '/change-password',
@@ -135,6 +142,11 @@ const AuthenticatedPhoneDirectoryRoute =
 const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedReceiptsRoute = AuthenticatedReceiptsRouteImport.update({
+  id: '/receipts',
+  path: '/receipts',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedTripArchiveRoute =
@@ -297,11 +309,13 @@ export interface FileRoutesByFullPath {
   '/privacy': typeof PrivacyRoute
   '/register': typeof RegisterRoute
   '/terms-of-service': typeof TermsOfServiceRoute
+  '/admin': typeof AuthenticatedAdminRoute
   '/change-password': typeof AuthenticatedChangePasswordRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/notifications': typeof AuthenticatedNotificationsRoute
   '/phone-directory': typeof AuthenticatedPhoneDirectoryRoute
   '/profile': typeof AuthenticatedProfileRoute
+  '/receipts': typeof AuthenticatedReceiptsRoute
   '/trip-archive': typeof AuthenticatedTripArchiveRoute
   '/vehicles': typeof AuthenticatedVehiclesRoute
   '/hrdo/analytics': typeof HrdoAnalyticsRoute
@@ -342,11 +356,13 @@ export interface FileRoutesByTo {
   '/privacy': typeof PrivacyRoute
   '/register': typeof RegisterRoute
   '/terms-of-service': typeof TermsOfServiceRoute
+  '/admin': typeof AuthenticatedAdminRoute
   '/change-password': typeof AuthenticatedChangePasswordRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/notifications': typeof AuthenticatedNotificationsRoute
   '/phone-directory': typeof AuthenticatedPhoneDirectoryRoute
   '/profile': typeof AuthenticatedProfileRoute
+  '/receipts': typeof AuthenticatedReceiptsRoute
   '/trip-archive': typeof AuthenticatedTripArchiveRoute
   '/vehicles': typeof AuthenticatedVehiclesRoute
   '/hrdo/analytics': typeof HrdoAnalyticsRoute
@@ -390,11 +406,13 @@ export interface FileRoutesById {
   '/privacy': typeof PrivacyRoute
   '/register': typeof RegisterRoute
   '/terms-of-service': typeof TermsOfServiceRoute
+  '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/change-password': typeof AuthenticatedChangePasswordRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/notifications': typeof AuthenticatedNotificationsRoute
   '/_authenticated/phone-directory': typeof AuthenticatedPhoneDirectoryRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
+  '/_authenticated/receipts': typeof AuthenticatedReceiptsRoute
   '/_authenticated/trip-archive': typeof AuthenticatedTripArchiveRoute
   '/_authenticated/vehicles': typeof AuthenticatedVehiclesRoute
   '/hrdo/analytics': typeof HrdoAnalyticsRoute
@@ -438,11 +456,13 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/register'
     | '/terms-of-service'
+    | '/admin'
     | '/change-password'
     | '/dashboard'
     | '/notifications'
     | '/phone-directory'
     | '/profile'
+    | '/receipts'
     | '/trip-archive'
     | '/vehicles'
     | '/hrdo/analytics'
@@ -483,11 +503,13 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/register'
     | '/terms-of-service'
+    | '/admin'
     | '/change-password'
     | '/dashboard'
     | '/notifications'
     | '/phone-directory'
     | '/profile'
+    | '/receipts'
     | '/trip-archive'
     | '/vehicles'
     | '/hrdo/analytics'
@@ -530,11 +552,13 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/register'
     | '/terms-of-service'
+    | '/_authenticated/admin'
     | '/_authenticated/change-password'
     | '/_authenticated/dashboard'
     | '/_authenticated/notifications'
     | '/_authenticated/phone-directory'
     | '/_authenticated/profile'
+    | '/_authenticated/receipts'
     | '/_authenticated/trip-archive'
     | '/_authenticated/vehicles'
     | '/hrdo/analytics'
@@ -665,6 +689,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TermsOfServiceRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/change-password': {
       id: '/_authenticated/change-password'
       path: '/change-password'
@@ -698,6 +729,13 @@ declare module '@tanstack/react-router' {
       path: '/profile'
       fullPath: '/profile'
       preLoaderRoute: typeof AuthenticatedProfileRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/receipts': {
+      id: '/_authenticated/receipts'
+      path: '/receipts'
+      fullPath: '/receipts'
+      preLoaderRoute: typeof AuthenticatedReceiptsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/trip-archive': {
@@ -907,11 +945,13 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedChangePasswordRoute: typeof AuthenticatedChangePasswordRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedNotificationsRoute: typeof AuthenticatedNotificationsRoute
   AuthenticatedPhoneDirectoryRoute: typeof AuthenticatedPhoneDirectoryRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
+  AuthenticatedReceiptsRoute: typeof AuthenticatedReceiptsRoute
   AuthenticatedTripArchiveRoute: typeof AuthenticatedTripArchiveRoute
   AuthenticatedVehiclesRoute: typeof AuthenticatedVehiclesRoute
   AuthenticatedPrintIdRoute: typeof AuthenticatedPrintIdRoute
@@ -922,11 +962,13 @@ interface AuthenticatedRouteChildren {
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedChangePasswordRoute: AuthenticatedChangePasswordRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedNotificationsRoute: AuthenticatedNotificationsRoute,
   AuthenticatedPhoneDirectoryRoute: AuthenticatedPhoneDirectoryRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
+  AuthenticatedReceiptsRoute: AuthenticatedReceiptsRoute,
   AuthenticatedTripArchiveRoute: AuthenticatedTripArchiveRoute,
   AuthenticatedVehiclesRoute: AuthenticatedVehiclesRoute,
   AuthenticatedPrintIdRoute: AuthenticatedPrintIdRoute,

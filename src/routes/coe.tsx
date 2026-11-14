@@ -60,7 +60,7 @@ function CoeEntryPage() {
           <span className="mt-5 min-w-0 flex-1">
             <span className="block text-lg font-bold text-foreground">Current employee</span>
             <span className="mt-2 block text-sm leading-6 text-muted-foreground">
-              Sign in using your institutional email to request and track your COE.
+              Sign in using your institutional email to request your COE.
             </span>
           </span>
           <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-primary">
@@ -84,7 +84,7 @@ function CoeEntryPage() {
               Former employee or verifier
             </span>
             <span className="mt-2 block text-sm leading-6 text-muted-foreground">
-              Use your personal Google account, not your institutional email.
+              Use your personal Google account.
             </span>
           </span>
           <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-primary">

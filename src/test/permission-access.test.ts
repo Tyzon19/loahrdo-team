@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   isPermissionHead,
+  canViewPermissionQueue,
   permissionRoleFor,
+  permissionViewerForAdminPortal,
   PERMISSION_HEAD_EMAIL,
+  canManagePermissionSignatories,
   type PermissionViewer,
 } from "@/lib/permission-access";
 
@@ -19,12 +22,40 @@ function viewer(overrides: Partial<PermissionViewer> = {}): PermissionViewer {
 
 describe("Permission Slip access", () => {
   it("gives the designated HRDO director approval powers in this system", () => {
-    expect(permissionRoleFor({ email: PERMISSION_HEAD_EMAIL, role: "department_head" })).toBe(
-      "director",
-    );
-    expect(permissionRoleFor({ email: PERMISSION_HEAD_EMAIL, role: "requisitioner" })).toBe(
-      "director",
-    );
+    expect(
+      permissionRoleFor({
+        email: PERMISSION_HEAD_EMAIL,
+        role: "requisitioner",
+        isPermissionSignatory: true,
+      }),
+    ).toBe("director");
+    expect(
+      permissionRoleFor({
+        email: PERMISSION_HEAD_EMAIL,
+        role: "requisitioner",
+        isPermissionSignatory: false,
+      }),
+    ).toBe("employee");
+    expect(
+      permissionRoleFor({
+        email: "new.signer@lyceumalabang.edu.ph",
+        role: "requisitioner",
+        isPermissionSignatory: true,
+      }),
+    ).toBe("director");
+    expect(
+      permissionRoleFor({
+        email: "employee@lyceumalabang.edu.ph",
+        role: "requisitioner",
+        isPermissionSignatory: false,
+      }),
+    ).toBe("employee");
+  });
+
+  it("allows only Super Admins to manage Permission Slip signatories", () => {
+    expect(canManagePermissionSignatories({ isSuperAdmin: true })).toBe(true);
+    expect(canManagePermissionSignatories({ isSuperAdmin: false })).toBe(false);
+    expect(canManagePermissionSignatories(null)).toBe(false);
   });
 
   it("treats every other institutional account as an ordinary employee", () => {
@@ -43,5 +74,54 @@ describe("Permission Slip access", () => {
     expect(isPermissionHead(viewer())).toBe(true);
     expect(isPermissionHead(viewer({ role: "employee" }))).toBe(false);
     expect(isPermissionHead(null)).toBe(false);
+  });
+
+  it("lets module Admins and Super Admins view the queue without granting approval", () => {
+    const moduleAdmin = viewer({ role: "employee", isAdmin: true });
+    const superAdmin = viewer({ role: "employee", isSuperAdmin: true });
+
+    expect(canViewPermissionQueue(moduleAdmin)).toBe(true);
+    expect(canViewPermissionQueue(superAdmin)).toBe(true);
+    expect(isPermissionHead(moduleAdmin)).toBe(false);
+    expect(isPermissionHead(superAdmin)).toBe(false);
+    expect(canViewPermissionQueue(viewer({ role: "employee" }))).toBe(false);
+  });
+
+  it("maps central admins to read-only Permission Slip access", () => {
+    const adminViewer = permissionViewerForAdminPortal({
+      id: "admin",
+      name: "System Admin",
+      email: "admin@lyceumalabang.edu.ph",
+      role: "admin",
+      department: "Administration",
+      isSuperAdmin: false,
+    });
+
+    expect(adminViewer?.isAdmin).toBe(true);
+    expect(canViewPermissionQueue(adminViewer)).toBe(true);
+    expect(isPermissionHead(adminViewer)).toBe(false);
+    expect(
+      permissionViewerForAdminPortal({
+        id: "employee",
+        name: "Employee",
+        email: "employee@lyceumalabang.edu.ph",
+        role: "requisitioner",
+        department: "Administration",
+        isSuperAdmin: false,
+      }),
+    ).toBe(null);
+
+    const rootViewer = permissionViewerForAdminPortal({
+      id: "root",
+      name: "Super Admin",
+      email: "root@lyceumalabang.edu.ph",
+      role: "requisitioner",
+      department: "Administration",
+      isSuperAdmin: true,
+    });
+
+    expect(rootViewer?.isSuperAdmin).toBe(true);
+    expect(canViewPermissionQueue(rootViewer)).toBe(true);
+    expect(isPermissionHead(rootViewer)).toBe(false);
   });
 });

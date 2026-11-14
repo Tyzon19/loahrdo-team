@@ -4,14 +4,24 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LoadingPanel } from "@/components/app/LoadingPanel";
+import { ButtonLoading, LoadingPanel } from "@/components/app/LoadingPanel";
 import { Section } from "@/components/app/PageHeader";
-import { createHrdoProcessorAccountFn, listHrdoProcessorAccountsFn } from "@/server-functions";
+import {
+  createHrdoProcessorAccountFn,
+  listHrdoProcessorAccountsFn,
+  resetHrdoProcessorPasswordFn,
+} from "@/server-functions";
 import { unwrap } from "@/lib/api";
 
 type ProcessorForm = { name: string; email: string; department: string; isHrdoAdmin?: boolean };
 
-export function HrdoProcessorSettings({ canCreateAdmin = false }: { canCreateAdmin?: boolean }) {
+export function HrdoProcessorSettings({
+  canCreateAdmin = false,
+  canResetPasswords = false,
+}: {
+  canCreateAdmin?: boolean;
+  canResetPasswords?: boolean;
+}) {
   const queryClient = useQueryClient();
   const accounts = useQuery({
     queryKey: ["hrdo-processor-accounts"],
@@ -28,6 +38,13 @@ export function HrdoProcessorSettings({ canCreateAdmin = false }: { canCreateAdm
     name: string;
     email: string;
     role: "hrdo_staff" | "hrdo_admin";
+    emailSent: boolean;
+    emailMessage?: string;
+    temporaryPassword?: string;
+  } | null>(null);
+  const [resettingId, setResettingId] = useState<string | null>(null);
+  const [resetCredentials, setResetCredentials] = useState<{
+    email: string;
     emailSent: boolean;
     emailMessage?: string;
     temporaryPassword?: string;
@@ -67,6 +84,39 @@ export function HrdoProcessorSettings({ canCreateAdmin = false }: { canCreateAdm
     }
   }
 
+  async function resetPassword(account: NonNullable<typeof accounts.data>[number]) {
+    if (resettingId) return;
+    if (!window.confirm(`Issue a temporary password for ${account.name}?`)) return;
+    setResettingId(account.id);
+    setResetCredentials(null);
+    try {
+      const result = await resetHrdoProcessorPasswordFn({ data: { userId: account.id } });
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      const { email, emailDelivery, temporaryPassword } = result.data;
+      setResetCredentials({
+        email,
+        emailSent: emailDelivery.sent,
+        ...(!emailDelivery.sent ? { emailMessage: emailDelivery.message } : {}),
+        ...(temporaryPassword ? { temporaryPassword } : {}),
+      });
+      if (emailDelivery.sent) {
+        toast.success("Temporary password sent. The processor must change it at next sign-in.");
+      } else {
+        toast.error(emailDelivery.message ?? "Password reset, but the email was not sent.");
+      }
+      await queryClient.invalidateQueries({ queryKey: ["hrdo-processor-accounts"] });
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "We couldn't reset the processor password.",
+      );
+    } finally {
+      setResettingId(null);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <Section title="Create HRDO processor account">
@@ -97,7 +147,9 @@ export function HrdoProcessorSettings({ canCreateAdmin = false }: { canCreateAdm
               maxLength={190}
               required
               value={form.email}
-              onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, email: event.target.value }))
+              }
             />
           </div>
           <div>
@@ -138,7 +190,9 @@ export function HrdoProcessorSettings({ canCreateAdmin = false }: { canCreateAdm
         {created && (
           <div
             className={`mt-4 rounded-sm border p-4 ${
-              created.emailSent ? "border-success/40 bg-success-soft" : "border-destructive/40 bg-destructive/5"
+              created.emailSent
+                ? "border-success/40 bg-success-soft"
+                : "border-destructive/40 bg-destructive/5"
             }`}
           >
             <p className="font-semibold">
@@ -150,7 +204,8 @@ export function HrdoProcessorSettings({ canCreateAdmin = false }: { canCreateAdm
             ) : (
               <>
                 <p className="mt-2 text-sm">
-                  The account was created, but its email was not sent: {created.emailMessage ?? "Gmail delivery failed."}
+                  The account was created, but its email was not sent:{" "}
+                  {created.emailMessage ?? "Gmail delivery failed."}
                 </p>
                 {created.temporaryPassword && (
                   <>
@@ -165,8 +220,11 @@ export function HrdoProcessorSettings({ canCreateAdmin = false }: { canCreateAdm
                       onFocus={(event) => event.currentTarget.select()}
                     />
                     <p className="mt-2 text-xs">
-                      The account holder must change it at first sign-in. They can sign in at
-                      {" "}<a className="font-medium text-primary underline" href="/hrdo/login">/hrdo/login</a>.
+                      The account holder must change it at first sign-in. They can sign in at{" "}
+                      <a className="font-medium text-primary underline" href="/hrdo/login">
+                        /hrdo/login
+                      </a>
+                      .
                     </p>
                   </>
                 )}
@@ -176,7 +234,7 @@ export function HrdoProcessorSettings({ canCreateAdmin = false }: { canCreateAdm
         )}
       </Section>
 
-        <Section title="HRDO accounts">
+      <Section title="HRDO accounts">
         {accounts.isPending ? (
           <LoadingPanel label="Loading HRDO processor accounts" rows={3} />
         ) : accounts.isError ? (
@@ -184,11 +242,16 @@ export function HrdoProcessorSettings({ canCreateAdmin = false }: { canCreateAdm
             We couldn't load HRDO processor accounts. Refresh the page and try again.
           </p>
         ) : accounts.data.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No HRDO processor accounts have been created.</p>
+          <p className="text-sm text-muted-foreground">
+            No HRDO processor accounts have been created.
+          </p>
         ) : (
           <ul className="divide-y rounded-md border">
             {accounts.data.map((account) => (
-              <li key={account.id} className="flex flex-wrap items-start justify-between gap-2 p-3">
+              <li
+                key={account.id}
+                className="flex min-w-0 flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between"
+              >
                 <div className="min-w-0">
                   <p className="font-medium">{account.name}</p>
                   <p className="break-all text-sm text-muted-foreground">{account.email}</p>
@@ -197,14 +260,70 @@ export function HrdoProcessorSettings({ canCreateAdmin = false }: { canCreateAdm
                     {account.department ? ` · ${account.department}` : ""}
                   </p>
                 </div>
-                {account.mustChangePassword && (
-                  <span className="rounded-full bg-warning-soft px-2 py-1 text-xs text-warning">
-                    Password change required
-                  </span>
-                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  {account.mustChangePassword && (
+                    <span className="rounded-full bg-warning-soft px-2 py-1 text-xs text-warning">
+                      Password change required
+                    </span>
+                  )}
+                  {canResetPasswords && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="min-h-11"
+                      disabled={Boolean(resettingId)}
+                      onClick={() => void resetPassword(account)}
+                    >
+                      {resettingId === account.id ? (
+                        <ButtonLoading label="Resetting" />
+                      ) : (
+                        "Reset password"
+                      )}
+                    </Button>
+                  )}
+                </div>
               </li>
             ))}
           </ul>
+        )}
+        {resetCredentials && (
+          <div
+            className={`mt-4 rounded-sm border p-4 ${
+              resetCredentials.emailSent
+                ? "border-success/40 bg-success-soft"
+                : "border-destructive/40 bg-destructive/5"
+            }`}
+            role={resetCredentials.emailSent ? "status" : "alert"}
+          >
+            <p className="font-semibold">Password reset for {resetCredentials.email}</p>
+            {resetCredentials.emailSent ? (
+              <p className="mt-2 text-sm">Login details were emailed to the processor.</p>
+            ) : (
+              <>
+                <p className="mt-2 text-sm">
+                  The password was reset, but its email was not sent:{" "}
+                  {resetCredentials.emailMessage ?? "Gmail delivery failed."}
+                </p>
+                {resetCredentials.temporaryPassword && (
+                  <>
+                    <Label htmlFor="hrdo-reset-temporary-password" className="mt-3 block">
+                      Temporary password — share securely with the account holder
+                    </Label>
+                    <Input
+                      id="hrdo-reset-temporary-password"
+                      className="mt-1 select-all font-mono"
+                      value={resetCredentials.temporaryPassword}
+                      readOnly
+                      onFocus={(event) => event.currentTarget.select()}
+                    />
+                    <p className="mt-2 text-xs">
+                      The account holder must change it at next sign-in.
+                    </p>
+                  </>
+                )}
+              </>
+            )}
+          </div>
         )}
       </Section>
     </div>

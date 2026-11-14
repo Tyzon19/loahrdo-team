@@ -52,9 +52,10 @@ const accounts = [
   },
   {
     name: "LOA Administrator",
-    email: "admin@lyceumalabang.edu.ph",
+    email: "superadmin@lyceumalabang.edu.ph",
     role: "admin",
     department: "Physical Facilities Management Office",
+    isSuperAdmin: true,
   },
   {
     name: "HRDO Director",
@@ -125,17 +126,47 @@ try {
     ],
   );
 
+  const legacySuperAdminEmail = "admin@lyceumalabang.edu.ph";
+  const superAdminEmail = "superadmin@lyceumalabang.edu.ph";
+  const [legacySuperAdmins] = await conn.query(
+    "SELECT id FROM users WHERE email = ? AND is_super_admin = 1 LIMIT 1",
+    [legacySuperAdminEmail],
+  );
+  const [currentSuperAdmins] = await conn.query("SELECT id FROM users WHERE email = ? LIMIT 1", [
+    superAdminEmail,
+  ]);
+  if (legacySuperAdmins.length && currentSuperAdmins.length) {
+    throw new Error(
+      `Cannot rename ${legacySuperAdminEmail}; ${superAdminEmail} already belongs to another account.`,
+    );
+  }
+  if (legacySuperAdmins.length) {
+    await conn.query("UPDATE users SET email = ? WHERE id = ?", [
+      superAdminEmail,
+      legacySuperAdmins[0].id,
+    ]);
+  }
+
   const created = [];
   for (const account of accounts) {
     const tableName = account.table ?? "users";
     const [rows] = await conn.query(`SELECT id FROM ${tableName} WHERE email = ?`, [account.email]);
     if (rows.length) {
+      if (account.isSuperAdmin && tableName === "users") {
+        await conn.query("UPDATE users SET is_super_admin = 1 WHERE email = ?", [account.email]);
+      }
       if (account.role === "department_head" && tableName === "users") {
         const existingPassword = account.passwordEnv ? env[account.passwordEnv] : undefined;
         if (existingPassword) {
           await conn.query(
             "UPDATE users SET role = ?, department = ?, password_hash = ?, must_change_password = ? WHERE email = ?",
-            [account.role, account.department, hashPassword(existingPassword), account.mustChangePassword ?? 0, account.email],
+            [
+              account.role,
+              account.department,
+              hashPassword(existingPassword),
+              account.mustChangePassword ?? 0,
+              account.email,
+            ],
           );
         } else {
           await conn.query(
@@ -150,22 +181,54 @@ try {
     const passwordFromEnv = account.passwordEnv ? env[account.passwordEnv] : undefined;
     const password = passwordFromEnv || makePassword();
     const mustChangePassword = account.mustChangePassword ?? 1;
-    await conn.query(
-      `INSERT INTO ${tableName} (id, name, email, password_hash, role, department, must_change_password)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [
-        randomUUID(),
-        account.name,
-        account.email,
-        hashPassword(password),
-        account.role,
-        account.department,
-        mustChangePassword,
-      ],
-    );
-    created.push({ ...account, table: tableName, password, passwordFromEnv: Boolean(passwordFromEnv) });
+    if (tableName === "users") {
+      await conn.query(
+        `INSERT INTO users
+          (id, name, email, password_hash, role, department, must_change_password, is_super_admin)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          randomUUID(),
+          account.name,
+          account.email,
+          hashPassword(password),
+          account.role,
+          account.department,
+          mustChangePassword,
+          account.isSuperAdmin ? 1 : 0,
+        ],
+      );
+    } else {
+      await conn.query(
+        `INSERT INTO ${tableName} (id, name, email, password_hash, role, department, must_change_password)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          randomUUID(),
+          account.name,
+          account.email,
+          hashPassword(password),
+          account.role,
+          account.department,
+          mustChangePassword,
+        ],
+      );
+    }
+    created.push({
+      ...account,
+      table: tableName,
+      password,
+      passwordFromEnv: Boolean(passwordFromEnv),
+    });
   }
-
+  const [permissionSignatoryCount] = await conn.query(
+    "SELECT COUNT(*) AS count FROM permission_slip_signatories",
+  );
+  if (Number(permissionSignatoryCount[0]?.count ?? 0) === 0) {
+    await conn.query(
+      `INSERT IGNORE INTO permission_slip_signatories (user_id)
+       SELECT id FROM users WHERE email = ? AND role = 'department_head'`,
+      ["hrdirector@lyceumalabang.edu.ph"],
+    );
+  }
   console.log("\nInitial application accounts ready.\n");
   for (const a of created) {
     console.log(`- ${a.table ?? "users"}`.padEnd(12) + ` ${a.role.padEnd(15)} ${a.email}`);

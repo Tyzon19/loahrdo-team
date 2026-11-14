@@ -3,12 +3,59 @@ import {
   coeDeadlineInfo,
   coeRequestorCounts,
   coeStaffActions,
+  canManageHrdoAccounts,
+  hrdoViewerFromAdminPortal,
   filterCoeRequests,
   hrCoeSummary,
   type CoeRequest,
 } from "@/lib/hrdo";
 
 const NOW = new Date("2026-10-28T12:00:00Z");
+
+describe("COE account access", () => {
+  it("allows Super Admins to manage COE accounts without changing employee role", () => {
+    expect(
+      canManageHrdoAccounts({
+        email: "root@lyceumalabang.edu.ph",
+        role: "employee",
+        isSuperAdmin: true,
+      }),
+    ).toBe(true);
+    expect(
+      canManageHrdoAccounts({
+        email: "employee@lyceumalabang.edu.ph",
+        role: "employee",
+        isSuperAdmin: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("maps central admins to COE account management access", () => {
+    const hrdoViewer = hrdoViewerFromAdminPortal({
+      id: "admin",
+      name: "System Admin",
+      email: "admin@lyceumalabang.edu.ph",
+      role: "admin",
+      department: "Administration",
+      mustChangePassword: false,
+      isSuperAdmin: false,
+    });
+
+    expect(hrdoViewer?.role).toBe("hrdo_admin");
+    expect(canManageHrdoAccounts(hrdoViewer)).toBe(true);
+    expect(
+      hrdoViewerFromAdminPortal({
+        id: "employee",
+        name: "Employee",
+        email: "employee@lyceumalabang.edu.ph",
+        role: "requisitioner",
+        department: "Administration",
+        mustChangePassword: false,
+        isSuperAdmin: false,
+      }),
+    ).toBe(null);
+  });
+});
 
 function request(overrides: Partial<CoeRequest>): CoeRequest {
   return {

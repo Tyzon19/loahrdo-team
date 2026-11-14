@@ -9,10 +9,12 @@ import {
 import type { RowDataPacket } from "mysql2/promise";
 import type { Role } from "@/lib/types";
 import {
+  permissionViewerForAdminPortal,
   permissionRoleFor,
   type PermissionRole,
   type PermissionViewer,
 } from "@/lib/permission-access";
+import { viewer } from "@/server/auth";
 import { changePasswordSchema, loginSchema, normaliseEmail, profileSchema } from "@/lib/validation";
 import { AppError, parseInput } from "@/lib/errors";
 import { encryptedCookieRequired } from "../env";
@@ -47,6 +49,10 @@ interface AccountRow extends RowDataPacket {
   password_hash: string;
   role: Role;
   department: string;
+  must_change_password?: number;
+  is_super_admin?: number;
+  is_permission_admin?: number;
+  is_permission_signatory?: number;
   is_locked?: number;
   lock_minutes?: number | null;
 }
@@ -125,6 +131,9 @@ function clearSessionCookie() {
 }
 
 export async function permissionViewer(): Promise<PermissionViewer | null> {
+  const adminPortalViewer = permissionViewerForAdminPortal(await viewer());
+  if (adminPortalViewer) return adminPortalViewer;
+
   const cookieName = sessionCookieName();
   const token = getCookie(cookieName);
   if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token)) {
@@ -133,7 +142,13 @@ export async function permissionViewer(): Promise<PermissionViewer | null> {
   }
   const hash = sha256(token);
   const rows = await all<AccountRow[]>(
-    `SELECT u.id, u.name, u.email, u.role, u.department
+    `SELECT u.id, u.name, u.email, u.role, u.department, u.must_change_password, u.is_super_admin,
+            EXISTS (
+              SELECT 1 FROM permission_slip_admins a WHERE a.user_id = u.id
+            ) AS is_permission_admin,
+            EXISTS (
+              SELECT 1 FROM permission_slip_signatories p WHERE p.user_id = u.id
+            ) AS is_permission_signatory
      FROM permission_sessions s
      JOIN users u ON u.id = s.user_id
      WHERE s.token_hash = ? AND s.expires_at > NOW()
@@ -159,8 +174,15 @@ export async function permissionViewer(): Promise<PermissionViewer | null> {
     id: row.id,
     name: row.name,
     email: row.email,
-    role: permissionRoleFor(row),
+    role: permissionRoleFor({
+      email: row.email,
+      role: row.role,
+      isPermissionSignatory: Boolean(row.is_permission_signatory),
+    }),
     department: row.department,
+    mustChangePassword: Boolean(row.must_change_password),
+    isAdmin: Boolean(row.is_permission_admin),
+    isSuperAdmin: Boolean(row.is_super_admin),
   };
 }
 
@@ -272,7 +294,10 @@ export async function permissionLogin(input: unknown): Promise<{ role: Permissio
 
   const invalid = new AppError("Incorrect email or password.");
   const rows = await all<AccountRow[]>(
-    `SELECT id, name, email, password_hash, role, department,
+    `SELECT id, name, email, password_hash, role, department, must_change_password,
+            EXISTS (
+              SELECT 1 FROM permission_slip_signatories p WHERE p.user_id = users.id
+            ) AS is_permission_signatory,
             (locked_until IS NOT NULL AND locked_until > NOW()) AS is_locked,
             TIMESTAMPDIFF(MINUTE, NOW(), locked_until) AS lock_minutes
      FROM users WHERE email = ? LIMIT 1`,
@@ -285,7 +310,13 @@ export async function permissionLogin(input: unknown): Promise<{ role: Permissio
   if (user && (await verifyPassword(data.password, user.password_hash))) {
     await run("UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?", [user.id]);
     await startSession(user.id);
-    return { role: permissionRoleFor(user) };
+    return {
+      role: permissionRoleFor({
+        email: user.email,
+        role: user.role,
+        isPermissionSignatory: Boolean(user.is_permission_signatory),
+      }),
+    };
   }
 
   // Accounts that only exist in the COE store can still sign in here. They get

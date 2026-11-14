@@ -109,6 +109,35 @@ export const submitPermissionSlipFn = createServerFn({ method: "POST" })
     runSafely(async () => (await import("./server/permission")).submitPermissionSlip(data)),
   );
 
+export const listPermissionSignatoriesFn = createServerFn({ method: "GET" }).handler(async () =>
+  runSafely(async () => (await import("./server/permission")).listPermissionSignatories()),
+);
+
+export const listPermissionSignatoryCandidatesFn = createServerFn({ method: "GET" }).handler(
+  async () =>
+    runSafely(async () =>
+      (await import("./server/permission")).listPermissionSignatoryCandidates(),
+    ),
+);
+
+export const assignPermissionSignatoryFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/permission")).assignPermissionSignatory(data)),
+  );
+
+export const createPermissionSignatoryFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/permission")).createPermissionSignatory(data)),
+  );
+
+export const removePermissionSignatoryFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/permission")).removePermissionSignatory(data)),
+  );
+
 export const listMyPermissionSlipsFn = createServerFn({ method: "GET" }).handler(async () =>
   runSafely(async () => (await import("./server/permission")).listMyPermissionSlips()),
 );
@@ -391,6 +420,28 @@ export const listHrdoProcessorAccountsFn = createServerFn({ method: "GET" }).han
   runSafely(async () => (await import("./server/hrdo/admin")).listHrdoProcessorAccounts()),
 );
 
+export const listSystemAccessUsersFn = createServerFn({ method: "GET" }).handler(async () =>
+  runSafely(async () => (await import("./server/system-access")).listSystemAccessUsers()),
+);
+
+export const listAdminReceiptsFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/admin-receipts")).listAdminReceipts(data)),
+  );
+
+export const getAdminReceiptPreviewFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/admin-receipts")).getAdminReceiptPreview(data)),
+  );
+
+export const setSystemAccessAssignmentFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/system-access")).setSystemAccessAssignment(data)),
+  );
+
 export const getHrdoCoeAnalyticsFn = createServerFn({ method: "GET" }).handler(async () =>
   runSafely(async () => (await import("./server/hrdo/analytics")).getCoeAnalytics()),
 );
@@ -399,6 +450,12 @@ export const createHrdoProcessorAccountFn = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) =>
     runSafely(async () => (await import("./server/hrdo/admin")).createHrdoProcessorAccount(data)),
+  );
+
+export const resetHrdoProcessorPasswordFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/hrdo/admin")).resetHrdoProcessorPassword(data)),
   );
 
 export const resetUserPasswordFn = createServerFn({ method: "POST" })

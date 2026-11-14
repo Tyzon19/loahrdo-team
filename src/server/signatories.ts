@@ -1,4 +1,4 @@
-import type { Role, StageKey } from "@/lib/types";
+import type { Role, StageKey, Viewer } from "@/lib/types";
 import {
   createAssistantAccountSchema,
   createMainSignatoryAccountSchema,
@@ -51,15 +51,15 @@ interface AssistantAccountRow extends RowDataPacket {
   role: Role;
 }
 
-function requireAdmin(role: Role) {
-  if (role !== "admin") {
+function requireAdmin(viewer: Pick<Viewer, "role" | "isSuperAdmin">) {
+  if (viewer.role !== "admin" && !viewer.isSuperAdmin) {
     throw new AppError("Only administrators can manage alternate signatories.");
   }
 }
 
 export async function getSignatoryAssistants() {
   const viewer = await requireViewer();
-  requireAdmin(viewer.role);
+  requireAdmin(viewer);
   const db = await getPool();
   const [names, alternateNames, alternateUserIds, mainUserIds, users] = await Promise.all([
     loadApproverNames(db),
@@ -100,7 +100,7 @@ export async function getPhoneDirectory(): Promise<SignatoryContact[]> {
 
 export async function saveSignatoryPhoneNumber(input: unknown): Promise<{ ok: true }> {
   const viewer = await requireViewer();
-  requireAdmin(viewer.role);
+  requireAdmin(viewer);
   const data = parseInput(signatoryPhoneSchema, input);
   const rows = await all<RowDataPacket[]>(
     `SELECT u.id
@@ -131,7 +131,7 @@ export async function saveSignatoryPhoneNumber(input: unknown): Promise<{ ok: tr
 
 export async function saveMainSignatories(input: unknown) {
   const viewer = await requireViewer();
-  requireAdmin(viewer.role);
+  requireAdmin(viewer);
   const assignments = parseInput(mainSignatoriesSchema, input);
   const stages: StageKey[] = ["review", "recommend", "approve"];
   if (stages.some((stage) => !assignments[stage])) {
@@ -203,7 +203,7 @@ export async function saveMainSignatories(input: unknown) {
 
 export async function saveSignatoryAssistants(input: unknown) {
   const viewer = await requireViewer();
-  requireAdmin(viewer.role);
+  requireAdmin(viewer);
   const assistants = parseInput(signatoryAssistantsSchema, input);
   const stages: StageKey[] = ["review", "recommend", "approve"];
 
@@ -255,7 +255,7 @@ export async function saveSignatoryAssistants(input: unknown) {
 
 export async function createAssistantAccount(input: unknown) {
   const viewer = await requireViewer();
-  requireAdmin(viewer.role);
+  requireAdmin(viewer);
   const data = parseInput(createAssistantAccountSchema, input);
   if (!emailDomainAllowed(data.email, allowedEmailDomains())) {
     throw new AppError("Use an official institutional email address.");
@@ -298,7 +298,7 @@ export async function createAssistantAccount(input: unknown) {
 
 export async function createMainSignatoryAccount(input: unknown) {
   const viewer = await requireViewer();
-  requireAdmin(viewer.role);
+  requireAdmin(viewer);
   const data = parseInput(createMainSignatoryAccountSchema, input);
   if (!emailDomainAllowed(data.email, allowedEmailDomains())) {
     throw new AppError("Use an official institutional email address.");
@@ -360,7 +360,7 @@ export async function createMainSignatoryAccount(input: unknown) {
 
 export async function resetUserPassword(input: unknown) {
   const viewer = await requireViewer();
-  requireAdmin(viewer.role);
+  requireAdmin(viewer);
   const { userId } = parseInput(resetUserPasswordSchema, input);
   if (userId === viewer.id) {
     throw new AppError("Administrators cannot reset their own password here.");

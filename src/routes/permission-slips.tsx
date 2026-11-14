@@ -13,13 +13,35 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { unwrap } from "@/lib/api";
 import { permissionLogoutFn } from "@/server-functions";
+import { AppShell } from "@/components/app/AppShell";
+import { canAccessAdminPortal } from "@/lib/access";
 
 export const Route = createFileRoute("/permission-slips")({
   // The session lives in the Permission Slip cookie and is resolved on the
   // client, so the private pages never prerender for a signed-out visitor.
   ssr: false,
   beforeLoad: ({ context, location }) => {
+    if (context.viewer && canAccessAdminPortal(context.viewer.role, context.viewer.isSuperAdmin)) {
+      if (context.viewer.needsProfileCompletion) {
+        throw redirect({ to: "/complete-profile", search: { redirect: "/admin" } });
+      }
+      if (context.viewer.mustChangePassword) {
+        throw redirect({ to: "/change-password" });
+      }
+      if (location.pathname === "/permission-slips/login") {
+        throw redirect({ to: "/admin" });
+      }
+      if (location.pathname === "/permission-slips/profile") {
+        throw redirect({ to: "/profile", search: { portal: undefined } });
+      }
+    }
     if (location.pathname === "/permission-slips/login") return;
+    if (
+      context.permissionViewer?.mustChangePassword &&
+      location.pathname !== "/permission-slips/profile"
+    ) {
+      throw redirect({ to: "/permission-slips/profile" });
+    }
     if (!context.permissionViewer) {
       throw redirect({
         to: "/permission-slips/login",
@@ -31,7 +53,14 @@ export const Route = createFileRoute("/permission-slips")({
 });
 
 function PermissionSlipsLayout() {
-  const { permissionViewer } = Route.useRouteContext();
+  const { permissionViewer, viewer } = Route.useRouteContext();
+  if (viewer && canAccessAdminPortal(viewer.role, viewer.isSuperAdmin)) {
+    return (
+      <AppShell user={viewer}>
+        <Outlet />
+      </AppShell>
+    );
+  }
   if (!permissionViewer) return <Outlet />;
 
   return (

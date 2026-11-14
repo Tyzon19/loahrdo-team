@@ -4,6 +4,9 @@
  * The HRDO COE service has its own accounts, sessions and database tables.
  */
 
+import { canAccessAdminPortal } from "./access";
+import type { Viewer } from "./types";
+
 export const HRDO = {
   name: "LOA HRDO Certificate of Employment",
   shortName: "HRDO COE",
@@ -34,9 +37,35 @@ export function isHrdoStaffRole(
   return role === "hrdo_staff" || role === "hrdo_admin";
 }
 
-export function canManageHrdoAccounts(user: Pick<HrdoViewer, "email" | "role"> | null | undefined) {
+export function hrdoViewerFromAdminPortal(
+  user:
+    | Pick<
+        Viewer,
+        "id" | "name" | "email" | "role" | "department" | "mustChangePassword" | "isSuperAdmin"
+      >
+    | null
+    | undefined,
+): HrdoViewer | null {
+  if (!user || !canAccessAdminPortal(user.role, user.isSuperAdmin)) return null;
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: "hrdo_admin",
+    department: user.department,
+    mustChangePassword: user.mustChangePassword,
+    isExternal: false,
+    isSuperAdmin: user.isSuperAdmin,
+  };
+}
+
+export function canManageHrdoAccounts(
+  user: Pick<HrdoViewer, "email" | "role" | "isSuperAdmin"> | null | undefined,
+) {
   return (
-    user?.role === "hrdo_admin" || user?.email.trim().toLowerCase() === HRDO_BOOTSTRAP_ADMIN_EMAIL
+    user?.role === "hrdo_admin" ||
+    user?.email.trim().toLowerCase() === HRDO_BOOTSTRAP_ADMIN_EMAIL ||
+    Boolean(user?.isSuperAdmin)
   );
 }
 
@@ -49,6 +78,7 @@ export interface HrdoViewer {
   department: string;
   mustChangePassword: boolean;
   isExternal: boolean;
+  isSuperAdmin?: boolean;
 }
 
 export type CoeCopyType = "soft" | "original" | "both";

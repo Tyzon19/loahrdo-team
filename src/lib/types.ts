@@ -29,6 +29,7 @@ export interface SignatoryContact {
 export interface Viewer extends User {
   mustChangePassword: boolean;
   needsProfileCompletion: boolean;
+  isSuperAdmin: boolean;
 }
 
 /** Minimal, non-sensitive row used by request lists. */

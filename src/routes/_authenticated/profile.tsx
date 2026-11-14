@@ -12,6 +12,8 @@ import {
   SignatoryAssignmentSettings,
 } from "@/components/app/SignatorySettings";
 import { HrdoProcessorSettings } from "@/components/app/HrdoProcessorSettings";
+import { PermissionSignatorySettings } from "@/components/app/PermissionSignatorySettings";
+import { SystemAccessSettings } from "@/components/app/SystemAccessSettings";
 import { ButtonLoading } from "@/components/app/LoadingPanel";
 import { ROLE_TITLES } from "@/lib/workflow";
 import { updateProfileFn } from "@/server-functions";
@@ -21,6 +23,7 @@ import { SITE } from "@/lib/site";
 export const Route = createFileRoute("/_authenticated/profile")({
   validateSearch: (search: Record<string, unknown>) => ({
     portal: search["portal"] === "permission" ? ("permission" as const) : undefined,
+    ...(search["tab"] === "system-access" ? { tab: "system-access" as const } : {}),
   }),
   head: () => ({
     meta: [
@@ -33,6 +36,7 @@ export const Route = createFileRoute("/_authenticated/profile")({
 });
 
 function Profile() {
+  const search = Route.useSearch();
   const { viewer } = Route.useRouteContext();
   const router = useRouter();
   const [form, setForm] = useState(() => {
@@ -59,6 +63,7 @@ function Profile() {
   }, [viewer?.id, viewer?.name, viewer?.department]);
 
   if (!viewer) return null;
+  const canManageVehicleAdmin = viewer.role === "admin" || viewer.isSuperAdmin;
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
@@ -178,67 +183,133 @@ function Profile() {
       <PageHeader
         title="Profile"
         description={
-          viewer.role === "admin"
-            ? "Your account details and the signatory settings you manage."
-            : "Your account details and password."
+          viewer.isSuperAdmin
+            ? "Your account details and system settings."
+            : viewer.role === "admin"
+              ? "Your account details and the signatory settings you manage."
+              : "Your account details and password."
         }
       />
 
-      {viewer.role === "admin" ? (
-        <Tabs defaultValue="account">
-          <TabsList className="mb-4 h-auto w-full flex-wrap justify-start gap-1 p-1 sm:w-auto">
-            <TabsTrigger value="account" className="h-11 px-3 sm:h-9">
+      {canManageVehicleAdmin ? (
+        <Tabs defaultValue={search.tab ?? "account"}>
+          <TabsList
+            className={`mb-4 h-auto w-full gap-1 p-1 ${
+              viewer.isSuperAdmin
+                ? "grid grid-cols-2 sm:flex sm:w-auto sm:flex-wrap"
+                : "flex flex-wrap justify-start sm:w-auto"
+            }`}
+          >
+            <TabsTrigger value="account" className="h-11 whitespace-nowrap px-2 sm:px-3 sm:h-9">
               My account
             </TabsTrigger>
-            <TabsTrigger value="accounts" className="h-11 px-3 sm:h-9">
-              Signatory accounts
-            </TabsTrigger>
-            <TabsTrigger value="hrdo-processors" className="h-11 px-3 sm:h-9">
-              HRDO processors
-            </TabsTrigger>
-            <TabsTrigger value="assignments" className="h-11 px-3 sm:h-9">
-              Signatory assignments
-            </TabsTrigger>
-            <TabsTrigger value="directory" className="h-11 px-3 sm:h-9">
-              Phone directory
-            </TabsTrigger>
+            {viewer.isSuperAdmin && (
+              <>
+                <TabsTrigger
+                  value="vehicle-trip-ticket"
+                  className="h-11 whitespace-nowrap px-2 sm:px-3 sm:h-9"
+                >
+                  Vehicle Trip Ticket
+                </TabsTrigger>
+                <TabsTrigger value="coe" className="h-11 whitespace-nowrap px-2 sm:px-3 sm:h-9">
+                  COE
+                </TabsTrigger>
+                <TabsTrigger
+                  value="permission-slip"
+                  className="h-11 whitespace-nowrap px-2 sm:px-3 sm:h-9"
+                >
+                  Permission Slip
+                </TabsTrigger>
+                <TabsTrigger
+                  value="system-access"
+                  className="h-11 whitespace-nowrap px-2 sm:px-3 sm:h-9"
+                >
+                  System access
+                </TabsTrigger>
+              </>
+            )}
+            {!viewer.isSuperAdmin && (
+              <>
+                <TabsTrigger value="accounts" className="h-11 px-3 sm:h-9">
+                  Signatory accounts
+                </TabsTrigger>
+                <TabsTrigger value="assignments" className="h-11 px-3 sm:h-9">
+                  Signatory assignments
+                </TabsTrigger>
+                <TabsTrigger value="directory" className="h-11 px-3 sm:h-9">
+                  Phone directory
+                </TabsTrigger>
+              </>
+            )}
           </TabsList>
 
           <TabsContent value="account" className="mt-0">
             {accountContent}
           </TabsContent>
 
-          <TabsContent value="accounts" className="mt-0 space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Create main and alternate signatory logins, and issue a new temporary password for an
-              existing account.
-            </p>
-            <SignatoryAccountsSettings />
-          </TabsContent>
+          {viewer.isSuperAdmin && (
+            <>
+              <TabsContent value="vehicle-trip-ticket" className="mt-0 space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Manage Vehicle Trip Ticket signatory accounts, approval assignments, and contact
+                  numbers.
+                </p>
+                <SignatoryAccountsSettings />
+                <SignatoryAssignmentSettings />
+                <PhoneDirectorySettings />
+              </TabsContent>
 
-          <TabsContent value="hrdo-processors" className="mt-0 space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Create separate staff accounts for the HRDO COE system. Processor accounts sign in at
-              /hrdo/login and do not use the trip-ticket signatory roles. You can also grant HRDO
-              administrator access to the first HRDO account.
-            </p>
-            <HrdoProcessorSettings canCreateAdmin />
-          </TabsContent>
+              <TabsContent value="coe" className="mt-0 space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Add COE processors, manage HRDO administrator access, and reset processor
+                  passwords.
+                </p>
+                <HrdoProcessorSettings canCreateAdmin canResetPasswords />
+              </TabsContent>
 
-          <TabsContent value="assignments" className="mt-0 space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Choose who signs each approval stage. Main signatories handle the standard flow, while
-              alternate signatories cover when the main signatory is unavailable.
-            </p>
-            <SignatoryAssignmentSettings />
-          </TabsContent>
+              <TabsContent value="permission-slip" className="mt-0 space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Manage Permission Slip approvers. Every active signatory may approve or reject;
+                  the first decision on a slip takes effect.
+                </p>
+                <PermissionSignatorySettings />
+              </TabsContent>
 
-          <TabsContent value="directory" className="mt-0 space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Publish verified contact numbers for signatories and administrators.
-            </p>
-            <PhoneDirectorySettings />
-          </TabsContent>
+              <TabsContent value="system-access" className="mt-0 space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Assign Super Admin access or grant read-only access to the Permission Slip queue.
+                  Only assigned Permission Slip signatories can approve or reject requests.
+                </p>
+                <SystemAccessSettings currentUserId={viewer.id} />
+              </TabsContent>
+            </>
+          )}
+          {!viewer.isSuperAdmin && (
+            <>
+              <TabsContent value="accounts" className="mt-0 space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Create main and alternate signatory logins, and issue a new temporary password for
+                  an existing account.
+                </p>
+                <SignatoryAccountsSettings />
+              </TabsContent>
+
+              <TabsContent value="assignments" className="mt-0 space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Choose who signs each approval stage. Main signatories handle the standard flow,
+                  while alternate signatories cover when the main signatory is unavailable.
+                </p>
+                <SignatoryAssignmentSettings />
+              </TabsContent>
+
+              <TabsContent value="directory" className="mt-0 space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Publish verified contact numbers for signatories and administrators.
+                </p>
+                <PhoneDirectorySettings />
+              </TabsContent>
+            </>
+          )}
         </Tabs>
       ) : (
         accountContent

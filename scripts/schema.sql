@@ -10,12 +10,50 @@ CREATE TABLE IF NOT EXISTS users (
   department VARCHAR(190) NOT NULL DEFAULT '',
   must_change_password TINYINT(1) NOT NULL DEFAULT 0,
   profile_complete TINYINT(1) NOT NULL DEFAULT 1,
+  is_super_admin TINYINT(1) NOT NULL DEFAULT 0,
   failed_attempts INT NOT NULL DEFAULT 0,
   locked_until DATETIME NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  UNIQUE KEY users_email_uq (email)
+  UNIQUE KEY users_email_uq (email),
+  KEY users_super_admin_idx (is_super_admin, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS permission_slip_admins (
+  user_id CHAR(36) NOT NULL,
+  assigned_by CHAR(36) NULL,
+  assigned_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id),
+  CONSTRAINT permission_slip_admin_user_fk FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+  CONSTRAINT permission_slip_admin_actor_fk FOREIGN KEY (assigned_by) REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS permission_slip_signatories (
+  user_id CHAR(36) NOT NULL,
+  assigned_by CHAR(36) NULL,
+  assigned_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id),
+  CONSTRAINT permission_slip_signatory_user_fk FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+  CONSTRAINT permission_slip_signatory_actor_fk FOREIGN KEY (assigned_by) REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS system_access_history (
+  id CHAR(36) NOT NULL,
+  actor_id CHAR(36) NULL,
+  actor_name VARCHAR(120) NOT NULL,
+  actor_email VARCHAR(190) NOT NULL,
+  target_id CHAR(36) NULL,
+  target_email VARCHAR(190) NOT NULL,
+  module_key ENUM('global','permission_slips') NOT NULL,
+  role_key ENUM('super_admin','admin') NOT NULL,
+  action ENUM('granted','revoked') NOT NULL,
+  happened_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY system_access_history_time_idx (happened_at),
+  KEY system_access_history_target_idx (target_email, happened_at),
+  CONSTRAINT system_access_history_actor_fk FOREIGN KEY (actor_id) REFERENCES users (id) ON DELETE SET NULL,
+  CONSTRAINT system_access_history_target_fk FOREIGN KEY (target_id) REFERENCES users (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS sessions (

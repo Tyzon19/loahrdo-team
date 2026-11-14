@@ -15,6 +15,8 @@ import {
 } from "@tanstack/react-start/server";
 import type { RowDataPacket } from "mysql2/promise";
 import type { HrdoRole, HrdoViewer } from "@/lib/hrdo";
+import { hrdoViewerFromAdminPortal } from "@/lib/hrdo";
+import { viewer } from "@/server/auth";
 import { joinFullName } from "@/lib/name";
 import {
   changePasswordSchema,
@@ -62,6 +64,7 @@ interface HrdoUserRow extends RowDataPacket {
   is_external?: number;
   department: string;
   must_change_password: number;
+  is_super_admin?: number;
   is_locked?: number;
   lock_minutes?: number | null;
 }
@@ -111,10 +114,11 @@ function mapViewer(row: HrdoUserRow): HrdoViewer {
     id: row.id,
     name: row.name,
     email: row.email,
-    role: row.role,
+    role: row.is_super_admin && !row.is_external ? "hrdo_admin" : row.role,
     department: row.department,
     mustChangePassword: Boolean(row.must_change_password),
     isExternal: Boolean(row.is_external),
+    isSuperAdmin: Boolean(row.is_super_admin),
   };
 }
 
@@ -161,7 +165,14 @@ export async function hrdoGoogleSignInAccount(
   email: string,
 ): Promise<HrdoGoogleSignInAccount | null> {
   const rows = await all<HrdoUserRow[]>(
-    "SELECT id, name, email, password_hash, role, is_external, department, must_change_password FROM hrdo_users WHERE email = ? LIMIT 1",
+    `SELECT h.id, h.name, h.email, h.password_hash,
+            CASE WHEN h.is_external = 0 AND COALESCE(m.is_super_admin, 0) = 1
+                 THEN 'hrdo_admin' ELSE h.role END AS role,
+            h.is_external, h.department, h.must_change_password,
+            COALESCE(m.is_super_admin, 0) AS is_super_admin
+     FROM hrdo_users h
+     LEFT JOIN users m ON m.email = h.email
+     WHERE h.email = ? LIMIT 1`,
     [normaliseEmail(email)],
   );
   const row = rows[0];
@@ -182,10 +193,9 @@ export async function ensureHrdoGoogleAccount(
   }
   const existing = await hrdoGoogleSignInAccount(normalised);
   if (existing) {
-    const linkedUsers = await all<Array<RowDataPacket & { name: string; department: string }>>(
-      "SELECT name, department FROM users WHERE email = ? LIMIT 1",
-      [normalised],
-    );
+    const linkedUsers = await all<
+      Array<RowDataPacket & { name: string; department: string; is_super_admin: number }>
+    >("SELECT name, department, is_super_admin FROM users WHERE email = ? LIMIT 1", [normalised]);
     const linkedUser = linkedUsers[0];
     if (linkedUser?.name?.trim()) {
       await run("UPDATE hrdo_users SET name = ?, department = ? WHERE id = ?", [
@@ -201,23 +211,23 @@ export async function ensureHrdoGoogleAccount(
     throw new AppError("Use your official Lyceum of Alabang email address.");
   }
 
-  const linkedUsers = await all<Array<RowDataPacket & { name: string; department: string }>>(
-    "SELECT name, department FROM users WHERE email = ? LIMIT 1",
-    [normalised],
-  );
+  const linkedUsers = await all<
+    Array<RowDataPacket & { name: string; department: string; is_super_admin: number }>
+  >("SELECT name, department, is_super_admin FROM users WHERE email = ? LIMIT 1", [normalised]);
   const linkedUser = linkedUsers[0];
   const localName = (normalised.split("@")[0] ?? "").replace(/[._-]+/g, " ").trim();
   const name = linkedUser?.name?.trim() || localName || "Institutional User";
   const department = linkedUser?.department?.trim() || "General";
+  const role: HrdoRole = !allowExternal && linkedUser?.is_super_admin ? "hrdo_admin" : "employee";
   const id = randomUUID();
   await run(
     `INSERT INTO hrdo_users
        (id, name, email, password_hash, role, is_external, department, must_change_password)
-     VALUES (?, ?, ?, ?, 'employee', ?, ?, 0)`,
-    [id, name, normalised, DUMMY_HASH, allowExternal ? 1 : 0, department],
+     VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,
+    [id, name, normalised, DUMMY_HASH, role, allowExternal ? 1 : 0, department],
   );
 
-  return { id, role: "employee", mustChangePassword: false, isNew: true };
+  return { id, role, mustChangePassword: false, isNew: true };
 }
 
 async function startSession(userId: string) {
@@ -243,6 +253,9 @@ function clearSessionCookie() {
 }
 
 export async function hrdoViewer(): Promise<HrdoViewer | null> {
+  const adminPortalViewer = hrdoViewerFromAdminPortal(await viewer());
+  if (adminPortalViewer) return adminPortalViewer;
+
   const cookieName = sessionCookieName();
   const token = getCookie(cookieName);
   if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token)) {
@@ -251,9 +264,11 @@ export async function hrdoViewer(): Promise<HrdoViewer | null> {
   }
   const hash = sha256(token);
   const rows = await all<HrdoUserRow[]>(
-    `SELECT u.id, u.name, u.email, u.role, u.is_external, u.department, u.must_change_password
+    `SELECT u.id, u.name, u.email, u.role, u.is_external, u.department, u.must_change_password,
+            COALESCE(m.is_super_admin, 0) AS is_super_admin
      FROM hrdo_sessions s
      JOIN hrdo_users u ON u.id = s.user_id
+     LEFT JOIN users m ON m.email = u.email
      WHERE s.token_hash = ? AND s.expires_at > NOW()
      LIMIT 1`,
     [hash],
@@ -581,7 +596,7 @@ export async function hrdoRequestRegistrationOtp(input: unknown): Promise<{ sent
       [
         email,
         data.name,
-        data.department,
+        "General",
         passwordHash,
         codeHash,
         sendNonce,

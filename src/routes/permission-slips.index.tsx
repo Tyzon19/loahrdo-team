@@ -31,7 +31,7 @@ import {
 import { SignaturePad, type SignatureValue } from "@/components/app/SignaturePad";
 import { ButtonLoading, LoadingScreen } from "@/components/app/LoadingPanel";
 import { ApiError, unwrap } from "@/lib/api";
-import { isPermissionHead } from "@/lib/permission-access";
+import { canViewPermissionQueue, isPermissionHead } from "@/lib/permission-access";
 import {
   listMyPermissionSlipsFn,
   listPendingPermissionSlipsFn,
@@ -94,7 +94,13 @@ function FieldError({ id, message }: { id: string; message: string | undefined }
 
 type PermissionTab = "history" | "request" | "review";
 
-function PermissionSlipTabs({ isHead, active }: { isHead: boolean; active: PermissionTab }) {
+function PermissionSlipTabs({
+  hasQueueAccess,
+  active,
+}: {
+  hasQueueAccess: boolean;
+  active: PermissionTab;
+}) {
   const base =
     "flex h-10 min-w-0 items-center justify-center gap-2 rounded-md px-2 text-sm font-semibold transition-colors sm:px-3";
   const activeClass = "bg-background text-foreground shadow-sm";
@@ -105,7 +111,7 @@ function PermissionSlipTabs({ isHead, active }: { isHead: boolean; active: Permi
       aria-label="Permission slip sections"
       className="rounded-lg border border-border bg-muted/60 p-1"
     >
-      <div className={isHead ? "grid grid-cols-3 gap-1" : "grid grid-cols-2 gap-1"}>
+      <div className={hasQueueAccess ? "grid grid-cols-3 gap-1" : "grid grid-cols-2 gap-1"}>
         <Link
           to="/permission-slips"
           search={{ view: "history" }}
@@ -126,7 +132,7 @@ function PermissionSlipTabs({ isHead, active }: { isHead: boolean; active: Permi
           <span className="hidden truncate sm:inline">Request Permission Slip</span>
           <span className="truncate sm:hidden">Request</span>
         </Link>
-        {isHead && (
+        {hasQueueAccess && (
           <Link
             to="/permission-slips"
             search={{}}
@@ -147,6 +153,7 @@ function PermissionSlipsPage() {
   const search = Route.useSearch();
   const { permissionViewer } = Route.useRouteContext();
   const isHead = isPermissionHead(permissionViewer);
+  const hasQueueAccess = canViewPermissionQueue(permissionViewer);
   const queryClient = useQueryClient();
 
   const isHistoryView = search.view === "history";
@@ -155,13 +162,13 @@ function PermissionSlipsPage() {
   const employeeQuery = useQuery({
     queryKey: ["permission-slips", "mine"],
     queryFn: () => unwrap(listMyPermissionSlipsFn()),
-    enabled: !isHead || isHistoryView,
+    enabled: !hasQueueAccess || isHistoryView,
   });
 
   const pendingQuery = useQuery({
     queryKey: ["permission-slips", "pending"],
     queryFn: () => unwrap(listPendingPermissionSlipsFn()),
-    enabled: isHead && !isHistoryView && !isExplicitNewView,
+    enabled: hasQueueAccess && !isHistoryView && !isExplicitNewView,
   });
 
   // Multi-step form state
@@ -324,7 +331,7 @@ function PermissionSlipsPage() {
   if (isHistoryView) {
     return (
       <div className="mx-auto w-full max-w-5xl space-y-6 py-4 sm:py-6">
-        <PermissionSlipTabs isHead={isHead} active="history" />
+        <PermissionSlipTabs hasQueueAccess={hasQueueAccess} active="history" />
         <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-primary">Attendance</p>
@@ -450,19 +457,20 @@ function PermissionSlipsPage() {
   }
 
   // ── VIEW 2: HR DIRECTOR REVIEW QUEUE (when head visits without search) ──────
-  if (isHead && !isExplicitNewView) {
+  if (hasQueueAccess && !isExplicitNewView) {
     return (
       <div className="mx-auto w-full max-w-5xl space-y-6 py-4 sm:py-6">
-        <PermissionSlipTabs isHead={isHead} active="review" />
+        <PermissionSlipTabs hasQueueAccess={hasQueueAccess} active="review" />
         <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-primary">HRDO</p>
             <h1 className="mt-1 text-2xl font-extrabold tracking-tight sm:text-3xl">
-              Permission Slip Review
+              {isHead ? "Permission Slip Review" : "Permission Slip Queue"}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Review, verify, and electronically sign permission slips submitted by school
-              personnel.
+              {isHead
+                ? "Review and electronically sign permission slips submitted by school personnel."
+                : "View pending permission slips. Assigned signatories can approve or reject requests."}
             </p>
           </div>
           <Button asChild variant="outline" className="gap-2 shrink-0">
@@ -498,7 +506,7 @@ function PermissionSlipsPage() {
                     </p>
                   </div>
                   <span className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90">
-                    Review
+                    {isHead ? "Review" : "View"}
                     <ArrowRight className="h-4 w-4" aria-hidden />
                   </span>
                 </CardContent>
@@ -582,7 +590,7 @@ function PermissionSlipsPage() {
 
       <div className="coe-main">
         <div className="mb-4">
-          <PermissionSlipTabs isHead={isHead} active="request" />
+          <PermissionSlipTabs hasQueueAccess={hasQueueAccess} active="request" />
         </div>
         {/* Intro header with seal & title */}
         <div className="coe-form-intro">

@@ -22,25 +22,34 @@ const ALL_REQUEST_ROLES: Role[] = [
 export function isApproverRole(role: Role) {
   return APPROVER_ROLES.includes(role);
 }
+export function canAccessAdminPortal(role: Role, isSuperAdmin = false) {
+  return isSuperAdmin || role === "admin";
+}
 export function canSubmitRequests(role: Role) {
   return role === "requisitioner";
 }
-export function canViewAllRequests(role: Role) {
-  return ALL_REQUEST_ROLES.includes(role);
+export function canViewAllRequests(role: Role, isSuperAdmin = false) {
+  return isSuperAdmin || ALL_REQUEST_ROLES.includes(role);
 }
 
-export function canViewRequest(user: Pick<User, "id" | "role">, requisitionerId: string) {
+export function canViewRequest(
+  user: Pick<User, "id" | "role"> & { isSuperAdmin?: boolean },
+  requisitionerId: string,
+) {
+  if (user.isSuperAdmin) return true;
   if (user.role === "requisitioner") return user.id === requisitionerId;
   return canViewAllRequests(user.role);
 }
 
-export function canManageVehicles(role: Role) {
-  return role === "transport_head" || role === "transport_staff" || role === "admin";
+export function canManageVehicles(role: Role, isSuperAdmin = false) {
+  return (
+    isSuperAdmin || role === "transport_head" || role === "transport_staff" || role === "admin"
+  );
 }
 export function canActOnStage(role: Role, stageRole: Role) {
   return role === stageRole;
 }
 
-export function canViewSiteAnalytics(role: Role) {
-  return role === "admin";
+export function canViewSiteAnalytics(role: Role, isSuperAdmin = false) {
+  return isSuperAdmin || role === "admin";
 }

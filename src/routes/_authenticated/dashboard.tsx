@@ -351,6 +351,7 @@ function WorkflowDashboard() {
   if (!viewer) return null;
 
   const rows = requests.data ?? [];
+  const isSystemAdmin = viewer.role === "admin" || viewer.isSuperAdmin;
   const pending = rows.filter((row) => row.status.startsWith("pending_"));
   const returned = rows.filter((row) => row.status === "returned");
   const errored = requests.isError || stats.isError;
@@ -364,14 +365,14 @@ function WorkflowDashboard() {
           ? `Welcome, ${viewer.name.split(" ")[0]}`
           : viewer.role === "president"
             ? "Requests awaiting your final approval"
-            : viewer.role === "admin"
+            : isSystemAdmin
               ? "System monitoring dashboard"
               : `${ROLE_TITLES[viewer.role]} dashboard`
       }
       description={
         viewer.role === "requisitioner"
           ? "Request a school vehicle and follow every approval."
-          : viewer.role === "admin"
+          : isSystemAdmin
             ? "Monitor system-wide requests, vehicle activity, and trip trends."
             : `${ROLE_TITLES[viewer.role]} · ${rows.length} request${rows.length === 1 ? "" : "s"} visible`
       }
@@ -424,9 +425,14 @@ function WorkflowDashboard() {
           hasError={notifications.isError}
         />
       )}
-      <StatsCards stats={stats.data} loading={stats.isPending} role={viewer.role} />
+      <StatsCards
+        stats={stats.data}
+        loading={stats.isPending}
+        role={viewer.role}
+        isSuperAdmin={viewer.isSuperAdmin}
+      />
 
-      {viewer.role === "admin" && <AdminAnalytics />}
+      {isSystemAdmin && <AdminAnalytics />}
       {viewer.role === "requisitioner" ? (
         <div className="space-y-4">
           {returned.length > 0 && (
@@ -467,9 +473,7 @@ function WorkflowDashboard() {
               )}
             </Section>
           )}
-          <Section
-            title={viewer.role === "admin" ? "System-wide recent requests" : "Recent requests"}
-          >
+          <Section title={isSystemAdmin ? "System-wide recent requests" : "Recent requests"}>
             {requests.isPending ? (
               <LoadingPanel label="Loading recent requests" />
             ) : (

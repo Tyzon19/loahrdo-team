@@ -1,10 +1,10 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import type { RowDataPacket } from "mysql2/promise";
-import { createHrdoProcessorAccountSchema } from "@/lib/validation";
+import { createHrdoProcessorAccountSchema, resetUserPasswordSchema } from "@/lib/validation";
 import { AppError, isDuplicateKey, parseInput } from "@/lib/errors";
 import { viewer } from "@/server/auth";
 import { hrdoViewer } from "@/server/hrdo/auth";
-import { all, run } from "@/server/db";
+import { all, run, withTransaction } from "@/server/db";
 import { hashPassword } from "@/server/password";
 import { sendTemporaryPasswordEmail } from "@/server/gmail";
 import { canManageHrdoAccounts, type HrdoRole } from "@/lib/hrdo";
@@ -20,10 +20,23 @@ interface HrdoProcessorRow extends RowDataPacket {
 
 async function requireAccountManager() {
   const mainViewer = await viewer();
-  if (mainViewer?.role === "admin") return { canCreateHrdoAdmin: true };
+  if (mainViewer?.isSuperAdmin) return { canCreateHrdoAdmin: true };
   const hrdoUser = await hrdoViewer();
-  if (canManageHrdoAccounts(hrdoUser)) return { canCreateHrdoAdmin: false };
+  if (canManageHrdoAccounts(hrdoUser)) {
+    return { canCreateHrdoAdmin: Boolean(hrdoUser?.isSuperAdmin) };
+  }
   throw new AppError("Only administrators can manage HRDO processor accounts.");
+}
+
+async function requireSuperAdmin() {
+  const mainViewer = await viewer();
+  if (!mainViewer?.isSuperAdmin) {
+    throw new AppError("Only Super Admins can reset COE processor passwords.");
+  }
+}
+
+function createTemporaryPassword() {
+  return `${randomBytes(24).toString("base64url")}Aa1!`;
 }
 
 export async function listHrdoProcessorAccounts() {
@@ -82,6 +95,50 @@ export async function createHrdoProcessorAccount(input: unknown) {
     name: data.name,
     email: data.email,
     role,
+    emailDelivery,
+    ...(!emailDelivery.sent ? { temporaryPassword } : {}),
+  };
+}
+
+export async function resetHrdoProcessorPassword(input: unknown) {
+  await requireSuperAdmin();
+  const { userId } = parseInput(resetUserPasswordSchema, input);
+  const temporaryPassword = createTemporaryPassword();
+  const passwordHash = await hashPassword(temporaryPassword);
+  const user = await withTransaction(async (conn) => {
+    const users = await all<HrdoProcessorRow[]>(
+      `SELECT id, name, email, department, role, must_change_password
+       FROM hrdo_users
+       WHERE id = ? AND role <> 'employee'
+       LIMIT 1
+       FOR UPDATE`,
+      [userId],
+      conn,
+    );
+    const account = users[0];
+    if (!account) throw new AppError("Choose a valid COE processor account.");
+    await run(
+      `UPDATE hrdo_users
+       SET password_hash = ?, must_change_password = 1, failed_attempts = 0, locked_until = NULL
+       WHERE id = ? AND role <> 'employee'`,
+      [passwordHash, userId],
+      conn,
+    );
+    await run("DELETE FROM hrdo_sessions WHERE user_id = ?", [userId], conn);
+    return account;
+  });
+
+  const emailDelivery = await sendTemporaryPasswordEmail({
+    recipientName: user.name,
+    recipientEmail: user.email,
+    temporaryPassword,
+    signatoryTitle: user.role === "hrdo_admin" ? "HRDO Administrator" : "COE Processor",
+    accountAction: "password-reset",
+    loginPath: "/hrdo/login",
+    systemName: "LOA HRDO Certificate of Employment",
+  });
+  return {
+    email: user.email,
     emailDelivery,
     ...(!emailDelivery.sent ? { temporaryPassword } : {}),
   };

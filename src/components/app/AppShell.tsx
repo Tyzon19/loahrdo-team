@@ -1,22 +1,27 @@
-import { useState, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   Bell,
   BarChart3,
+  Building2,
   Car,
   ChevronDown,
   ClipboardList,
   FilePlus2,
+  FileText,
+  Images,
   LayoutDashboard,
   LogOut,
+  MoreHorizontal,
   PhoneCall,
   ShieldCheck,
   UserRound,
 } from "lucide-react";
 import type { Role, Viewer } from "@/lib/types";
 import { ROLE_TITLES } from "@/lib/workflow";
+import { canAccessAdminPortal } from "@/lib/access";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,14 +41,39 @@ type NavItem = {
   mobileLabel: string;
   icon: typeof Bell;
   exact?: boolean;
+  section?: string;
 };
 const ITEMS = {
+  adminHome: {
+    to: "/admin",
+    label: "Admin Dashboard",
+    mobileLabel: "Home",
+    icon: LayoutDashboard,
+    exact: true,
+    section: "Portal",
+  },
+  receipts: {
+    to: "/receipts",
+    label: "Receipts Archive",
+    mobileLabel: "Receipts",
+    icon: Images,
+    exact: true,
+    section: "Portal",
+  },
   dash: {
     to: "/dashboard",
     label: "Dashboard",
     mobileLabel: "Home",
     icon: LayoutDashboard,
     exact: true,
+  },
+  vehicleDashboard: {
+    to: "/dashboard",
+    label: "Vehicle Trip Ticket",
+    mobileLabel: "Vehicle",
+    icon: Car,
+    exact: true,
+    section: "Vehicle Trip Ticket",
   },
   newReq: {
     to: "/requests/new",
@@ -72,6 +102,13 @@ const ITEMS = {
     label: "Permission Slips",
     mobileLabel: "Permission",
     icon: ShieldCheck,
+  },
+  coe: {
+    to: "/hrdo/dashboard",
+    label: "Certificate of Employment",
+    mobileLabel: "COE",
+    icon: FileText,
+    section: "Other systems",
   },
   phoneDirectory: {
     to: "/phone-directory",
@@ -118,13 +155,17 @@ export const NAV: Record<Role, NavItem[]> = {
   guard: [ITEMS.dash, ITEMS.req, ITEMS.notif, ITEMS.phoneDirectory, ITEMS.profile],
   driver: [ITEMS.dash, ITEMS.req, ITEMS.notif, ITEMS.phoneDirectory, ITEMS.profile],
   admin: [
-    ITEMS.dash,
-    ITEMS.req,
-    ITEMS.vehicles,
-    ITEMS.tripArchive,
-    ITEMS.notif,
-    ITEMS.phoneDirectory,
-    ITEMS.profileSettings,
+    ITEMS.adminHome,
+    ITEMS.receipts,
+    ITEMS.vehicleDashboard,
+    { ...ITEMS.req, section: "Vehicle Trip Ticket" },
+    { ...ITEMS.vehicles, section: "Vehicle Trip Ticket" },
+    { ...ITEMS.tripArchive, section: "Vehicle Trip Ticket" },
+    { ...ITEMS.coe, section: "Other systems" },
+    { ...ITEMS.permission, section: "Other systems" },
+    { ...ITEMS.notif, section: "Account" },
+    { ...ITEMS.phoneDirectory, section: "Account" },
+    { ...ITEMS.profileSettings, section: "Account" },
   ],
 };
 
@@ -135,9 +176,12 @@ function permissionNavSearch(permissionPortal: boolean, item: NavItem) {
   return undefined;
 }
 
-function navItemsFor(user: Viewer, permissionPortal: boolean) {
-  if (permissionPortal) {
+function navItemsFor(user: Viewer, permissionPortal: boolean): NavItem[] {
+  if (permissionPortal && !canAccessAdminPortal(user.role, user.isSuperAdmin)) {
     return [ITEMS.permission, ITEMS.profile];
+  }
+  if (user.isSuperAdmin) {
+    return user.role === "requisitioner" ? [ITEMS.newReq, ...NAV.admin] : NAV.admin;
   }
   return NAV[user.role] ?? [ITEMS.dash, ITEMS.profile];
 }
@@ -155,6 +199,7 @@ function SideNav({
 }) {
   const location = useRouterState({ select: (r) => r.location.pathname });
   const items = navItemsFor(user, permissionPortal);
+  const centralAdmin = canAccessAdminPortal(user.role, user.isSuperAdmin);
   return (
     <nav className="flex h-full flex-col bg-sidebar text-sidebar-foreground" aria-label="Main">
       <div className="border-b border-sidebar-border px-4 py-4">
@@ -162,40 +207,53 @@ function SideNav({
           Lyceum of Alabang
         </p>
         <p className="text-xs opacity-80">
-          {permissionPortal ? "Permission Slip System" : "Vehicle Reservation & Trip Ticket"}
+          {centralAdmin
+            ? "Admin Portal"
+            : permissionPortal
+              ? "Permission Slip System"
+              : "Vehicle Reservation & Trip Ticket"}
         </p>
       </div>
       <ul className="flex-1 py-2">
-        {items.map((item) => {
+        {items.map((item, index) => {
           const active = isNavItemActive(item, location);
           const search = permissionNavSearch(permissionPortal, item);
           return (
-            <li key={item.to + item.label}>
-              <Link
-                to={item.to}
-                {...(search ? { search } : {})}
-                onClick={onNavigate}
-                className={cn(
-                  "flex min-h-11 items-center gap-2.5 border-l-4 px-4 py-2 text-sm transition-colors",
-                  active
-                    ? "border-sidebar-primary bg-sidebar-accent font-medium text-sidebar-accent-foreground"
-                    : "border-transparent hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                )}
-              >
-                <item.icon className="h-4 w-4" aria-hidden />
-                <span className="flex-1">{item.label}</span>
-                {item.to === "/notifications" && unread > 0 && (
-                  <span className="rounded-sm bg-sidebar-primary px-1.5 text-xs text-sidebar-primary-foreground">
-                    {unread}
-                  </span>
-                )}
-              </Link>
-            </li>
+            <Fragment key={item.to + item.label}>
+              {item.section && item.section !== items[index - 1]?.section && (
+                <li className="px-4 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-wide text-sidebar-foreground/60">
+                  {item.section}
+                </li>
+              )}
+              <li>
+                <Link
+                  to={item.to}
+                  {...(search ? { search } : {})}
+                  onClick={onNavigate}
+                  className={cn(
+                    "flex min-h-11 items-center gap-2.5 border-l-4 px-4 py-2 text-sm transition-colors",
+                    active
+                      ? "border-sidebar-primary bg-sidebar-accent font-medium text-sidebar-accent-foreground"
+                      : "border-transparent hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                  )}
+                >
+                  <item.icon className="h-4 w-4" aria-hidden />
+                  <span className="flex-1">{item.label}</span>
+                  {item.to === "/notifications" && unread > 0 && (
+                    <span className="rounded-sm bg-sidebar-primary px-1.5 text-xs text-sidebar-primary-foreground">
+                      {unread}
+                    </span>
+                  )}
+                </Link>
+              </li>
+            </Fragment>
           );
         })}
       </ul>
       <div className="border-t border-sidebar-border px-4 py-3 text-xs opacity-80">
-        <p>{permissionPortal ? "HRDO" : "PFMO"} · Lyceum of Alabang</p>
+        <p>
+          {centralAdmin ? "LOA Systems" : permissionPortal ? "HRDO" : "PFMO"} · Lyceum of Alabang
+        </p>
         <Link
           to="/privacy"
           onClick={onNavigate}
@@ -232,6 +290,18 @@ function MobileNav({
   const items = navItemsFor(user, permissionPortal).filter(
     (item) => item.to !== "/profile" || item.label === "Profile",
   );
+  const centralAdmin = canAccessAdminPortal(user.role, user.isSuperAdmin);
+  const primaryItems =
+    items.length > 4
+      ? centralAdmin
+        ? [ITEMS.adminHome, ITEMS.vehicleDashboard, ITEMS.req]
+        : items.slice(0, 3)
+      : items;
+  const overflowItems = items.filter(
+    (item) =>
+      !primaryItems.some((primary) => primary.to === item.to && primary.label === item.label),
+  );
+  const moreActive = overflowItems.some((item) => isNavItemActive(item, location));
 
   return (
     <nav
@@ -240,7 +310,7 @@ function MobileNav({
       aria-label="Mobile navigation"
     >
       <ul className="mx-auto grid w-full max-w-lg grid-flow-col auto-cols-fr gap-1">
-        {items.map((item) => {
+        {primaryItems.map((item) => {
           const active = isNavItemActive(item, location);
           const search = permissionNavSearch(permissionPortal, item);
           return (
@@ -270,6 +340,45 @@ function MobileNav({
             </li>
           );
         })}
+        {overflowItems.length > 0 && (
+          <li className="min-w-0">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="More navigation options"
+                  aria-current={moreActive ? "page" : undefined}
+                  className={cn(
+                    "flex min-h-14 w-full min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1 text-[10px] font-medium leading-tight transition-colors",
+                    moreActive
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  )}
+                >
+                  <MoreHorizontal className="h-5 w-5" aria-hidden />
+                  <span>More</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="top" align="end" className="mb-1 w-56">
+                {overflowItems.map((item) => {
+                  const search = permissionNavSearch(permissionPortal, item);
+                  return (
+                    <DropdownMenuItem key={item.to + item.label} asChild className="min-h-11">
+                      <Link
+                        to={item.to}
+                        {...(search ? { search } : {})}
+                        aria-current={isNavItemActive(item, location) ? "page" : undefined}
+                      >
+                        <item.icon className="h-4 w-4" aria-hidden />
+                        {item.label}
+                      </Link>
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </li>
+        )}
       </ul>
     </nav>
   );
@@ -284,9 +393,19 @@ export function AppShell({ user, children }: { user: Viewer; children: ReactNode
     }),
   });
   const permissionPortal =
-    location.pathname.startsWith("/permission-slips") ||
-    (location.pathname === "/profile" &&
-      new URLSearchParams(location.searchStr).get("portal") === "permission");
+    !canAccessAdminPortal(user.role, user.isSuperAdmin) &&
+    (location.pathname.startsWith("/permission-slips") ||
+      (location.pathname === "/profile" &&
+        new URLSearchParams(location.searchStr).get("portal") === "permission"));
+  const centralAdmin = canAccessAdminPortal(user.role, user.isSuperAdmin);
+  const currentSystem = location.pathname.startsWith("/hrdo")
+    ? "COE"
+    : location.pathname.startsWith("/permission-slips")
+      ? "Permission Slips"
+      : location.pathname.startsWith("/receipts")
+        ? "Receipts"
+        : "Vehicle Trip Ticket";
+  const portalTitle = user.isSuperAdmin ? "Super Admin Portal" : "Admin Portal";
   const queryClient = useQueryClient();
   const notifications = useQuery({
     queryKey: ["notifications"],
@@ -324,10 +443,16 @@ export function AppShell({ user, children }: { user: Viewer; children: ReactNode
             className="h-8 w-8 shrink-0 rounded-full border bg-white object-contain p-0.5 md:hidden"
           />
           <span className="hidden truncate text-sm font-semibold md:inline">
-            {permissionPortal ? "Permission Slip Portal" : `${ROLE_TITLES[user.role]} Portal`}
+            {permissionPortal
+              ? "Permission Slip Portal"
+              : centralAdmin
+                ? location.pathname === "/admin"
+                  ? portalTitle
+                  : `${portalTitle} · ${currentSystem}`
+                : `${ROLE_TITLES[user.role]} Portal`}
           </span>
           <span className="truncate text-sm font-semibold md:hidden">
-            {permissionPortal ? "Permission Slip" : "LOA VRTT"}
+            {permissionPortal ? "Permission Slip" : centralAdmin ? "Admin Portal" : "LOA VRTT"}
           </span>
           <div className="ml-auto flex items-center gap-1.5">
             {!permissionPortal && (
@@ -357,7 +482,7 @@ export function AppShell({ user, children }: { user: Viewer; children: ReactNode
                 <DropdownMenuLabel>
                   <span className="block truncate text-sm">{user.name}</span>
                   <span className="block truncate text-xs font-normal text-muted-foreground">
-                    {user.email} · {ROLE_TITLES[user.role]}
+                    {user.email} · {user.isSuperAdmin ? "Super Admin" : ROLE_TITLES[user.role]}
                   </span>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />

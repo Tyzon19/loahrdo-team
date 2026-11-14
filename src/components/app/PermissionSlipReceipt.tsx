@@ -66,7 +66,7 @@ export function PermissionSlipReceipt({
   slip: PermissionSlip;
   receiptRef?: RefObject<HTMLDivElement | null>;
 }) {
-  const directorName = slip.departmentHeadName?.trim() || "HRDO Director";
+  const signatoryName = slip.departmentHeadName?.trim() || "HRDO Signatory";
 
   return (
     <div
@@ -184,10 +184,10 @@ export function PermissionSlipReceipt({
             emptyNote="No signature on file"
           />
           <SignatureBlock
-            label="Approved by: Department Head"
+            label="Approved by: Signatory"
             image={slip.departmentHeadSignature ?? null}
-            imageAlt={`Signature of ${directorName}`}
-            name={directorName}
+            imageAlt={`Signature of ${signatoryName}`}
+            name={signatoryName}
             caption={
               slip.approvedAt
                 ? `Signed on ${fmtDateTime(slip.approvedAt)}`

@@ -152,6 +152,7 @@ function RequestDetailPage() {
   }
 
   const r = detail.request;
+  const hasTransportAssignment = Boolean(r.vehicleId || r.vehicleType || r.plateNo);
   const stage = stageForStatus(r.status);
   const isProxySigner = Boolean(
     stage && stage.key !== "review" && detail.assistantUserIds[stage.key] === viewer.id,
@@ -163,7 +164,7 @@ function RequestDetailPage() {
     stage && (isAssignedMainSignatory || isRoleBasedSignatory || isProxySigner),
   );
   const isOwner = r.requisitionerId === viewer.id;
-  const canSendTripTicket = canViewAllRequests(viewer.role);
+  const canSendTripTicket = canViewAllRequests(viewer.role, viewer.isSuperAdmin);
   const sigs = currentSignatures(r);
   const allStagesSigned = STAGES.every((approvalStage) =>
     sigs.some((signature) => signature.stage === approvalStage.key),
@@ -389,6 +390,35 @@ function RequestDetailPage() {
 
       <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-4">
+          <Section title="Transport assignment">
+            <dl className="grid gap-4 sm:grid-cols-3">
+              <Field label="Vehicle type" comfortable>
+                <span className="font-medium">
+                  {r.vehicleType ?? (hasTransportAssignment ? "Not recorded" : "Not yet assigned")}
+                </span>
+              </Field>
+              <Field label="Plate number" comfortable>
+                <span className="font-medium">
+                  {r.plateNo ?? (hasTransportAssignment ? "Not recorded" : "Not yet assigned")}
+                </span>
+              </Field>
+              <Field label="Driver" comfortable>
+                <span className="font-medium">
+                  {hasTransportAssignment
+                    ? (r.dispatch.driverName ?? "Not recorded")
+                    : "Not yet assigned"}
+                </span>
+              </Field>
+              {r.reviewRemarks && (
+                <div className="sm:col-span-3">
+                  <Field label="Transport notes" comfortable>
+                    <span className="font-medium">{r.reviewRemarks}</span>
+                  </Field>
+                </div>
+              )}
+            </dl>
+          </Section>
+
           {!(myTurn && stage?.key === "review") && (
             <Section title="Request details">
               <dl className="grid gap-4 sm:grid-cols-2">
@@ -475,24 +505,6 @@ function RequestDetailPage() {
                         <br />
                         {fmtDateTime(signature.at)}
                       </p>
-                    )}
-                    {st.key === "review" && (
-                      <dl className="mt-2 space-y-0.5 border-t pt-2 text-[13px]">
-                        <div>
-                          <dt className="inline text-muted-foreground">Vehicle Type: </dt>
-                          <dd className="inline">{r.vehicleType ?? "—"}</dd>
-                        </div>
-                        <div>
-                          <dt className="inline text-muted-foreground">Plate No.: </dt>
-                          <dd className="inline">{r.plateNo ?? "—"}</dd>
-                        </div>
-                        {r.reviewRemarks && (
-                          <div>
-                            <dt className="inline text-muted-foreground">Remarks: </dt>
-                            <dd className="inline">{r.reviewRemarks}</dd>
-                          </div>
-                        )}
-                      </dl>
                     )}
                   </div>
                 );
@@ -655,10 +667,10 @@ function ActionPanel({
                 {r.passengers} · {fmtRange(r.dateStart, r.dateEnd)} · {fmtTime(r.timeNeeded)}
               </span>
             </Field>
-            <Field label="Vehicle">
+            <Field label="Vehicle and driver">
               <span className="text-base font-semibold leading-6 sm:text-[17px]">
                 {r.vehicleType
-                  ? `${r.vehicleType} · ${r.plateNo ?? "No plate recorded"}`
+                  ? `${r.vehicleType} · ${r.plateNo ?? "No plate recorded"} · Driver: ${r.dispatch.driverName ?? "Not recorded"}`
                   : "Not yet assigned"}
               </span>
             </Field>
