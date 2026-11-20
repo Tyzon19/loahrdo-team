@@ -185,6 +185,8 @@ export function FakeCaptcha() {
   );
 }
 
+
+
 export function OrDivider() {
   return (
     <div className="my-3 flex items-center gap-3 text-xs uppercase tracking-wide text-muted-foreground">
@@ -194,6 +196,7 @@ export function OrDivider() {
     </div>
   );
 }
+
 
 export function GoogleButton({ href, label }: { href: string; label: string }) {
   return (

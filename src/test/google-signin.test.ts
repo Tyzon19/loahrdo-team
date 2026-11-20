@@ -7,7 +7,11 @@ import {
   requiresProfileCompletion,
   safeSignInNext,
 } from "@/lib/google-signin";
-import { googleSignInCredentials, googleSignInRedirectUri } from "@/server/google-signin";
+import {
+  googleSignInCanonicalStartUrl,
+  googleSignInCredentials,
+  googleSignInRedirectUri,
+} from "@/server/google-signin";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -127,6 +131,27 @@ describe("Google sign-in redirect target", () => {
 });
 
 describe("Google sign-in callback URI", () => {
+  it("starts OAuth on the callback host so state cookies reach the callback", () => {
+    vi.stubEnv(
+      "GOOGLE_SIGNIN_REDIRECT_URI",
+      "https://tunnel.example.test/api/auth/google/callback",
+    );
+    const localUrl = new URL(
+      "http://localhost:8080/api/auth/google?mode=external&redirect=%2Fhrdo%2Fcoe",
+    );
+    const redirectUri = googleSignInRedirectUri(localUrl);
+
+    expect(googleSignInCanonicalStartUrl(localUrl, redirectUri)).toBe(
+      "https://tunnel.example.test/api/auth/google?mode=external&redirect=%2Fhrdo%2Fcoe",
+    );
+    expect(
+      googleSignInCanonicalStartUrl(
+        new URL("https://tunnel.example.test/api/auth/google?mode=external"),
+        redirectUri,
+      ),
+    ).toBeNull();
+  });
+
   it("uses the current local origin when SITE_URL points to another local port", () => {
     vi.stubEnv("SITE_URL", "http://localhost:8080");
     vi.stubEnv("GOOGLE_SIGNIN_REDIRECT_URI", "");

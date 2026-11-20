@@ -59,6 +59,15 @@ export function googleSignInRedirectUri(requestUrl: URL): string {
   return `${requestUrl.origin}${GOOGLE_SIGN_IN_CALLBACK_PATH}`;
 }
 
+export function googleSignInCanonicalStartUrl(requestUrl: URL, redirectUri: string): string | null {
+  const callbackUrl = new URL(redirectUri);
+  if (callbackUrl.origin === requestUrl.origin) return null;
+
+  const startUrl = new URL(GOOGLE_SIGN_IN_START_PATH, callbackUrl.origin);
+  startUrl.search = requestUrl.search;
+  return startUrl.toString();
+}
+
 export function signInCookie(name: string, value: string, secure: boolean, maxAge = 600): string {
   return `${name}=${value}; HttpOnly; SameSite=Lax; Path=${GOOGLE_SIGN_IN_COOKIE_PATH}; Max-Age=${maxAge}${secure ? "; Secure" : ""}`;
 }

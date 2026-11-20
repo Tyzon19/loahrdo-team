@@ -6,6 +6,7 @@ import {
   GOOGLE_NEXT_COOKIE,
   GOOGLE_STATE_COOKIE,
   GOOGLE_VERIFIER_COOKIE,
+  googleSignInCanonicalStartUrl,
   googleSignInCredentials,
   googleSignInMode,
   googleSignInRedirectUri,
@@ -38,9 +39,9 @@ export const Route = createFileRoute("/api/auth/google")({
         }
 
         const redirectUri = googleSignInRedirectUri(requestUrl);
-        let secure = false;
+        let callbackUrl: URL;
         try {
-          secure = new URL(redirectUri).protocol === "https:";
+          callbackUrl = new URL(redirectUri);
         } catch {
           return redirect(
             mode === "external"
@@ -48,6 +49,17 @@ export const Route = createFileRoute("/api/auth/google")({
               : "/login?error=google_unavailable",
           );
         }
+        if (callbackUrl.protocol !== "http:" && callbackUrl.protocol !== "https:") {
+          return redirect(
+            mode === "external"
+              ? "/coe?error=google_unavailable"
+              : "/login?error=google_unavailable",
+          );
+        }
+
+        const canonicalStartUrl = googleSignInCanonicalStartUrl(requestUrl, redirectUri);
+        if (canonicalStartUrl) return redirect(canonicalStartUrl);
+        const secure = callbackUrl.protocol === "https:";
 
         const state = randomBytes(32).toString("base64url");
         const verifier = randomBytes(32).toString("base64url");

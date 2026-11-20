@@ -22,6 +22,7 @@ import {
   canViewAllRequests,
   canViewRequest,
   isApproverRole,
+
 } from "@/lib/access";
 import {
   approveSchema,
@@ -69,6 +70,7 @@ import {
   type RequestDbRow,
   type VehicleDbRow,
 } from "./mappers";
+import { constants } from "node:buffer";
 
 function canSee(viewer: Viewer, requisitionerId: string) {
   return canViewRequest(viewer, requisitionerId);
@@ -81,6 +83,7 @@ function assertFutureDate(input: RequestInput) {
     });
   }
 }
+
 
 async function insertHistory(conn: PoolConnection, requestId: string, events: HistoryEvent[]) {
   if (!events.length) return;
@@ -1033,8 +1036,6 @@ export async function sendTripTicket(input: unknown): Promise<{
   return { alreadySent: result.alreadySent, emailDelivery };
 }
 
-/* ------------------------------ Vehicles ----------------------------- */
-
 export async function listVehicles(): Promise<{
   vehicles: Vehicle[];
   reservations: VehicleReservation[];
@@ -1140,8 +1141,6 @@ export async function updateVehicle(input: unknown) {
 
   return { id: data.id };
 }
-
-/* ------------------------------- Stats ------------------------------- */
 
 export async function dashboardStats(): Promise<DashboardStats> {
   const viewer = await requireViewer();
