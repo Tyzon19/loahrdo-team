@@ -75,7 +75,6 @@ interface UserRow extends RowDataPacket {
   lock_minutes?: number | null;
 }
 
-
 const loginAttempts = new Map<string, { count: number; resetAt: number }>();
 
 function isLocalEnvironmentIp(ip: string | null | undefined) {
@@ -182,7 +181,7 @@ export interface GoogleSignInAccount {
 
 export async function googleSignInAccount(email: string): Promise<GoogleSignInAccount | null> {
   const rows = await all<UserRow[]>(
-    "SELECT id, role, must_change_password, profile_complete FROM users WHERE email = ? LIMIT 1",
+    "SELECT id, role, must_change_password, profile_complete, is_super_admin FROM users WHERE email = ? LIMIT 1",
     [normaliseEmail(email)],
   );
   const row = rows[0];

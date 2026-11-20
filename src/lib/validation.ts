@@ -272,6 +272,26 @@ export const resetUserPasswordSchema = z.object({
   userId: z.string().uuid(),
 });
 
+export const attendanceGroupSchema = z.object({
+  staffGroup: z.enum(["NON_TEACHING", "COLLEGE", "BASIC_ED"]).optional(),
+});
+
+export const attendanceSyncSchema = z.object({
+  staffGroup: z.enum(["NON_TEACHING", "COLLEGE", "BASIC_ED"]),
+});
+
+export const attendanceMappingSchema = z.object({
+  userId: z.string().uuid(),
+  staffGroup: z.enum(["NON_TEACHING", "COLLEGE", "BASIC_ED"]),
+  sheetEmployeeName: z.string().trim().min(2).max(190),
+});
+
+export const attendanceFlagSchema = z.object({
+  attendanceLogId: z.string().uuid().optional(),
+  flagId: z.string().uuid().optional(),
+  message: z.string().trim().min(3).max(1000),
+});
+
 export const signatoryPhoneSchema = z.object({
   userId: z.string().uuid(),
   phoneNumber: z

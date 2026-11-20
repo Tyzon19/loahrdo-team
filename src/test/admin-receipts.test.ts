@@ -3,7 +3,11 @@ import type { RowDataPacket } from "mysql2/promise";
 import { all } from "@/server/db";
 import { requireViewer } from "@/server/auth";
 import { getPermissionSlip, type PermissionSlip } from "@/server/permission";
-import { getAdminReceiptPreview, listAdminReceipts } from "@/server/admin-receipts";
+import {
+  bulkDownloadAdminReceipts,
+  getAdminReceiptPreview,
+  listAdminReceipts,
+} from "@/server/admin-receipts";
 import type { Viewer } from "@/lib/types";
 
 vi.mock("@/server/db", () => ({ all: vi.fn() }));
@@ -51,7 +55,29 @@ describe("Admin receipts", () => {
       items: [],
       page: 0,
       hasMore: false,
+      counts: {
+        all: 0,
+        vehicle_trip_ticket: 0,
+        coe: 0,
+        permission_slip: 0,
+      },
     });
+  });
+
+  it("searches receipt archives by person name or department", async () => {
+    vi.mocked(requireViewer).mockResolvedValue(viewer("admin"));
+    vi.mocked(all).mockResolvedValue([]);
+
+    await expect(
+      listAdminReceipts({ system: "all", q: "Juan Dela Cruz", page: 0 }),
+    ).resolves.toMatchObject({
+      items: [],
+      hasMore: false,
+    });
+    expect(all).toHaveBeenCalledWith(
+      expect.stringContaining("person_name LIKE ?"),
+      expect.arrayContaining(["%Juan Dela Cruz%", "%Juan Dela Cruz%", "%Juan Dela Cruz%", 25, 0]),
+    );
   });
 
   it("lists receipts for the selected system and date range", async () => {
@@ -76,7 +102,9 @@ describe("Admin receipts", () => {
       receipt_at_ms: Date.parse("2026-11-12T08:30:00Z"),
       file_name: "certificate.pdf",
     };
-    vi.mocked(all).mockResolvedValue([row]);
+    vi.mocked(all)
+      .mockResolvedValueOnce([{ system: "coe", total: 1 }])
+      .mockResolvedValueOnce([row]);
 
     const result = await listAdminReceipts({
       system: "coe",
@@ -158,6 +186,30 @@ describe("Admin receipts", () => {
     });
   });
 
+  it("creates a bulk ZIP for selected receipts", async () => {
+    vi.mocked(requireViewer).mockResolvedValue(viewer("admin"));
+    vi.mocked(all).mockResolvedValue([
+      {
+        status: "released",
+        file_name: "certificate.pdf",
+        mime: "application/pdf",
+        content: Buffer.from("%PDF-1.7 receipt"),
+      },
+    ]);
+
+    const result = await bulkDownloadAdminReceipts({
+      receipts: [
+        {
+          system: "coe",
+          id: "22222222-2222-4222-8222-222222222222",
+        },
+      ],
+    });
+
+    expect(result.fileName).toMatch(/^receipts-\d{4}-\d{2}-\d{2}\.zip$/);
+    expect(result.base64).toBeTruthy();
+  });
+
   it("does not return a COE document before it is ready for release", async () => {
     vi.mocked(requireViewer).mockResolvedValue(viewer("admin"));
     vi.mocked(all).mockResolvedValue([]);
@@ -172,6 +224,7 @@ describe("Admin receipts", () => {
 
   it("returns an approved Permission Slip for its receipt preview", async () => {
     vi.mocked(requireViewer).mockResolvedValue(viewer("admin"));
+    vi.mocked(all).mockResolvedValue([]);
     const slip: PermissionSlip = {
       id: "33333333-3333-4333-8333-333333333333",
       employeeId: "44444444-4444-4444-8444-444444444444",
@@ -195,5 +248,39 @@ describe("Admin receipts", () => {
     await expect(
       getAdminReceiptPreview({ system: "permission_slip", id: slip.id }),
     ).resolves.toEqual({ system: "permission_slip", slip });
+  });
+
+  it("returns the archived Permission Slip PNG instead of regenerating HTML", async () => {
+    vi.mocked(requireViewer).mockResolvedValue(viewer("admin"));
+    vi.mocked(all).mockResolvedValue([
+      { status: "approved", receipt_image: Buffer.from("permission receipt png") },
+    ]);
+    const slip: PermissionSlip = {
+      id: "33333333-3333-4333-8333-333333333333",
+      employeeId: "44444444-4444-4444-8444-444444444444",
+      employeeName: "Employee User",
+      employeeEmail: "employee@lyceumalabang.edu.ph",
+      department: "Administration",
+      requestedDate: "2026-11-13",
+      timeOut: "14:00",
+      timeIn: "16:00",
+      reason: "Official business",
+      employeeSignature: "data:image/png;base64,",
+      status: "approved",
+      departmentHeadName: "Signatory User",
+      departmentHeadSignature: "data:image/png;base64,",
+      requestedAt: "2026-11-13T06:00:00Z",
+      approvedAt: "2026-11-13T08:00:00Z",
+      history: [],
+    };
+    vi.mocked(getPermissionSlip).mockResolvedValue(slip);
+
+    await expect(
+      getAdminReceiptPreview({ system: "permission_slip", id: slip.id }),
+    ).resolves.toEqual({
+      system: "permission_slip",
+      slip,
+      receiptImage: Buffer.from("permission receipt png").toString("base64"),
+    });
   });
 });

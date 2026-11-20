@@ -19,6 +19,7 @@ import {
   saveSignatoryAssistantsFn,
 } from "@/server-functions";
 import { unwrap } from "@/lib/api";
+import { FORMAL_NAME_PREFIXES } from "@/lib/name";
 
 const FIELDS: { key: StageKey; label: string }[] = [
   { key: "review", label: "Head of Transport Services" },
@@ -30,6 +31,7 @@ type AssistantEntry = { name: string; userId: string };
 type AssistantForm = Record<StageKey, AssistantEntry>;
 type MainSignatoryForm = Record<StageKey, string>;
 type NewAssistantAccount = {
+  prefix: string;
   name: string;
   email: string;
   department: string;
@@ -69,6 +71,7 @@ export function SignatoryAccountsSettings() {
   const query = useSignatorySettings();
   const [mainAccountForm, setMainAccountForm] = useState<NewMainSignatoryAccount>({
     stage: "approve",
+    prefix: "",
     name: "",
     email: "",
     department: "",
@@ -82,6 +85,7 @@ export function SignatoryAccountsSettings() {
     temporaryPassword?: string;
   } | null>(null);
   const [accountForm, setAccountForm] = useState<NewAssistantAccount>({
+    prefix: "",
     name: "",
     email: "",
     department: "",
@@ -108,7 +112,12 @@ export function SignatoryAccountsSettings() {
     setMainAccountBusy(true);
     setCreatedMainAccount(null);
     try {
-      const result: unknown = await createMainSignatoryAccountFn({ data: mainAccountForm });
+      const result: unknown = await createMainSignatoryAccountFn({
+        data: {
+          ...mainAccountForm,
+          name: `${mainAccountForm.prefix ? `${mainAccountForm.prefix} ` : ""}${mainAccountForm.name.trim()}`,
+        },
+      });
       const data = isRecord(result) ? result["data"] : undefined;
       const id = isRecord(data) ? data["id"] : undefined;
       const email = isRecord(data) ? data["email"] : undefined;
@@ -139,7 +148,13 @@ export function SignatoryAccountsSettings() {
         ...(emailMessage ? { emailMessage } : {}),
         ...(typeof temporaryPassword === "string" ? { temporaryPassword } : {}),
       });
-      setMainAccountForm((current) => ({ ...current, name: "", email: "", department: "" }));
+      setMainAccountForm((current) => ({
+        ...current,
+        prefix: "",
+        name: "",
+        email: "",
+        department: "",
+      }));
       if (emailSent) {
         toast.success("Main signatory account created and assigned. Login details emailed.");
       } else {
@@ -161,7 +176,12 @@ export function SignatoryAccountsSettings() {
     setAccountBusy(true);
     setCreatedAccount(null);
     try {
-      const result: unknown = await createAssistantAccountFn({ data: accountForm });
+      const result: unknown = await createAssistantAccountFn({
+        data: {
+          ...accountForm,
+          name: `${accountForm.prefix ? `${accountForm.prefix} ` : ""}${accountForm.name.trim()}`,
+        },
+      });
       const data = isRecord(result) ? result["data"] : undefined;
       const email = isRecord(data) ? data["email"] : undefined;
       const emailDelivery = isRecord(data) ? data["emailDelivery"] : undefined;
@@ -188,6 +208,7 @@ export function SignatoryAccountsSettings() {
         ...(typeof temporaryPassword === "string" ? { temporaryPassword } : {}),
       });
       setAccountForm({
+        prefix: "",
         name: "",
         email: "",
         department: "",
@@ -278,6 +299,27 @@ export function SignatoryAccountsSettings() {
             </select>
           </div>
           <div>
+            <Label htmlFor="main-account-prefix">Name prefix</Label>
+            <select
+              id="main-account-prefix"
+              className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={mainAccountForm.prefix}
+              onChange={(event) =>
+                setMainAccountForm((current) => ({
+                  ...current,
+                  prefix: event.target.value,
+                }))
+              }
+            >
+              <option value="">No prefix</option>
+              {FORMAL_NAME_PREFIXES.map((prefix) => (
+                <option key={prefix} value={prefix}>
+                  {prefix}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="sm:col-span-2">
             <Label htmlFor="main-account-name">Full name</Label>
             <Input
               id="main-account-name"
@@ -373,6 +415,27 @@ export function SignatoryAccountsSettings() {
           one-time temporary password to the account holder, who must change it at first sign-in.
         </p>
         <form className="grid max-w-3xl gap-4 sm:grid-cols-2" onSubmit={createAccount}>
+          <div>
+            <Label htmlFor="assistant-account-prefix">Name prefix</Label>
+            <select
+              id="assistant-account-prefix"
+              className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={accountForm.prefix}
+              onChange={(event) =>
+                setAccountForm((current) => ({
+                  ...current,
+                  prefix: event.target.value,
+                }))
+              }
+            >
+              <option value="">No prefix</option>
+              {FORMAL_NAME_PREFIXES.map((prefix) => (
+                <option key={prefix} value={prefix}>
+                  {prefix}
+                </option>
+              ))}
+            </select>
+          </div>
           <div>
             <Label htmlFor="assistant-account-name">Full name</Label>
             <Input

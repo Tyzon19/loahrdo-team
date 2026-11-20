@@ -1,0 +1,77 @@
+Attached Element Context from Integrated Browser
+
+Element: div.coe-step-content
+
+URL: http://localhost:8080/hrdo/coe
+
+HTML Path: div.flex.min-h-screen > div.flex.min-w-0.flex-1.flex-col > main#main-content.w-full.flex-1.px-3.pb-24.pt-5.sm:px-6.md:pb-5 > div.coe-request > main.coe-main > ol.coe-steps > li.coe-step > div.coe-step-content
+
+Outer HTML:
+```html
+<div class="coe-step-content"><span class="coe-step-circle"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></span><span class="coe-step-name">Request Type</span></div>
+```
+
+Dimensions:
+- top: 254px
+- left: 443px
+- width: 124px
+- height: 28px
+
+CSS:
+```css
+*, ::after, ::before, ::backdrop, ::file-selector-button { box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border: 0 solid; }
+* { border-color: var(--color-border); }
+.coe-request, .coe-request * { box-sizing: border-box; }
+.coe-step-content { position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: fit-content;
+  padding-right: 0.65rem;
+  background: var(--coe-surface); }
+.coe-step-content { gap: 0.45rem; }
+
+/* Inherited */
+ol, ul, menu { list-style: none }
+.coe-request { color: var(--coe-fg); font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif }
+.coe-request { color: var(--foreground); font-family: inherit }
+body { color: var(--color-foreground); font-family: var(--font-sans); font-size: 14px }
+html, :host { line-height: 1.5; tab-size: 4; font-family: var(--default-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"); font-feature-settings: var(--default-font-feature-settings, normal) }
+
+/* Resolved values */
+margin: 0px;
+padding: 0px 10.4px 0px 0px;
+border: 0px solid oklch(0.89 0.006 250);
+align-items: center;
+box-sizing: border-box;
+color: oklch(0.22 0.015 255);
+column-gap: 7.2px;
+display: flex;
+font-family: "IBM Plex Sans", system-ui, sans-serif;
+font-feature-settings: normal;
+font-size: 14px;
+height: 28px;
+line-height: 21px;
+list-style-image: none;
+list-style-position: outside;
+list-style-type: none;
+position: relative;
+row-gap: 7.2px;
+tab-size: 4;
+unicode-bidi: isolate /*UA*/;
+width: 124px;
+z-index: 1;
+
+/* CSS variables */
+--coe-fg: oklch(0.22 0.015 255);
+--font-sans: "IBM Plex Sans", system-ui, sans-serif;
+--default-font-family: "IBM Plex Sans", system-ui, sans-serif;
+--coe-surface: oklch(1 0 0);
+--color-border: oklch(0.89 0.006 250);
+--color-foreground: oklch(0.22 0.015 255);
+--foreground: oklch(0.22 0.015 255);
+```

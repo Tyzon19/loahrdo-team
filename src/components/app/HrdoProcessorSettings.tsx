@@ -12,8 +12,15 @@ import {
   resetHrdoProcessorPasswordFn,
 } from "@/server-functions";
 import { unwrap } from "@/lib/api";
+import { FORMAL_NAME_PREFIXES } from "@/lib/name";
 
-type ProcessorForm = { name: string; email: string; department: string; isHrdoAdmin?: boolean };
+type ProcessorForm = {
+  prefix: string;
+  name: string;
+  email: string;
+  department: string;
+  isHrdoAdmin?: boolean;
+};
 
 export function HrdoProcessorSettings({
   canCreateAdmin = false,
@@ -28,6 +35,7 @@ export function HrdoProcessorSettings({
     queryFn: () => unwrap(listHrdoProcessorAccountsFn()),
   });
   const [form, setForm] = useState<ProcessorForm>({
+    prefix: "",
     name: "",
     email: "",
     department: "",
@@ -56,7 +64,12 @@ export function HrdoProcessorSettings({
     setBusy(true);
     setCreated(null);
     try {
-      const result = await createHrdoProcessorAccountFn({ data: form });
+      const result = await createHrdoProcessorAccountFn({
+        data: {
+          ...form,
+          name: `${form.prefix ? `${form.prefix} ` : ""}${form.name.trim()}`,
+        },
+      });
       if (!result.ok) {
         toast.error(result.error);
         return;
@@ -70,7 +83,7 @@ export function HrdoProcessorSettings({
         ...(!emailDelivery.sent ? { emailMessage: emailDelivery.message } : {}),
         ...(temporaryPassword ? { temporaryPassword } : {}),
       });
-      setForm({ name: "", email: "", department: "", isHrdoAdmin: false });
+      setForm({ prefix: "", name: "", email: "", department: "", isHrdoAdmin: false });
       if (emailDelivery.sent) {
         toast.success("HRDO account created. Login details emailed.");
       } else {
@@ -125,6 +138,24 @@ export function HrdoProcessorSettings({
           receive a temporary password and must change it at first sign-in.
         </p>
         <form className="grid max-w-3xl gap-4 sm:grid-cols-2" onSubmit={createAccount}>
+          <div>
+            <Label htmlFor="hrdo-processor-prefix">Name prefix</Label>
+            <select
+              id="hrdo-processor-prefix"
+              className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              value={form.prefix}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, prefix: event.target.value }))
+              }
+            >
+              <option value="">No prefix</option>
+              {FORMAL_NAME_PREFIXES.map((prefix) => (
+                <option key={prefix} value={prefix}>
+                  {prefix}
+                </option>
+              ))}
+            </select>
+          </div>
           <div>
             <Label htmlFor="hrdo-processor-name">Full name</Label>
             <Input

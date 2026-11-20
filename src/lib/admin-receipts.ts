@@ -17,6 +17,7 @@ const dateOnlySchema = z.iso.date().optional();
 export const adminReceiptListSchema = z
   .object({
     system: z.enum(["all", ...ADMIN_RECEIPT_SYSTEMS]).default("all"),
+    q: z.string().trim().max(100).optional(),
     dateFrom: dateOnlySchema,
     dateTo: dateOnlySchema,
     page: z.number().int().min(0).max(10_000).default(0),
@@ -29,6 +30,18 @@ export const adminReceiptListSchema = z
 export const adminReceiptPreviewSchema = z.object({
   system: z.enum(ADMIN_RECEIPT_SYSTEMS),
   id: z.string().uuid("Invalid receipt reference."),
+});
+
+export const adminReceiptBulkDownloadSchema = z.object({
+  receipts: z
+    .array(
+      z.object({
+        system: z.enum(ADMIN_RECEIPT_SYSTEMS),
+        id: z.string().uuid("Invalid receipt reference."),
+      }),
+    )
+    .min(1, "Select at least one receipt.")
+    .max(24, "Download up to 24 receipts at a time."),
 });
 
 export type AdminReceiptListInput = z.input<typeof adminReceiptListSchema>;
@@ -49,6 +62,7 @@ export interface AdminReceiptListResult {
   page: number;
   pageSize: number;
   hasMore: boolean;
+  counts: Record<AdminReceiptSystemFilter, number>;
 }
 
 export type AdminReceiptPreview =
@@ -58,4 +72,4 @@ export type AdminReceiptPreview =
       mime: string;
       base64: string;
     }
-  | { system: "permission_slip"; slip: PermissionSlip };
+  | { system: "permission_slip"; slip: PermissionSlip; receiptImage?: string };

@@ -1,8 +1,10 @@
 import type { RowDataPacket } from "mysql2/promise";
+import JSZip from "jszip";
 import { AppError, parseInput } from "@/lib/errors";
 import {
   adminReceiptListSchema,
   adminReceiptPreviewSchema,
+  adminReceiptBulkDownloadSchema,
   type AdminReceiptListResult,
   type AdminReceiptPreview,
   type AdminReceiptSystem,
@@ -26,6 +28,11 @@ interface ReceiptRow extends RowDataPacket {
   file_name: string | null;
 }
 
+interface ReceiptCountRow extends RowDataPacket {
+  system: AdminReceiptSystem;
+  total: number;
+}
+
 interface VehicleReceiptFileRow extends RowDataPacket {
   number: string;
   mime: string;
@@ -37,6 +44,11 @@ interface CoeReceiptFileRow extends RowDataPacket {
   file_name: string;
   mime: string;
   content: Buffer;
+}
+
+interface PermissionReceiptFileRow extends RowDataPacket {
+  status: string;
+  receipt_image: Buffer | null;
 }
 
 async function requireAdminPortalAccess() {
@@ -120,9 +132,32 @@ export async function listAdminReceipts(input: unknown): Promise<AdminReceiptLis
   const queries = systems.map((system) => receiptQuery(system, filters.dateFrom, filters.dateTo));
   const sql = queries.map((query) => query.sql).join(" UNION ALL ");
   const params = queries.flatMap((query) => query.params);
+  let searchSql = "";
+  if (filters.q) {
+    searchSql = ` WHERE person_name LIKE ? OR department LIKE ? OR reference LIKE ?`;
+    const term = `%${filters.q.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_")}%`;
+    params.push(term, term, term);
+  }
+  const countRows = await all<ReceiptCountRow[]>(
+    `SELECT system, COUNT(*) AS total
+     FROM (${sql}) AS receipts${searchSql}
+     GROUP BY system`,
+    [...params],
+  );
+  const counts: AdminReceiptListResult["counts"] = {
+    all: 0,
+    vehicle_trip_ticket: 0,
+    coe: 0,
+    permission_slip: 0,
+  };
+  for (const row of countRows) {
+    const total = Number(row.total);
+    counts[row.system] = total;
+    counts.all += total;
+  }
   const offset = filters.page * PAGE_SIZE;
   const rows = await all<ReceiptRow[]>(
-    `SELECT * FROM (${sql}) AS receipts
+    `SELECT * FROM (${sql}) AS receipts${searchSql}
      ORDER BY receipt_at_ms DESC, system ASC, id ASC
      LIMIT ? OFFSET ?`,
     [...params, PAGE_SIZE + 1, offset],
@@ -148,6 +183,7 @@ export async function listAdminReceipts(input: unknown): Promise<AdminReceiptLis
     page: filters.page,
     pageSize: PAGE_SIZE,
     hasMore: rows.length > PAGE_SIZE,
+    counts,
   };
 }
 
@@ -206,5 +242,60 @@ export async function getAdminReceiptPreview(input: unknown): Promise<AdminRecei
 
   const slip = await getPermissionSlip(data.id);
   if (!slip || slip.status !== "approved") throw new AppError("Receipt not found.");
-  return { system: data.system, slip };
+  const rows = await all<PermissionReceiptFileRow[]>(
+    "SELECT status, receipt_image FROM permission_slips WHERE id = ? AND status = 'approved'",
+    [data.id],
+  );
+  const row = rows[0];
+  return {
+    system: data.system,
+    slip,
+    ...(row?.receipt_image
+      ? { receiptImage: Buffer.from(row.receipt_image).toString("base64") }
+      : {}),
+  };
+}
+
+function safeFileName(value: string) {
+  return (
+    value
+      .replace(/[^a-z0-9._-]+/gi, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 100) || "receipt"
+  );
+}
+
+export async function bulkDownloadAdminReceipts(input: unknown) {
+  await requireAdminPortalAccess();
+  const data = parseInput(adminReceiptBulkDownloadSchema, input);
+  const zip = new JSZip();
+
+  for (const receipt of data.receipts) {
+    const preview = await getAdminReceiptPreview(receipt);
+    const folder =
+      preview.system === "vehicle_trip_ticket"
+        ? "Vehicle-Trip-Tickets"
+        : preview.system === "coe"
+          ? "Certificates-of-Employment"
+          : "Permission-Slips";
+
+    if (preview.system === "permission_slip") {
+      if (!preview.receiptImage) {
+        throw new AppError(
+          `The saved PNG receipt is missing for ${preview.slip.employeeName}. Open and archive it again.`,
+        );
+      }
+      const fileName = `PS-${safeFileName(preview.slip.id.slice(0, 8).toUpperCase())}.png`;
+      zip.folder(folder)?.file(fileName, Buffer.from(preview.receiptImage, "base64"));
+      continue;
+    }
+
+    zip.folder(folder)?.file(preview.fileName, Buffer.from(preview.base64, "base64"));
+  }
+
+  const bytes = await zip.generateAsync({ type: "base64", compression: "DEFLATE" });
+  return {
+    fileName: `receipts-${new Date().toISOString().slice(0, 10)}.zip`,
+    base64: bytes,
+  };
 }

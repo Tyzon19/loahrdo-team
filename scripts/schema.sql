@@ -102,6 +102,7 @@ CREATE TABLE IF NOT EXISTS permission_slips (
   department_head_id CHAR(36) NULL,
   department_head_name VARCHAR(120) NULL,
   department_head_signature MEDIUMTEXT NULL,
+  receipt_image MEDIUMBLOB NULL,
   rejection_reason VARCHAR(500) NULL,
   requested_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   approved_at DATETIME NULL,
@@ -298,6 +299,114 @@ CREATE TABLE IF NOT EXISTS notification_attachments (
   image MEDIUMBLOB NOT NULL,
   PRIMARY KEY (notification_id),
   CONSTRAINT notification_attachments_fk FOREIGN KEY (notification_id) REFERENCES notifications (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS sheet_sources (
+  id CHAR(36) NOT NULL,
+  staff_group ENUM('NON_TEACHING','COLLEGE','BASIC_ED') NOT NULL,
+  spreadsheet_id VARCHAR(255) NOT NULL,
+  sheet_name VARCHAR(120) NOT NULL DEFAULT 'STAFF',
+  last_synced_at DATETIME NULL,
+  sync_status ENUM('NEVER','RUNNING','SUCCESS','FAILED') NOT NULL DEFAULT 'NEVER',
+  sync_message VARCHAR(500) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY sheet_sources_group_uq (staff_group)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS employee_sheet_mappings (
+  id CHAR(36) NOT NULL,
+  user_id CHAR(36) NOT NULL,
+  staff_group ENUM('NON_TEACHING','COLLEGE','BASIC_ED') NOT NULL,
+  sheet_employee_name VARCHAR(190) NOT NULL,
+  employee_status_note VARCHAR(255) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY employee_sheet_mapping_user_group_uq (user_id, staff_group),
+  UNIQUE KEY employee_sheet_mapping_name_group_uq (sheet_employee_name, staff_group),
+  CONSTRAINT employee_sheet_mapping_user_fk FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS leave_balances (
+  id CHAR(36) NOT NULL,
+  user_id CHAR(36) NOT NULL,
+  staff_group ENUM('NON_TEACHING','COLLEGE','BASIC_ED') NOT NULL,
+  cycle_label VARCHAR(64) NOT NULL,
+  expiry_date DATE NOT NULL,
+  total_allocation DECIMAL(5,1) NOT NULL DEFAULT 17,
+  leaves_this_month DECIMAL(5,1) NOT NULL DEFAULT 0,
+  leaves_this_year DECIMAL(5,1) NOT NULL DEFAULT 0,
+  rem_el DECIMAL(5,1) NOT NULL DEFAULT 6,
+  rem_sl DECIMAL(5,1) NOT NULL DEFAULT 5,
+  rem_vl DECIMAL(5,1) NOT NULL DEFAULT 5,
+  rem_bl DECIMAL(5,1) NOT NULL DEFAULT 1,
+  total_lates INT UNSIGNED NOT NULL DEFAULT 0,
+  carry_over_bl DECIMAL(5,1) NOT NULL DEFAULT 0,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY leave_balances_user_cycle_uq (user_id, cycle_label),
+  KEY leave_balances_group_idx (staff_group),
+  CONSTRAINT leave_balances_user_fk FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS attendance_logs (
+  id CHAR(36) NOT NULL,
+  user_id CHAR(36) NOT NULL,
+  staff_group ENUM('NON_TEACHING','COLLEGE','BASIC_ED') NOT NULL,
+  incident_date DATE NOT NULL,
+  day_of_week VARCHAR(12) NOT NULL,
+  code VARCHAR(12) NOT NULL,
+  leave_type VARCHAR(40) NOT NULL,
+  credited_days DECIMAL(3,1) NOT NULL DEFAULT 0,
+  synced_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY attendance_logs_user_date_uq (user_id, incident_date),
+  KEY attendance_logs_date_idx (incident_date, staff_group),
+  CONSTRAINT attendance_logs_user_fk FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS leave_discrepancy_flags (
+  id CHAR(36) NOT NULL,
+  attendance_log_id CHAR(36) NULL,
+  user_id CHAR(36) NOT NULL,
+  message VARCHAR(1000) NOT NULL,
+  status ENUM('OPEN','RESOLVED') NOT NULL DEFAULT 'OPEN',
+  hr_reply VARCHAR(1000) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  resolved_at DATETIME NULL,
+  PRIMARY KEY (id),
+  KEY leave_flags_user_idx (user_id, status, created_at),
+  KEY leave_flags_log_idx (attendance_log_id),
+  CONSTRAINT leave_flags_log_fk FOREIGN KEY (attendance_log_id) REFERENCES attendance_logs (id) ON DELETE SET NULL,
+  CONSTRAINT leave_flags_user_fk FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS attendance_notifications (
+  id CHAR(36) NOT NULL,
+  user_id CHAR(36) NOT NULL,
+  event_type ENUM('ADDED','UPDATED','REMOVED','SYNC_FAILED','FLAG_REPLY') NOT NULL,
+  heading VARCHAR(255) NOT NULL,
+  body VARCHAR(1000) NOT NULL,
+  read_at DATETIME NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY attendance_notifications_inbox_idx (user_id, created_at),
+  CONSTRAINT attendance_notifications_user_fk FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS attendance_sync_logs (
+  id CHAR(36) NOT NULL,
+  staff_group ENUM('NON_TEACHING','COLLEGE','BASIC_ED') NOT NULL,
+  status ENUM('RUNNING','SUCCESS','FAILED') NOT NULL,
+  rows_seen INT UNSIGNED NOT NULL DEFAULT 0,
+  changes_applied INT UNSIGNED NOT NULL DEFAULT 0,
+  message VARCHAR(500) NULL,
+  started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  finished_at DATETIME NULL,
+  PRIMARY KEY (id),
+  KEY attendance_sync_logs_group_idx (staff_group, started_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS doc_config (

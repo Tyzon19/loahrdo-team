@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -41,6 +41,7 @@ import {
   getPermissionSlipFn,
   rejectPermissionSlipFn,
   sendPermissionSlipReceiptFn,
+  persistPermissionSlipReceiptFn,
 } from "@/server-functions";
 
 type Search = {
@@ -216,6 +217,7 @@ function PermissionSlipDetailPage() {
   const { permissionViewer } = Route.useRouteContext();
   const queryClient = useQueryClient();
   const receiptRef = useRef<HTMLDivElement>(null);
+  const archivedReceiptRef = useRef(false);
   const isHead = isPermissionHead(permissionViewer);
 
   const query = useQuery({
@@ -240,6 +242,34 @@ function PermissionSlipDetailPage() {
   const isApproved = slip?.status === "approved";
   const isPendingReview = isHead && slip?.status === "pending_approval";
   const hrDirectorName = slip?.departmentHeadName || permissionViewer?.name || "HRDO Director";
+
+  useEffect(() => {
+    if (
+      !slip ||
+      slip.status !== "approved" ||
+      (!receiptOpen && search.view !== "receipt") ||
+      archivedReceiptRef.current
+    ) {
+      return;
+    }
+    let cancelled = false;
+    const timeoutId = window.setTimeout(() => {
+      void (async () => {
+        if (!receiptRef.current || cancelled) return;
+        try {
+          const receiptImage = await captureReceiptImage();
+          await unwrap(persistPermissionSlipReceiptFn({ data: { id: slip.id, receiptImage } }));
+          if (!cancelled) archivedReceiptRef.current = true;
+        } catch {
+          // The archive retry remains available from Download or Send Receipt.
+        }
+      })();
+    }, 600);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [slip, search.view, receiptOpen]);
 
   const emailAlreadyDelivered =
     receiptEmailedLocally ||
@@ -378,6 +408,7 @@ function PermissionSlipDetailPage() {
     setDownloading(true);
     try {
       const image = await captureReceiptImage();
+      await unwrap(persistPermissionSlipReceiptFn({ data: { id: slip.id, receiptImage: image } }));
       const link = document.createElement("a");
       link.href = image;
       link.download = `Permission-Slip-${slip.employeeName.replace(/[^a-zA-Z0-9_-]/g, "_")}-${slip.requestedDate}.png`;

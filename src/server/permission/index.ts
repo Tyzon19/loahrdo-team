@@ -17,9 +17,10 @@ import {
   isPermissionHead,
   type PermissionViewer,
 } from "@/lib/permission-access";
+import { canAccessAdminPortal } from "@/lib/access";
 import { all, run, withTransaction } from "../db";
 import { requirePermissionViewer } from "./auth";
-import { requireViewer } from "../auth";
+import { requireViewer, viewer } from "../auth";
 import { hashPassword } from "../password";
 import { sendPermissionSlipEmail, sendTemporaryPasswordEmail } from "../gmail";
 
@@ -208,6 +209,15 @@ function requireDepartmentHead(viewer: PermissionViewer) {
   if (!isPermissionHead(viewer)) {
     throw new AppError("Only an assigned Permission Slip signatory can approve or reject slips.");
   }
+}
+
+async function requireReceiptArchiver() {
+  const mainViewer = await viewer();
+  if (mainViewer && canAccessAdminPortal(mainViewer.role, mainViewer.isSuperAdmin)) {
+    return;
+  }
+  const permissionViewer = await requirePermissionViewer();
+  requireDepartmentHead(permissionViewer);
 }
 
 export async function listPermissionSignatories() {
@@ -572,15 +582,33 @@ export async function rejectPermissionSlip(input: unknown) {
   return { emailDelivery };
 }
 
+export async function persistPermissionSlipReceipt(input: unknown) {
+  await requireReceiptArchiver();
+  const data = parseInput(sendPermissionReceiptSchema, input);
+  const slip = await loadPermission(data.id);
+  if (!slip) throw new AppError("Permission slip not found.");
+  if (slip.status !== "approved") {
+    throw new AppError("The Permission Slip must be approved before archiving its receipt.");
+  }
+  await run("UPDATE permission_slips SET receipt_image = ?, updated_at = NOW() WHERE id = ?", [
+    Buffer.from(data.receiptImage.split(",")[1] ?? "", "base64"),
+    slip.id,
+  ]);
+  return { ok: true };
+}
+
 export async function sendPermissionSlipReceipt(input: unknown) {
-  const viewer = await requirePermissionViewer();
-  requireDepartmentHead(viewer);
+  await requireReceiptArchiver();
   const data = parseInput(sendPermissionReceiptSchema, input);
   const slip = await loadPermission(data.id);
   if (!slip) throw new AppError("Permission slip not found.");
   if (slip.status !== "approved") {
     throw new AppError("The Permission Slip must be approved before sending the receipt.");
   }
+  await run("UPDATE permission_slips SET receipt_image = ? WHERE id = ? AND status = 'approved'", [
+    Buffer.from(data.receiptImage.split(",")[1] ?? "", "base64"),
+    slip.id,
+  ]);
 
   const emailDelivery = await sendPermissionSlipEmail({
     kind: "employee_approved",

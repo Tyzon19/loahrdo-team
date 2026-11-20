@@ -170,6 +170,12 @@ export const sendPermissionSlipReceiptFn = createServerFn({ method: "POST" })
     runSafely(async () => (await import("./server/permission")).sendPermissionSlipReceipt(data)),
   );
 
+export const persistPermissionSlipReceiptFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/permission")).persistPermissionSlipReceipt(data)),
+  );
+
 export const hrdoLogoutFn = createServerFn({ method: "POST" }).handler(async () =>
   runSafely(async () => (await import("./server/hrdo/auth")).hrdoLogout()),
 );
@@ -424,6 +430,14 @@ export const listSystemAccessUsersFn = createServerFn({ method: "GET" }).handler
   runSafely(async () => (await import("./server/system-access")).listSystemAccessUsers()),
 );
 
+export const listSuperAdminOverviewFn = createServerFn({ method: "GET" }).handler(async () =>
+  runSafely(async () => (await import("./server/system-access")).listSuperAdminOverview()),
+);
+
+export const listAdminOperationsOverviewFn = createServerFn({ method: "GET" }).handler(async () =>
+  runSafely(async () => (await import("./server/system-access")).listAdminOperationsOverview()),
+);
+
 export const listAdminReceiptsFn = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) =>
@@ -434,6 +448,14 @@ export const getAdminReceiptPreviewFn = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) =>
     runSafely(async () => (await import("./server/admin-receipts")).getAdminReceiptPreview(data)),
+  );
+
+export const bulkDownloadAdminReceiptsFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () =>
+      (await import("./server/admin-receipts")).bulkDownloadAdminReceipts(data),
+    ),
   );
 
 export const setSystemAccessAssignmentFn = createServerFn({ method: "POST" })
@@ -528,4 +550,56 @@ export const getTripArchiveFn = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) =>
     runSafely(async () => (await import("./server/analytics")).getTripArchive(data)),
+  );
+
+export const listMyAttendanceFn = createServerFn({ method: "GET" }).handler(async () =>
+  runSafely(async () => (await import("./server/late-absences")).listMyAttendance()),
+);
+
+export const listAttendanceAdminFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/late-absences")).listAttendanceAdmin(data)),
+  );
+
+export const listDirectorAttendanceFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/late-absences")).listDirectorAttendance(data)),
+  );
+
+export const syncAttendanceGroupFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/late-absences")).syncStaffGroup(data)),
+  );
+
+export const saveAttendanceMappingFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/late-absences")).saveAttendanceMapping(data)),
+  );
+
+export const createAttendanceFlagFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/late-absences")).createAttendanceFlag(data)),
+  );
+
+export const resolveAttendanceFlagFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/late-absences")).resolveAttendanceFlag(data)),
+  );
+
+export const listAttendanceNotificationsFn = createServerFn({ method: "GET" }).handler(async () =>
+  runSafely(async () => (await import("./server/late-absences")).listAttendanceNotifications()),
+);
+
+export const markAttendanceNotificationReadFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () =>
+      (await import("./server/late-absences")).markAttendanceNotificationRead(data),
+    ),
   );

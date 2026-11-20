@@ -30,7 +30,6 @@ type NavItem = {
   label: string;
   mobileLabel: string;
   icon: typeof LayoutDashboard;
-  /** Extra path prefixes that should highlight this item (e.g. a detail route). */
   alsoStartsWith?: string[];
 };
 
@@ -216,7 +215,7 @@ export function HrdoShell({ user, children }: { user: HrdoViewer; children: Reac
             />
           </div>
           <span className="truncate text-sm font-semibold">
-            {canManageHrdoAccounts(user) ? "HRDO Admin Portal" : isHrdoStaffRole(user.role) ? "HRDO Staff Portal" : "Employee Portal"}
+            {canManageHrdoAccounts(user) ? "HRDO COE PORTAL" : isHrdoStaffRole(user.role) ? "HRDO Staff Portal" : "Employee Portal"}
           </span>
           <div className="ml-auto flex items-center gap-1">
             <DropdownMenu>

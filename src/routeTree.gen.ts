@@ -15,6 +15,7 @@ import { Route as CoeRouteImport } from './routes/coe'
 import { Route as CompleteProfileRouteImport } from './routes/complete-profile'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as HrdoRouteImport } from './routes/hrdo'
+import { Route as LeavesRouteImport } from './routes/leaves'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PermissionSlipsRouteImport } from './routes/permission-slips'
 import { Route as PrivacyRouteImport } from './routes/privacy'
@@ -29,6 +30,8 @@ import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedReceiptsRouteImport } from './routes/_authenticated/receipts'
 import { Route as AuthenticatedTripArchiveRouteImport } from './routes/_authenticated/trip-archive'
 import { Route as AuthenticatedVehiclesRouteImport } from './routes/_authenticated/vehicles'
+import { Route as AdminLateAbsencesRouteImport } from './routes/admin/late-absences'
+import { Route as DirectorLateAbsencesRouteImport } from './routes/director/late-absences'
 import { Route as HrdoAnalyticsRouteImport } from './routes/hrdo/analytics'
 import { Route as HrdoChangePasswordRouteImport } from './routes/hrdo/change-password'
 import { Route as HrdoCoeRouteImport } from './routes/hrdo/coe'
@@ -53,6 +56,7 @@ import { Route as AuthenticatedReviseIdRouteImport } from './routes/_authenticat
 import { Route as ApiAuthGoogleRouteImport } from './routes/api.auth.google'
 import { Route as ApiGmailCallbackRouteImport } from './routes/api.gmail.callback'
 import { Route as ApiGmailConnectRouteImport } from './routes/api.gmail.connect'
+import { Route as ApiSheetsWebhookRouteImport } from './routes/api.sheets.webhook'
 import { Route as ApiVerifyTicketTokenRouteImport } from './routes/api.verify-ticket.$token'
 import { Route as HrdoCoeIdRouteImport } from './routes/hrdo/coe_.$id'
 import { Route as ApiAuthGoogleCallbackRouteImport } from './routes/api.auth.google.callback'
@@ -84,6 +88,11 @@ const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
 const HrdoRoute = HrdoRouteImport.update({
   id: '/hrdo',
   path: '/hrdo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LeavesRoute = LeavesRouteImport.update({
+  id: '/leaves',
+  path: '/leaves',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -159,6 +168,16 @@ const AuthenticatedVehiclesRoute = AuthenticatedVehiclesRouteImport.update({
   id: '/vehicles',
   path: '/vehicles',
   getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AdminLateAbsencesRoute = AdminLateAbsencesRouteImport.update({
+  id: '/admin/late-absences',
+  path: '/admin/late-absences',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DirectorLateAbsencesRoute = DirectorLateAbsencesRouteImport.update({
+  id: '/director/late-absences',
+  path: '/director/late-absences',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const HrdoAnalyticsRoute = HrdoAnalyticsRouteImport.update({
   id: '/analytics',
@@ -282,6 +301,11 @@ const ApiGmailConnectRoute = ApiGmailConnectRouteImport.update({
   path: '/api/gmail/connect',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSheetsWebhookRoute = ApiSheetsWebhookRouteImport.update({
+  id: '/api/sheets/webhook',
+  path: '/api/sheets/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiVerifyTicketTokenRoute = ApiVerifyTicketTokenRouteImport.update({
   id: '/api/verify-ticket/$token',
   path: '/api/verify-ticket/$token',
@@ -304,6 +328,7 @@ export interface FileRoutesByFullPath {
   '/complete-profile': typeof CompleteProfileRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/hrdo': typeof HrdoRouteWithChildren
+  '/leaves': typeof LeavesRoute
   '/login': typeof LoginRoute
   '/permission-slips': typeof PermissionSlipsRouteWithChildren
   '/privacy': typeof PrivacyRoute
@@ -318,6 +343,8 @@ export interface FileRoutesByFullPath {
   '/receipts': typeof AuthenticatedReceiptsRoute
   '/trip-archive': typeof AuthenticatedTripArchiveRoute
   '/vehicles': typeof AuthenticatedVehiclesRoute
+  '/admin/late-absences': typeof AdminLateAbsencesRoute
+  '/director/late-absences': typeof DirectorLateAbsencesRoute
   '/hrdo/analytics': typeof HrdoAnalyticsRoute
   '/hrdo/change-password': typeof HrdoChangePasswordRoute
   '/hrdo/coe': typeof HrdoCoeRoute
@@ -341,6 +368,7 @@ export interface FileRoutesByFullPath {
   '/api/auth/google': typeof ApiAuthGoogleRouteWithChildren
   '/api/gmail/callback': typeof ApiGmailCallbackRoute
   '/api/gmail/connect': typeof ApiGmailConnectRoute
+  '/api/sheets/webhook': typeof ApiSheetsWebhookRoute
   '/api/verify-ticket/$token': typeof ApiVerifyTicketTokenRoute
   '/hrdo/coe/$id': typeof HrdoCoeIdRoute
   '/requests/': typeof AuthenticatedRequestsIndexRoute
@@ -352,6 +380,7 @@ export interface FileRoutesByTo {
   '/complete-profile': typeof CompleteProfileRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/hrdo': typeof HrdoRouteWithChildren
+  '/leaves': typeof LeavesRoute
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
   '/register': typeof RegisterRoute
@@ -365,6 +394,8 @@ export interface FileRoutesByTo {
   '/receipts': typeof AuthenticatedReceiptsRoute
   '/trip-archive': typeof AuthenticatedTripArchiveRoute
   '/vehicles': typeof AuthenticatedVehiclesRoute
+  '/admin/late-absences': typeof AdminLateAbsencesRoute
+  '/director/late-absences': typeof DirectorLateAbsencesRoute
   '/hrdo/analytics': typeof HrdoAnalyticsRoute
   '/hrdo/change-password': typeof HrdoChangePasswordRoute
   '/hrdo/coe': typeof HrdoCoeRoute
@@ -388,6 +419,7 @@ export interface FileRoutesByTo {
   '/api/auth/google': typeof ApiAuthGoogleRouteWithChildren
   '/api/gmail/callback': typeof ApiGmailCallbackRoute
   '/api/gmail/connect': typeof ApiGmailConnectRoute
+  '/api/sheets/webhook': typeof ApiSheetsWebhookRoute
   '/api/verify-ticket/$token': typeof ApiVerifyTicketTokenRoute
   '/hrdo/coe/$id': typeof HrdoCoeIdRoute
   '/requests': typeof AuthenticatedRequestsIndexRoute
@@ -401,6 +433,7 @@ export interface FileRoutesById {
   '/complete-profile': typeof CompleteProfileRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/hrdo': typeof HrdoRouteWithChildren
+  '/leaves': typeof LeavesRoute
   '/login': typeof LoginRoute
   '/permission-slips': typeof PermissionSlipsRouteWithChildren
   '/privacy': typeof PrivacyRoute
@@ -415,6 +448,8 @@ export interface FileRoutesById {
   '/_authenticated/receipts': typeof AuthenticatedReceiptsRoute
   '/_authenticated/trip-archive': typeof AuthenticatedTripArchiveRoute
   '/_authenticated/vehicles': typeof AuthenticatedVehiclesRoute
+  '/admin/late-absences': typeof AdminLateAbsencesRoute
+  '/director/late-absences': typeof DirectorLateAbsencesRoute
   '/hrdo/analytics': typeof HrdoAnalyticsRoute
   '/hrdo/change-password': typeof HrdoChangePasswordRoute
   '/hrdo/coe': typeof HrdoCoeRoute
@@ -438,6 +473,7 @@ export interface FileRoutesById {
   '/api/auth/google': typeof ApiAuthGoogleRouteWithChildren
   '/api/gmail/callback': typeof ApiGmailCallbackRoute
   '/api/gmail/connect': typeof ApiGmailConnectRoute
+  '/api/sheets/webhook': typeof ApiSheetsWebhookRoute
   '/api/verify-ticket/$token': typeof ApiVerifyTicketTokenRoute
   '/hrdo/coe_/$id': typeof HrdoCoeIdRoute
   '/_authenticated/requests/': typeof AuthenticatedRequestsIndexRoute
@@ -451,6 +487,7 @@ export interface FileRouteTypes {
     | '/complete-profile'
     | '/forgot-password'
     | '/hrdo'
+    | '/leaves'
     | '/login'
     | '/permission-slips'
     | '/privacy'
@@ -465,6 +502,8 @@ export interface FileRouteTypes {
     | '/receipts'
     | '/trip-archive'
     | '/vehicles'
+    | '/admin/late-absences'
+    | '/director/late-absences'
     | '/hrdo/analytics'
     | '/hrdo/change-password'
     | '/hrdo/coe'
@@ -488,6 +527,7 @@ export interface FileRouteTypes {
     | '/api/auth/google'
     | '/api/gmail/callback'
     | '/api/gmail/connect'
+    | '/api/sheets/webhook'
     | '/api/verify-ticket/$token'
     | '/hrdo/coe/$id'
     | '/requests/'
@@ -499,6 +539,7 @@ export interface FileRouteTypes {
     | '/complete-profile'
     | '/forgot-password'
     | '/hrdo'
+    | '/leaves'
     | '/login'
     | '/privacy'
     | '/register'
@@ -512,6 +553,8 @@ export interface FileRouteTypes {
     | '/receipts'
     | '/trip-archive'
     | '/vehicles'
+    | '/admin/late-absences'
+    | '/director/late-absences'
     | '/hrdo/analytics'
     | '/hrdo/change-password'
     | '/hrdo/coe'
@@ -535,6 +578,7 @@ export interface FileRouteTypes {
     | '/api/auth/google'
     | '/api/gmail/callback'
     | '/api/gmail/connect'
+    | '/api/sheets/webhook'
     | '/api/verify-ticket/$token'
     | '/hrdo/coe/$id'
     | '/requests'
@@ -547,6 +591,7 @@ export interface FileRouteTypes {
     | '/complete-profile'
     | '/forgot-password'
     | '/hrdo'
+    | '/leaves'
     | '/login'
     | '/permission-slips'
     | '/privacy'
@@ -561,6 +606,8 @@ export interface FileRouteTypes {
     | '/_authenticated/receipts'
     | '/_authenticated/trip-archive'
     | '/_authenticated/vehicles'
+    | '/admin/late-absences'
+    | '/director/late-absences'
     | '/hrdo/analytics'
     | '/hrdo/change-password'
     | '/hrdo/coe'
@@ -584,6 +631,7 @@ export interface FileRouteTypes {
     | '/api/auth/google'
     | '/api/gmail/callback'
     | '/api/gmail/connect'
+    | '/api/sheets/webhook'
     | '/api/verify-ticket/$token'
     | '/hrdo/coe_/$id'
     | '/_authenticated/requests/'
@@ -597,16 +645,20 @@ export interface RootRouteChildren {
   CompleteProfileRoute: typeof CompleteProfileRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   HrdoRoute: typeof HrdoRouteWithChildren
+  LeavesRoute: typeof LeavesRoute
   LoginRoute: typeof LoginRoute
   PermissionSlipsRoute: typeof PermissionSlipsRouteWithChildren
   PrivacyRoute: typeof PrivacyRoute
   RegisterRoute: typeof RegisterRoute
   TermsOfServiceRoute: typeof TermsOfServiceRoute
+  AdminLateAbsencesRoute: typeof AdminLateAbsencesRoute
+  DirectorLateAbsencesRoute: typeof DirectorLateAbsencesRoute
   ServiceSlugRoute: typeof ServiceSlugRoute
   VerifyTicketTokenRoute: typeof VerifyTicketTokenRoute
   ApiAuthGoogleRoute: typeof ApiAuthGoogleRouteWithChildren
   ApiGmailCallbackRoute: typeof ApiGmailCallbackRoute
   ApiGmailConnectRoute: typeof ApiGmailConnectRoute
+  ApiSheetsWebhookRoute: typeof ApiSheetsWebhookRoute
   ApiVerifyTicketTokenRoute: typeof ApiVerifyTicketTokenRoute
 }
 
@@ -652,6 +704,13 @@ declare module '@tanstack/react-router' {
       path: '/hrdo'
       fullPath: '/hrdo'
       preLoaderRoute: typeof HrdoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/leaves': {
+      id: '/leaves'
+      path: '/leaves'
+      fullPath: '/leaves'
+      preLoaderRoute: typeof LeavesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -751,6 +810,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/vehicles'
       preLoaderRoute: typeof AuthenticatedVehiclesRouteImport
       parentRoute: typeof AuthenticatedRoute
+    }
+    '/admin/late-absences': {
+      id: '/admin/late-absences'
+      path: '/admin/late-absences'
+      fullPath: '/admin/late-absences'
+      preLoaderRoute: typeof AdminLateAbsencesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/director/late-absences': {
+      id: '/director/late-absences'
+      path: '/director/late-absences'
+      fullPath: '/director/late-absences'
+      preLoaderRoute: typeof DirectorLateAbsencesRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/hrdo/analytics': {
       id: '/hrdo/analytics'
@@ -920,6 +993,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiGmailConnectRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/sheets/webhook': {
+      id: '/api/sheets/webhook'
+      path: '/api/sheets/webhook'
+      fullPath: '/api/sheets/webhook'
+      preLoaderRoute: typeof ApiSheetsWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/verify-ticket/$token': {
       id: '/api/verify-ticket/$token'
       path: '/api/verify-ticket/$token'
@@ -1049,16 +1129,20 @@ const rootRouteChildren: RootRouteChildren = {
   CompleteProfileRoute: CompleteProfileRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
   HrdoRoute: HrdoRouteWithChildren,
+  LeavesRoute: LeavesRoute,
   LoginRoute: LoginRoute,
   PermissionSlipsRoute: PermissionSlipsRouteWithChildren,
   PrivacyRoute: PrivacyRoute,
   RegisterRoute: RegisterRoute,
   TermsOfServiceRoute: TermsOfServiceRoute,
+  AdminLateAbsencesRoute: AdminLateAbsencesRoute,
+  DirectorLateAbsencesRoute: DirectorLateAbsencesRoute,
   ServiceSlugRoute: ServiceSlugRoute,
   VerifyTicketTokenRoute: VerifyTicketTokenRoute,
   ApiAuthGoogleRoute: ApiAuthGoogleRouteWithChildren,
   ApiGmailCallbackRoute: ApiGmailCallbackRoute,
   ApiGmailConnectRoute: ApiGmailConnectRoute,
+  ApiSheetsWebhookRoute: ApiSheetsWebhookRoute,
   ApiVerifyTicketTokenRoute: ApiVerifyTicketTokenRoute,
 }
 export const routeTree = rootRouteImport

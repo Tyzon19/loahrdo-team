@@ -4,9 +4,9 @@ import { useState } from "react";
 import {
   ArrowRight,
   ArrowUpRight,
-  BriefcaseBusiness,
   Bus,
   CheckCircle2,
+  ClipboardCheck,
   Facebook,
   FileBadge,
   FilePlus2,
@@ -43,8 +43,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
       { title: "LOA HRDO Desk | Lyceum of Alabang" },
       {
         name: "description",
-        content:
-          "Request HR services online: vehicle reservation, COE, permission slips, and attendance.",
+        content: "Access HR services: vehicle reservation, COE, permission slips, and attendance.",
       },
       { property: "og:title", content: "LOA HRDO Desk | Lyceum of Alabang" },
       {
@@ -64,7 +63,7 @@ type Service = {
   desc: string;
   icon: LucideIcon;
   tag: string;
-  to?: "/requests/new" | "/coe" | "/permission-slips";
+  to?: "/requests/new" | "/coe" | "/permission-slips" | "/leaves";
 };
 
 const SERVICES: Service[] = [
@@ -91,9 +90,10 @@ const SERVICES: Service[] = [
   },
   {
     title: "Late & Absences",
-    desc: "Explain tardiness or absences and track their status.",
-    icon: BriefcaseBusiness,
+    desc: "View leave balances, lates, absences, and attendance records.",
+    icon: ClipboardCheck,
     tag: "Attendance",
+    to: "/leaves",
   },
 ];
 

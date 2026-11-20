@@ -8,6 +8,7 @@ import {
   Building2,
   Car,
   ChevronDown,
+  ClipboardCheck,
   ClipboardList,
   FilePlus2,
   FileText,
@@ -103,6 +104,13 @@ const ITEMS = {
     mobileLabel: "Permission",
     icon: ShieldCheck,
   },
+  attendanceAdmin: {
+    to: "/admin/late-absences",
+    label: "Late & Absences",
+    mobileLabel: "Attendance",
+    icon: ClipboardCheck,
+    section: "Other systems",
+  },
   coe: {
     to: "/hrdo/dashboard",
     label: "Certificate of Employment",
@@ -161,6 +169,7 @@ export const NAV: Record<Role, NavItem[]> = {
     { ...ITEMS.req, section: "Vehicle Trip Ticket" },
     { ...ITEMS.vehicles, section: "Vehicle Trip Ticket" },
     { ...ITEMS.tripArchive, section: "Vehicle Trip Ticket" },
+    ITEMS.attendanceAdmin,
     { ...ITEMS.coe, section: "Other systems" },
     { ...ITEMS.permission, section: "Other systems" },
     { ...ITEMS.notif, section: "Account" },
@@ -404,7 +413,9 @@ export function AppShell({ user, children }: { user: Viewer; children: ReactNode
       ? "Permission Slips"
       : location.pathname.startsWith("/receipts")
         ? "Receipts"
-        : "Vehicle Trip Ticket";
+        : centralAdmin
+          ? "LOA Systems"
+          : "Vehicle Trip Ticket";
   const portalTitle = user.isSuperAdmin ? "Super Admin Portal" : "Admin Portal";
   const queryClient = useQueryClient();
   const notifications = useQuery({

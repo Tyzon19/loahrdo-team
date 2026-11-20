@@ -625,18 +625,13 @@ function PermissionSlipsPage() {
           })}
         </ol>
 
-        {/* Form Card (Roomy, large inputs, no auto name/department) */}
         <form className="coe-form" onSubmit={(event) => event.preventDefault()}>
-          {/* ── STEP 0: SCHEDULE (Date, Time Out, Time In) ─────────────── */}
           {currentStep === 0 && (
             <section aria-labelledby="step-schedule-title" className="coe-section">
               <div>
                 <h2 id="step-schedule-title" className="coe-section-title">
                   Department &amp; Schedule
                 </h2>
-                <p className="coe-section-description">
-                  Enter your department or office, date, departure time, and return time.
-                </p>
               </div>
 
               <div>
@@ -696,7 +691,6 @@ function PermissionSlipsPage() {
                   </p>
                   <FieldError id="permission-date-error" message={fieldErrors.requestedDate} />
                 </div>
-
                 <div>
                   <Label
                     htmlFor="permission-time-out"
@@ -718,7 +712,6 @@ function PermissionSlipsPage() {
                   />
                   <FieldError id="permission-time-out-error" message={fieldErrors.timeOut} />
                 </div>
-
                 <div>
                   <Label htmlFor="permission-time-in" className="text-sm font-bold text-foreground">
                     Time In <span className="text-destructive">*</span>
@@ -743,7 +736,6 @@ function PermissionSlipsPage() {
             </section>
           )}
 
-          {/* ── STEP 1: REASON ─────────────────────────────────────────── */}
           {currentStep === 1 && (
             <section aria-labelledby="step-reason-title" className="coe-section">
               <div>
@@ -781,7 +773,6 @@ function PermissionSlipsPage() {
             </section>
           )}
 
-          {/* ── STEP 2: SIGNATURE ──────────────────────────────────────── */}
           {currentStep === 2 && (
             <section aria-labelledby="step-signature-title" className="coe-section">
               <div>
@@ -814,7 +805,6 @@ function PermissionSlipsPage() {
             </section>
           )}
 
-          {/* ── STEP 3: REVIEW & CONFIRMATION ──────────────────────────── */}
           {currentStep === 3 && (
             <section aria-labelledby="step-review-title" className="coe-section">
               <div>

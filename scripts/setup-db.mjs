@@ -187,6 +187,15 @@ try {
       "ALTER TABLE permission_slips ADD KEY permission_employee_email_idx (employee_email, requested_at)",
     );
   }
+  const [permissionReceiptImageColumn] = await conn.query(
+    `SELECT COUNT(*) AS count
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'permission_slips' AND COLUMN_NAME = 'receipt_image'`,
+    [dbName],
+  );
+  if (Number(permissionReceiptImageColumn[0]?.count ?? 0) === 0) {
+    await conn.query("ALTER TABLE permission_slips ADD COLUMN receipt_image MEDIUMBLOB NULL");
+  }
   const [coeDocumentMimeColumn] = await conn.query(
     `SELECT CHARACTER_MAXIMUM_LENGTH AS maxLength
      FROM information_schema.COLUMNS

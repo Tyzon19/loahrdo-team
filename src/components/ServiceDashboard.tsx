@@ -2,8 +2,8 @@ import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   ArrowRight,
-  BriefcaseBusiness,
   Bus,
+  ClipboardCheck,
   Facebook,
   FileBadge,
   FolderClock,
@@ -23,7 +23,7 @@ type Service = {
   desc: string;
   icon: LucideIcon;
   tag: string;
-  to?: "/requests/new" | "/coe" | "/permission-slips";
+  to?: "/requests/new" | "/coe" | "/permission-slips" | "/leaves";
 };
 
 const SERVICES: Service[] = [
@@ -50,9 +50,10 @@ const SERVICES: Service[] = [
   },
   {
     title: "Late & Absences",
-    desc: "Explain tardiness or absences and track their status.",
-    icon: BriefcaseBusiness,
+    desc: "View leave balances, lates, absences, and attendance records.",
+    icon: ClipboardCheck,
     tag: "Attendance",
+    to: "/leaves",
   },
 ];
 

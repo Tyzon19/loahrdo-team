@@ -2,6 +2,7 @@ import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { HrdoShell } from "@/components/hrdo/HrdoShell";
 import { AppShell } from "@/components/app/AppShell";
 import { canAccessAdminPortal } from "@/lib/access";
+import { canExternalHrdoViewerAccessPath } from "@/lib/hrdo";
 
 export const Route = createFileRoute("/hrdo")({
   beforeLoad: ({ context, location }) => {
@@ -37,11 +38,7 @@ export const Route = createFileRoute("/hrdo")({
         search: { redirect: location.pathname },
       });
     }
-    if (
-      context.hrdoViewer.isExternal &&
-      location.pathname !== "/hrdo/coe" &&
-      !location.pathname.startsWith("/hrdo/coe/")
-    ) {
+    if (context.hrdoViewer.isExternal && !canExternalHrdoViewerAccessPath(location.pathname)) {
       throw redirect({ to: "/hrdo/coe" });
     }
     if (context.hrdoViewer.mustChangePassword && location.pathname !== "/hrdo/change-password") {

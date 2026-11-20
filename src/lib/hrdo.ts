@@ -37,6 +37,12 @@ export function isHrdoStaffRole(
   return role === "hrdo_staff" || role === "hrdo_admin";
 }
 
+export function canExternalHrdoViewerAccessPath(pathname: string) {
+  return (
+    pathname === "/hrdo/profile" || pathname === "/hrdo/coe" || pathname.startsWith("/hrdo/coe/")
+  );
+}
+
 export function hrdoViewerFromAdminPortal(
   user:
     | Pick<

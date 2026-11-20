@@ -42,6 +42,7 @@ function Profile() {
   const [form, setForm] = useState(() => {
     const split = splitFullName(viewer?.name ?? "");
     return {
+      prefix: split.prefix,
       firstName: split.firstName,
       middleName: split.middleName,
       lastName: split.lastName,
@@ -55,6 +56,7 @@ function Profile() {
     if (!viewer) return;
     const split = splitFullName(viewer.name);
     setForm({
+      prefix: split.prefix,
       firstName: split.firstName,
       middleName: split.middleName,
       lastName: split.lastName,
@@ -76,10 +78,11 @@ function Profile() {
       middleName: form.middleName,
       lastName: form.lastName,
     });
+    const storedName = viewer.isSuperAdmin && form.prefix ? `${form.prefix} ${fullName}` : fullName;
 
     const result = await updateProfileFn({
       data: {
-        name: fullName,
+        name: storedName,
         department: form.department,
       },
     });
@@ -97,6 +100,29 @@ function Profile() {
     <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
       <Section title="Account">
         <form className="grid gap-4 sm:grid-cols-2" onSubmit={save} noValidate>
+          {viewer.isSuperAdmin && (
+            <div className="sm:col-span-2">
+              <Label htmlFor="profile-prefix">Name prefix</Label>
+              <select
+                id="profile-prefix"
+                className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={form.prefix}
+                onChange={(event) => setForm({ ...form, prefix: event.target.value })}
+                aria-label="Name prefix"
+              >
+                <option value="">No prefix</option>
+                <option value="Mr.">Mr.</option>
+                <option value="Ms.">Ms.</option>
+                <option value="Mrs.">Mrs.</option>
+                <option value="Mx.">Mx.</option>
+                <option value="Dr.">Dr.</option>
+                <option value="Atty.">Atty.</option>
+              </select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Used on official records and signatures.
+              </p>
+            </div>
+          )}
           <div>
             <Label htmlFor="profile-first-name">First name</Label>
             <Input
@@ -209,7 +235,7 @@ function Profile() {
                   value="vehicle-trip-ticket"
                   className="h-11 whitespace-nowrap px-2 sm:px-3 sm:h-9"
                 >
-                  Vehicle Trip Ticket
+                  Transportation
                 </TabsTrigger>
                 <TabsTrigger value="coe" className="h-11 whitespace-nowrap px-2 sm:px-3 sm:h-9">
                   COE

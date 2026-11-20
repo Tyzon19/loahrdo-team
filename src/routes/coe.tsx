@@ -94,6 +94,19 @@ function CoeEntryPage() {
               aria-hidden
             />
           </span>
+
+          <span className="mt-5 text-xs text muted-foreground">
+            By continuing, you agree to our{" "}
+            <a
+              href="https://www.lyceum-alabang.edu.ph/privacy-policy/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary underline transition-colors hover:text-primary-foreground"
+            >
+              Privacy Policy
+            </a>
+            .
+          </span>
         </a>
       </div>
     </AuthLayout>

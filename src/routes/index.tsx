@@ -12,7 +12,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Request HR services online: vehicle reservation, COE, permission slips, and attendance.",
+          "Access LOA HR services online: vehicle reservation, COE, permission slips, and attendance.",
       },
       { property: "og:title", content: "LOA HRDO Desk | Lyceum of Alabang" },
       {

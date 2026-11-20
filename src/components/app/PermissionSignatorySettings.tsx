@@ -14,8 +14,9 @@ import {
   listPermissionSignatoriesFn,
   removePermissionSignatoryFn,
 } from "@/server-functions";
+import { FORMAL_NAME_PREFIXES } from "@/lib/name";
 
-type SignatoryForm = { name: string; email: string; department: string };
+type SignatoryForm = { prefix: string; name: string; email: string; department: string };
 
 export function PermissionSignatorySettings() {
   const queryClient = useQueryClient();
@@ -27,7 +28,12 @@ export function PermissionSignatorySettings() {
     queryKey: ["permission-slip-signatory-candidates"],
     queryFn: () => unwrap(listPermissionSignatoryCandidatesFn()),
   });
-  const [form, setForm] = useState<SignatoryForm>({ name: "", email: "", department: "" });
+  const [form, setForm] = useState<SignatoryForm>({
+    prefix: "",
+    name: "",
+    email: "",
+    department: "",
+  });
   const [busy, setBusy] = useState(false);
   const [selectedCandidateId, setSelectedCandidateId] = useState("");
   const [assigning, setAssigning] = useState(false);
@@ -46,7 +52,12 @@ export function PermissionSignatorySettings() {
     setBusy(true);
     setCreated(null);
     try {
-      const result = await createPermissionSignatoryFn({ data: form });
+      const result = await createPermissionSignatoryFn({
+        data: {
+          ...form,
+          name: `${form.prefix ? `${form.prefix} ` : ""}${form.name.trim()}`,
+        },
+      });
       if (!result.ok) {
         toast.error(result.error);
         return;
@@ -59,7 +70,7 @@ export function PermissionSignatorySettings() {
         ...(!emailDelivery.sent ? { emailMessage: emailDelivery.message } : {}),
         ...(temporaryPassword ? { temporaryPassword } : {}),
       });
-      setForm({ name: "", email: "", department: "" });
+      setForm({ prefix: "", name: "", email: "", department: "" });
       if (emailDelivery.sent) {
         toast.success("Permission Slip signatory added. Login details emailed.");
       } else {
@@ -133,6 +144,24 @@ export function PermissionSignatorySettings() {
           takes effect. New accounts receive a temporary password and must change it at sign-in.
         </p>
         <form className="grid max-w-3xl gap-4 sm:grid-cols-2" onSubmit={createAccount}>
+          <div>
+            <Label htmlFor="permission-signatory-prefix">Name prefix</Label>
+            <select
+              id="permission-signatory-prefix"
+              className="mt-1 min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
+              value={form.prefix}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, prefix: event.target.value }))
+              }
+            >
+              <option value="">No prefix</option>
+              {FORMAL_NAME_PREFIXES.map((prefix) => (
+                <option key={prefix} value={prefix}>
+                  {prefix}
+                </option>
+              ))}
+            </select>
+          </div>
           <div>
             <Label htmlFor="permission-signatory-name">Full name</Label>
             <Input

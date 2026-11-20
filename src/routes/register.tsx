@@ -20,6 +20,7 @@ import { SITE, canonical } from "@/lib/site";
 
 type RegisterSearch = {
   email?: string | undefined;
+  reason?: "registration_required" | undefined;
 };
 
 export const Route = createFileRoute("/register")({
@@ -28,6 +29,7 @@ export const Route = createFileRoute("/register")({
       typeof search["email"] === "string" && search["email"].trim().length > 0
         ? search["email"].trim()
         : undefined,
+    reason: search["reason"] === "registration_required" ? "registration_required" : undefined,
   }),
   beforeLoad: ({ context }) => {
     if (context.viewer) throw routerRedirect({ to: "/dashboard" });
@@ -218,6 +220,15 @@ function RegisterPage() {
 
       <AuthLayout title={verificationStarted ? "Verify Your Email" : "Create Account"} back>
         <form onSubmit={onSubmit} noValidate>
+          {search.reason === "registration_required" && (
+            <p
+              role="alert"
+              className="mb-4 rounded-md border border-primary/20 bg-primary/5 p-3 text-sm"
+            >
+              Register and verify this institutional email before signing in. Existing accounts from
+              other LOA systems are not linked automatically.
+            </p>
+          )}
           {error && (
             <p className="mb-3 text-sm text-destructive" role="alert">
               {error}
@@ -292,6 +303,10 @@ function RegisterPage() {
             </>
           ) : (
             <>
+              <p className="mb-3 text-sm text-muted-foreground">
+                Enter your name exactly as it appears in the staff Google Sheet. This is used to
+                connect your institutional account to your attendance records.
+              </p>
               <Field
                 icon={User}
                 placeholder="First name"
