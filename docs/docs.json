@@ -28,34 +28,72 @@
     "directory": "card",
     "groups": [
       {
-        "group": "System Documentation",
+        "group": "Part I: System overview",
         "icon": "book-open",
         "expanded": true,
         "pages": [
-          "technical/overview",
-          "technical/architecture",
+          "technical-documentation",
+          "technical/overview"
+        ]
+      },
+      {
+        "group": "Part II: Architecture",
+        "icon": "network",
+        "pages": [
+          "technical/architecture"
+        ]
+      },
+      {
+        "group": "Part III: Modules and roles",
+        "icon": "users",
+        "pages": [
           "technical/modules"
         ]
       },
       {
-        "group": "Data and Integration",
+        "group": "Part IV: Database and API",
         "icon": "database",
-        "expanded": true,
         "pages": [
           "technical/database",
-          "technical/api",
-          "technical/security"
+          "technical/api"
         ]
       },
       {
-        "group": "Operations",
-        "icon": "settings",
-        "expanded": true,
+        "group": "Part V: Security and tech stack",
+        "icon": "shield",
         "pages": [
-          "technical/quality-assurance",
-          "technical/deployment",
-          "technical/manuals",
-          "technical/troubleshooting"
+          "technical/security",
+          "technical/tech-stack"
+        ]
+      },
+      {
+        "group": "Part VI: Quality assurance",
+        "icon": "badge-check",
+        "pages": [
+          "technical/quality-assurance"
+        ]
+      },
+      {
+        "group": "Part VII: Deployment and operations",
+        "icon": "server",
+        "pages": [
+          "technical/environment",
+          "technical/deployment"
+        ]
+      },
+      {
+        "group": "Part VIII: User manuals",
+        "icon": "book-user",
+        "pages": [
+          "technical/manuals"
+        ]
+      },
+      {
+        "group": "Part IX: Support",
+        "icon": "life-buoy",
+        "pages": [
+          "technical/troubleshooting",
+          "technical/version-history"
         ]
       },
       {

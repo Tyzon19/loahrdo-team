@@ -1,77 +1,267 @@
 ---
-title: Employee and Admin User Manuals
-description: Day-to-day procedures for employees, approvers, administrators, and support staff.
+title: "User Manuals"
+description: "Day-to-day procedures for employees, approvers, HRDO processors, and administrators."
+sidebarTitle: "User Manuals"
 ---
 
-# Employee manual
+This page is Part VIII of the technical documentation. It covers the standard operating procedures for four groups: employees (requisitioners), approvers and signatories, HRDO processors, and system administrators.
 
-## Sign in
+---
 
-1. Open the LOA HRDO Desk service dashboard.
-2. Select the required service.
-3. Sign in with an institutional or eligible account.
-4. Complete a forced password change if prompted.
-5. Update the profile if required.
+## Employee manual
 
-## Vehicle reservation
+### Register a new institutional account
 
-1. Open **Vehicle Reservation**.
-2. Enter trip dates, time, passengers, destination, and purpose.
-3. Review the request and submit it.
-4. Track the request from My Requests.
-5. Edit or resubmit if it is returned.
-6. Download or receive the official ticket after final approval.
-7. Use the public verification link printed on the official ticket when needed.
+<Steps>
+  <Step title="Open the registration page">
+    Go to `/register`.
+  </Step>
+  <Step title="Request an OTP">
+    Enter your `@lyceumalabang.edu.ph` email address, your full name, department, and a password that meets the policy (12-128 characters with lowercase, uppercase, number, and symbol). Click **Request verification code**.
+  </Step>
+  <Step title="Enter the OTP">
+    Check your email for a six-digit code. It expires in 10 minutes and can be resent after 60 seconds. Enter the code within 5 attempts.
+  </Step>
+  <Step title="Complete registration">
+    After the code is accepted, your requisitioner account is created.
+  </Step>
+</Steps>
 
-## Certificate of Employment
+### Sign in
 
-1. Open **COE Request**.
-2. Choose internal employee or former employee or verifier.
-3. Sign in using the applicable account method.
-4. Enter purpose, copy type, and compensation details if applicable.
-5. Submit the request.
-6. Review status and respond to correction requests.
-7. Receive or collect the final document according to delivery status.
+<Steps>
+  <Step title="Open the sign-in page">
+    Go to `/login`.
+  </Step>
+  <Step title="Choose a method">
+    Sign in with your institutional email and password, or click **Sign in with Google** if your `@lyceumalabang.edu.ph` requisitioner account already exists.
+  </Step>
+  <Step title="Handle forced password changes">
+    If the system shows a password-change screen, create a new password that meets the policy and continue.
+  </Step>
+  <Step title="Complete your profile if needed">
+    First-time Google sign-ins may be asked to confirm their name at `/complete-profile` before reaching the dashboard.
+  </Step>
+</Steps>
 
-## Permission Slip
+### Change your password
 
-1. Open `/permission-slips/login`.
-2. Sign in or complete the required password change.
-3. Open **Request Permission Slip**.
-4. Enter department, date, departure time, return time, reason, and signature.
-5. Review and submit.
-6. Open **My Permission Slips** to track the request.
+1. Sign in and open `/change-password`.
+2. Enter your current password and a new password that meets the policy.
+3. Submit. The system invalidates existing sessions and refreshes your login state.
 
-## Late and Absences
+### File a vehicle request
 
-Open **Late & Absences** to view leave balances, attendance logs, lates, absences, staff mappings, and discrepancy status. Submit a discrepancy with a concise explanation when an attendance record is incorrect.
+<Steps>
+  <Step title="Open the request form">
+    From the dashboard, choose **Vehicle Reservation**, or go directly to `/requests/new`.
+  </Step>
+  <Step title="Fill in the details">
+    Enter department, destination(s), number of passengers, time needed, start date, end date, and purpose.
+  </Step>
+  <Step title="Submit">
+    Review the form and submit. The request enters the workflow at the Head of Transport Services review stage.
+  </Step>
+  <Step title="Track the request">
+    Open `/requests` to view all your requests, or `/requests/$id` for a specific request.
+  </Step>
+</Steps>
 
-# Approver manual
+### Track and revise a returned request
 
-## Vehicle approval
+- If a request is returned, you will receive a notification and an email.
+- Open `/requests/$id` to read the return reason.
+- Click **Revise request** to open `/revise/$id`.
+- Edit the allowed fields and resubmit. The request restarts at the Head of Transport Services stage; previous signatures are kept separately.
 
-Approvers open the pending request queue for their assigned stage. Review request details, add remarks or signature, approve, reject, or return the request with a reason.
+### Receive the trip ticket
 
-Transport Heads assign an approved vehicle and driver. The Director and President complete their configured stages. Alternates act only within assigned stage authorization.
+- After final approval, the request status becomes **approved**.
+- Open `/print/$id` to preview the official trip ticket and its QR verification code.
+- If the ticket was not sent, an authorized sender can resend it from the same page.
+- Save or print the ticket for the trip.
 
-## Permission Slip approval
+### Submit a Permission Slip
 
-Assigned signatories open **Permission Slip Review**. Review the employee, department, date, time, reason, and signature. Approve or reject the slip with the required decision information.
+<Steps>
+  <Step title="Sign in">
+    Go to `/permission-slips/login` and sign in with your Permission Slip account.
+  </Step>
+  <Step title="Open the request form">
+    From the Permission Slip dashboard, choose **Request Permission Slip**.
+  </Step>
+  <Step title="Fill in the details">
+    Enter department, departure date, departure time, return time, reason (at least 5 characters, at most 500), and add an electronic signature.
+  </Step>
+  <Step title="Submit">
+    Review and submit. The slip status becomes **pending_approval**.
+  </Step>
+  <Step title="Track">
+    Open **My Permission Slips** to view your slips and their status.
+  </Step>
+</Steps>
 
-# Administrator manual
+### Request a Certificate of Employment
 
-## Account management
+<Steps>
+  <Step title="Choose the portal">
+    Current employees sign in through `/hrdo/login`. Former employees or external verifiers use the external COE flow at `/coe` with a personal Google account.
+  </Step>
+  <Step title="Fill in the request">
+    Go to `/hrdo/coe`. Enter the purpose, copy type (soft, original, or both), and whether compensation details should be included.
+  </Step>
+  <Step title="Submit">
+    The request status becomes **pending**. HRDO has three working days to process it.
+  </Step>
+  <Step title="Respond to corrections">
+    If HRDO requests a correction, open the request at `/hrdo/coe/$id`, read the message, update the required fields, and resubmit.
+  </Step>
+  <Step title="Pickup or receive the document">
+    When the status becomes **ready_for_pickup** or **released**, follow the delivery instructions shown on the request page.
+  </Step>
+</Steps>
 
-1. Open the central admin dashboard.
-2. Review existing users and module access.
-3. Create or assign authorized accounts.
-4. Set temporary passwords or reset credentials.
-5. Remove or reassign signatory access when organizational responsibility changes.
+### View attendance and flag a discrepancy
 
-## Records and reports
+1. Sign in and open `/leaves`.
+2. Review your leave balances, attendance logs, lates, and absences for the current June-to-May cycle.
+3. If a record looks incorrect, select the log and click **Flag discrepancy**.
+4. Enter a concise explanation. The flag is sent to HRDO for resolution.
 
-Administrators can search trip archives, Permission Slip history, COE records, attendance records, notifications, and available receipts according to role.
+### Notifications
 
-## HRDO operations
+- In-app notifications appear at `/notifications`. Click a notification to mark it read.
+- Email status for each notification is shown as **pending**, **sent**, or **failed**.
+- If email delivery fails, the in-app notification and the underlying record remain intact.
 
-HRDO administrators manage processor accounts and review COE workloads. HRDO staff verify requests, prepare documents, request corrections, mark documents ready, and record release or pickup.
+---
+
+## Approver and signatory manual
+
+### Vehicle request approval
+
+<Steps>
+  <Step title="Open the pending queue">
+    Sign in and go to `/dashboard`. The pending count for your stage is shown in the stats card.
+  </Step>
+  <Step title="Review the request">
+    Open `/requests/$id`. Review dates, destinations, passengers, purpose, and prior signatures.
+  </Step>
+  <Step title="Record vehicle and driver (Head of Transport only)">
+    During the transport review stage, select the assigned vehicle and driver before approving.
+  </Step>
+  <Step title="Decide">
+    Click **Approve**, **Reject**, or **Return**. Returns require a reason. Rejections also require a reason.
+  </Step>
+</Steps>
+
+- **Director:** reviews at the recommendation stage (`pending_recommendation`).
+- **President:** reviews at the final approval stage (`pending_approval`).
+- **Alternates:** assigned alternate signatories can act only within their assigned stage and sign with their own identity.
+
+### Permission Slip approval
+
+1. Sign in and open `/permission-slips/$id` for a pending slip, or view the pending list from the Permission Slip dashboard.
+2. Review the employee name, department, schedule, reason, and signature.
+3. Click **Approve** or **Reject**. A rejection requires a reason.
+4. After approval, a receipt is generated. The signatory can trigger email delivery of the receipt if needed.
+
+---
+
+## HRDO Processor manual
+
+### COE queue and review
+
+1. Sign in at `/hrdo/login`.
+2. Open `/hrdo/dashboard` to see the COE queue summary: pending, under review, correction requested, processing, awaiting review, ready for pickup, released, and rejected.
+3. Click a request to open `/hrdo/coe/$id`.
+
+### Verify and process a request
+
+<Steps>
+  <Step title="Verify">
+    Click **Verify** to confirm the employee details and purpose.
+  </Step>
+  <Step title="Start processing">
+    Click **Start processing** to move the status to **processing**.
+  </Step>
+  <Step title="Prepare the document">
+    Use **Generate template** to create a draft, or upload a signed file directly. Uploads must be PDF or DOCX and no larger than 5 MB.
+  </Step>
+  <Step title="Request a correction">
+    If information is incomplete or incorrect, click **Request correction** and explain what the employee should fix.
+  </Step>
+  <Step title="Reject">
+    If the request cannot be fulfilled, click **Reject** and provide a reason.
+  </Step>
+</Steps>
+
+### Mark ready and release
+
+1. After the signed document is uploaded, click **Mark ready for pickup**.
+2. When the employee collects the document, or when you send the soft copy, click **Release** and record the recipient name.
+3. For soft-copy or both-copy requests, the system can email the signed document when the release step is completed.
+
+### Analytics
+
+- Open the analytics panel on the HRDO dashboard to view summary counts, overdue requests, and due-soon flags based on the three-day deadline.
+
+---
+
+## Administrator manual
+
+### First sign-in and initial setup
+
+1. After `npm run db:seed`, the initial administrator account is `admin@loa.edu.ph`. The seed script prints the temporary password once.
+2. Sign in at `/login` and change the password immediately.
+3. From `/profile`, create the Head of Transport Services, Director for Administration, and President accounts. Each receives a temporary password by email and must change it at first sign-in.
+
+### Create signatory accounts and assign roles
+
+- **Main signatories:** In `/profile`, under **Signatory settings**, assign existing users to main approval stages (Head of Transport, Director, President). You can also create a new main signatory account.
+- **Alternate assistants:** In the same section, assign alternate assistants per stage. Alternates can approve or return on behalf of the stage when the main signatory is unavailable.
+
+### Phone directory
+
+- Open `/phone-directory` to view and update contact numbers for signatories and staff.
+- Save changes with `saveSignatoryPhoneNumberFn`.
+
+### Manage vehicles
+
+- Go to `/vehicles`.
+- Add a vehicle with the driver's name, vehicle type, and plate number.
+- Update or delete vehicle records as needed. Existing request history is preserved.
+
+### Reset passwords
+
+- In `/profile`, under **Account management**, select a user and reset their password.
+- The system emails a temporary password. The user must change it at next sign-in.
+- For HRDO processors, use the HRDO processor settings in `/profile` to reset passwords.
+
+### Receipts archive and bulk ZIP
+
+- Go to `/receipts`.
+- Filter by system, date range, and status.
+- Select receipts and click **Download ZIP** to bulk download a ZIP archive of the selected files.
+- Preview individual receipts before downloading.
+
+### Trip archive and analytics
+
+- Go to `/trip-archive`.
+- Search by ticket number, destination, requester, driver, or vehicle.
+- Filter by travel dates.
+- Review trip counts and destination analytics.
+
+### Late and absences sync and mappings
+
+- Go to `/admin/late-absences`.
+- Choose a staff group: NON_TEACHING, COLLEGE, or BASIC_ED.
+- Click **Sync** to pull data from the configured Google Sheet.
+- Review employee mappings and correct mismatched names with **Save mapping**.
+- Resolve discrepancy flags raised by employees.
+
+### Super Admin system access
+
+- Super Admins can open `/admin` to view the system overview, module totals, recent users, and access activity.
+- Use **System access settings** in `/profile` to assign or remove system access roles.
+- Super Admins can manage HRDO processor accounts and Permission Slip signatories.

@@ -1,87 +1,224 @@
 ---
-title: Security and Tech Stack
-description: Authentication, authorization, privacy, dependencies, environment, and browser requirements.
+title: "Security"
+description: "Authentication, authorization, session protection, password hashing, input validation, and security headers for the LOA HRDO systems."
 ---
 
-# Security model
+Security is enforced server-side. Client-side checks only hide UI controls; every action is re-validated inside server functions before it reaches the database.
 
-## Authentication
+## Role-based access control
 
-- Main accounts use salted scrypt password hashes.
-- Password recovery uses time-limited verification codes.
-- Registration uses institutional email OTP validation.
-- Google OAuth supports institutional internal accounts and a separate external COE client.
-- Main, HRDO, and Permission Slip modules use separate session tables.
-- Account lockout and forced password changes are implemented.
+The system uses a central `users` role column plus module-specific signatory and admin tables. `src/lib/access.ts` defines pure access rules that server functions run on every request.
 
-## Authorization
+### Central roles
 
-Authorization is role-based and is enforced inside server functions. `src/lib/access.ts` and module-specific access helpers distinguish:
+| Role enum | Display title | Typical powers |
+| --- | --- | --- |
+| `requisitioner` | Requestor | Submit vehicle requests; view own requests only |
+| `department_head` | HRDO Department Head | n/a (role exists for compatibility) |
+| `transport_head` | Head of Transport Services | Review requests; manage vehicles; dispatch |
+| `director` | Director for Administration | Recommend approval |
+| `president` | President | Final approval |
+| `transport_staff` | Transport Personnel | Dispatch, print, send trip tickets |
+| `assistant` | Alternate Signatory | Sign as proxy when assigned |
+| `guard` | Guard on Duty | Record time out / time in |
+| `driver` | Driver | Record odometer, driver report |
+| `admin` | System Administrator | Admin portal, analytics, user management |
 
-- Requisitioners.
-- Transport stages.
-- HRDO staff and administrators.
-- Permission Slip signatories and administrators.
-- Super administrators.
-- Assistants and operational roles.
+The `users.is_super_admin` flag grants system access without workflow signatory authority.
 
-The central administrator role does not automatically grant approval authority. The Permission Slip designated director role can approve, but module administrators have controlled read or management access.
+### Access rule functions
 
-## Session protection
-
-Session identifiers are stored as SHA-256 token hashes in database session tables. Sessions use an expiry timestamp and are tied to user-agent information. Logout invalidates module sessions.
-
-## Data protection
-
-- Zod and custom schemas validate input lengths and formats.
-- HTML email and user-controlled text must be escaped in generated messages.
-- Public verification is limited to approved ticket tokens.
-- Uploaded COE and receipt data are restricted to authorized retrieval.
-- Database credentials and OAuth secrets are environment variables.
-- `.env` and environment-specific secret files must not be committed.
-
-## Audit trail
-
-Request history, COE history, Permission Slip history, system access history, synchronization logs, and notification records provide operational traceability.
-
-# Technical requirements
-
-| Requirement | Recommended value |
+| Function | Pass condition |
 | --- | --- |
-| Node.js | 20 or newer |
-| Package manager | npm |
-| Database | MySQL or MariaDB |
-| Browser | Current Chrome, Edge, Firefox, or Safari |
-| Device | Desktop, tablet, or mobile with responsive layout |
-| Network | HTTPS in production |
+| `canAccessAdminPortal(role, isSuperAdmin)` | `isSuperAdmin` or `role === "admin"` |
+| `canSubmitRequests(role)` | `role === "requisitioner"` |
+| `canViewAllRequests(role, isSuperAdmin)` | `isSuperAdmin` or role in `transport_head`, `director`, `president`, `transport_staff`, `assistant`, `guard`, `driver`, `admin` |
+| `canManageVehicles(role, isSuperAdmin)` | `isSuperAdmin` or role in `transport_head`, `transport_staff`, `admin` |
+| `canActOnStage(role, stageRole)` | `role === stageRole` |
+| `canViewSiteAnalytics(role, isSuperAdmin)` | `isSuperAdmin` or `role === "admin"` |
 
-# Environment categories
+### Module-scoped tables
 
-The implementation uses database, public-origin, OAuth, Gmail, ticket-signing, analytics, and attendance synchronization variables.
+- `main_signatory_assignments` and `signatory_assistants` map stage roles to specific user accounts for VRTT signing.
+- `permission_slip_signatories` grants `director` approval role within the Permission Slip module.
+- `permission_slip_admins` and `hrdo_users` (`hrdo_staff` / `hrdo_admin`) scope admin powers to their modules.
+- `system_access_history` records every role or access change for auditing.
 
-## Required application values
+### Dispatch permissions
 
-- `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`.
-- `DB_CONNECTION_LIMIT` and database pool limits.
-- `SITE_URL`.
-- `TICKET_VERIFICATION_SECRET`.
-- `ALLOWED_EMAIL_DOMAINS`.
+`src/lib/workflow.ts` `DISPATCH_PERMISSIONS` restricts who may fill each dispatch field:
 
-## Google and Gmail values
+| Field | Allowed roles |
+| --- | --- |
+| `dispatchedBy` | `transport_staff`, `transport_head` |
+| `timeOut` / `timeIn` | `guard` |
+| `userSignatureName` | `transport_staff`, `transport_head` |
+| `odometerStart` / `odometerEnd` | `driver`, `transport_staff` |
+| `driverReport` | `driver` |
+| `driverName` | `driver`, `transport_staff` |
 
-- `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
-- `GOOGLE_EXTERNAL_CLIENT_ID` and `GOOGLE_EXTERNAL_CLIENT_SECRET`.
-- `GOOGLE_SIGNIN_REDIRECT_URI`.
-- `GOOGLE_REDIRECT_URI`.
-- `GOOGLE_SENDER_EMAIL`.
-- `GOOGLE_REFRESH_TOKEN`.
+## Authentication and sessions
 
-## Attendance values
+Three independent session stores exist:
 
-- `GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON`.
-- `LATE_ABSENCES_WEBHOOK_SECRET`.
-- `LATE_ABSENCES_NON_TEACHING_SPREADSHEET_ID`.
-- `LATE_ABSENCES_COLLEGE_SPREADSHEET_ID`.
-- `LATE_ABSENCES_BASIC_ED_SPREADSHEET_ID`.
+| Cookie name | Table | Module |
+| --- | --- | --- |
+| `loa_session` | `sessions` | Main / VRTT |
+| `loa_hrdo_session` | `hrdo_sessions` | HRDO / COE |
+| `loa_permission_session` | `permission_sessions` | Permission Slip |
 
-Secrets must be provided through server environment configuration. Public browser environment variables must never contain database or OAuth secrets.
+Session tokens are 256-bit random values stored as SHA-256 hashes (`token_hash CHAR(64)`). Cookies are:
+
+- `HttpOnly`
+- `SameSite=Lax`
+- `Secure` when `SITE_URL` begins with `https://`
+- `Path=/`
+- `Max-Age` = 8 hours (28,800 seconds)
+
+Sessions expire after 8 hours and are cleaned up after 7 days. On login, any previous session for the same cookie is deleted. The session row records `user_agent` (truncated to 255 chars) and refreshes `last_seen_at` and `expires_at` when active.
+
+### Account lockout
+
+After 5 failed password attempts, `locked_until` is set to `NOW() + 15 minutes`. Error responses never reveal whether the email exists. A per-IP rate limit also applies in production: 60 attempts per 10-minute window.
+
+## Password hashing
+
+Passwords are hashed with Node.js `scrypt` and stored as:
+
+```text
+scrypt$N$r$p$salt$key
+```
+
+- Algorithm: `scrypt`
+- Parameters: `N=16384`, `r=8`, `p=1`, `keylen=64`
+- Salt: 16 random bytes, base64url
+- Key: derived key, base64url
+
+Verification accepts stored hashes within these bounds: `N` 16384-131072, `r` 8-16, `p` 1-4, key length 32-128 bytes. Verification uses `timingSafeEqual`. Unregistered or Google-linked accounts compare against a deterministic `DUMMY_HASH` so timing does not leak existence.
+
+## Password policy and recovery
+
+`passwordIssues` enforces:
+
+- 12-128 characters
+- At least one lower-case letter
+- At least one upper-case letter
+- At least one number
+- At least one symbol
+
+Registration OTPs and password recovery codes are six-digit numbers. Constants:
+
+| Constant | Value |
+| --- | --- |
+| OTP lifetime | 10 minutes |
+| OTP resend cooldown | 60 seconds |
+| OTP max attempts | 5 |
+| Recovery code lifetime | 10 minutes |
+
+OTP codes are hashed with HMAC-SHA256 (`GOOGLE_CLIENT_SECRET` as key) before storage. Recovery codes are stored as SHA-256 hashes. Codes are deleted after successful use or expiry.
+
+## Google OAuth
+
+### Institutional sign-in
+
+- Client: `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`
+- Redirect URI: `GOOGLE_SIGNIN_REDIRECT_URI` or derived from `SITE_URL`
+- Scope: `openid email profile`
+- PKCE S256 code challenge used
+- State and verifier cookies: `loa_google_state`, `loa_google_verifier`, `loa_google_next`, `loa_google_mode`
+- Only verified `@lyceumalabang.edu.ph` Google accounts belonging to existing requisitioners are accepted
+- Staff accounts are refused; external mode uses a separate client
+
+### External COE client
+
+- Client: `GOOGLE_EXTERNAL_CLIENT_ID` / `GOOGLE_EXTERNAL_CLIENT_SECRET` (falls back to shared client)
+- Used on `/coe` for former employees and third-party verifiers
+- Accepts personal Google accounts; rejects institutional ones
+
+### Gmail sender OAuth
+
+- Endpoint: `GET /api/gmail/connect` (localhost only, non-production)
+- Scope: `openid email https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/gmail.send`
+- Redirect URI: `GOOGLE_REDIRECT_URI`
+- Callback rejects any account other than `GOOGLE_SENDER_EMAIL`
+- Only the refresh token is stored in `.env` with mode `0o600`
+
+## Trip ticket QR verification
+
+Approved trip tickets contain a QR code linking to `/verify-ticket/$token`.
+
+- Token format: `base64url(payload).base64url(signature)`
+- Signature: HMAC-SHA256 over the payload using `TICKET_VERIFICATION_SECRET` (minimum 32 bytes)
+- Payload contains `requestId`, `approvedAt` (ISO UTC), and `ticketDigest` (SHA-256 of date range and destinations)
+- Verification endpoint (`GET /api/verify-ticket/$token`) checks the signature with `timingSafeEqual`, validates claims shape, matches the request in the database, confirms `approved`/`dispatched`/`completed` status, and compares the ticket digest. Returns `200 {valid:true,ticket}`, `404 {valid:false}`, or `503` on error.
+
+## Webhook authentication
+
+The Late/Absences sync endpoint `POST /api/sheets/webhook` requires the `x-webhook-secret` header to match `LATE_ABSENCES_WEBHOOK_SECRET`. A mismatch returns `401` with the message containing "authentication". Other failures return `400`.
+
+## Input validation
+
+All user input is parsed with Zod schemas in `src/lib/validation.ts` before processing. Key controls:
+
+- Email: trimmed, lower-cased, max 190 chars, valid format
+- Names: 2-120 chars, letters, spaces, periods, apostrophes, hyphens
+- Destinations: 2-200 chars, control characters rejected
+- Purpose: 5-1,000 chars, control characters rejected
+- Plate numbers: upper-case letters, digits, spaces, hyphens only
+- Signature images: PNG/JPEG base64, max 2 MB
+- Trip ticket photos: PNG base64, max 6 MB
+- Search and filter text: max 100 chars
+
+`hasControlChars` rejects ASCII control codes (0x00-0x1f and 0x7f).
+
+## Database security
+
+- All SQL queries use prepared statements (`mysql2/promise`)
+- Application DB user is granted only `SELECT`, `INSERT`, `UPDATE`, `DELETE`
+- Pool settings are bounded: `DB_CONNECTION_LIMIT` (1-100), `DB_MAX_IDLE` (0-100), `DB_IDLE_TIMEOUT_MS` (1,000-300,000), `DB_QUEUE_LIMIT` (0-10,000)
+- Slow query threshold: `DB_SLOW_QUERY_MS` (50-60,000); queries exceeding it are logged
+
+## Security headers
+
+`src/server.ts` adds the following headers on every response:
+
+- `X-Content-Type-Options: nosniff`
+- `X-Frame-Options: DENY`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()`
+- `x-powered-by` removed
+
+### Production-only headers
+
+- `Strict-Transport-Security: max-age=31536000; includeSubDomains`
+- `Content-Security-Policy`:
+  - `default-src 'self'`
+  - `base-uri 'self'`
+  - `form-action 'self'`
+  - `frame-ancestors 'none'`
+  - `object-src 'none'`
+  - `script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com`
+  - `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`
+  - `font-src 'self' data: https://fonts.gstatic.com`
+  - `img-src 'self' data: https://www.google-analytics.com https://www.googletagmanager.com`
+  - `connect-src 'self' https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com`
+
+Private paths (`/dashboard`, `/requests`, `/profile`, `/print`, etc.) receive `Cache-Control: no-store, private` and `Pragma: no-cache`.
+
+## Privacy and analytics
+
+First-party analytics are cookie-free. The `analytics_pageviews` table stores only path strings with a 30-second deduplication window per IP-path pair. GA4 is optional and loads only after explicit consent via a localStorage flag (`loa-analytics-consent`). If the browser sends `Do-Not-Track: 1`, consent defaults to denied. No client secrets or tracking IDs are exposed to the browser.
+
+## Secrets handling
+
+Secrets live only in server environment variables. The following must never have a `VITE_` prefix or appear in client bundles:
+
+- `DB_PASSWORD`
+- `TICKET_VERIFICATION_SECRET`
+- `GOOGLE_CLIENT_SECRET`
+- `GOOGLE_EXTERNAL_CLIENT_SECRET`
+- `GOOGLE_REFRESH_TOKEN`
+- `GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON`
+- `LATE_ABSENCES_WEBHOOK_SECRET`
+
+`.env` is created by `npm run db:setup` with generated strong values and mode `0o600` for the refresh token line. It must not be committed.

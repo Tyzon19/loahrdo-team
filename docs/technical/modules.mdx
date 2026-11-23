@@ -1,74 +1,331 @@
 ---
 title: Modules and User Roles
 description: Implemented service modules, role permissions, and operational boundaries.
+sidebarTitle: "Modules and roles"
 ---
 
-# Module inventory
+The LOA HRDO platform is organized into four functional modules: Vehicle Reservation and Trip Ticket, Permission Slip, Certificate of Employment, and Late and Absences. Each module has its own tables, routes, and server functions, but all share the same central `users` table when running under the main institutional authentication system. The HRDO COE module also maintains a separate `hrdo_users` table for employee and staff accounts.
 
-## Public and shared services
+## Module inventory
 
-- Public service dashboard.
-- Password and OTP account registration.
-- Institutional account login and password recovery.
-- Google OAuth sign-in.
-- User profile management.
-- Forced temporary-password changes.
-- Notifications and account sessions.
-- Privacy and terms pages.
+| Module | Routes | Server module | Main tables |
+| --- | --- | --- | --- |
+| Vehicle Reservation and Trip Ticket | `/requests`, `/requests/new`, `/requests/$id`, `/print/$id`, `/revise/$id`, `/vehicles`, `/trip-archive`, `/receipts`, `/phone-directory` | `server/requests.ts`, `server/signatories.ts`, `server/admin-receipts.ts`, `server/analytics.ts` | `users`, `requests`, `request_destinations`, `request_signatures`, `request_history`, `request_returns`, `dispatch_records`, `vehicles`, `request_sequences`, `notifications`, `main_signatory_assignments`, `signatory_assistants` |
+| Permission Slip | `/permission-slips`, `/permission-slips/$id`, `/permission-slips/profile`, `/permission-slips/login` | `server/permission/index.ts`, `server/permission/auth.ts` | `permission_slips`, `permission_history`, `permission_slip_signatories`, `permission_slip_admins`, `permission_sessions` |
+| Certificate of Employment (HRDO) | `/hrdo/login`, `/hrdo/dashboard`, `/hrdo/coe`, `/hrdo/coe/$id`, `/hrdo/requests`, `/hrdo/history`, `/hrdo/analytics`, `/hrdo/profile`, `/hrdo/change-password`, `/hrdo/complete-profile`, `/hrdo/forgot-password` | `server/hrdo/coe.ts`, `server/hrdo/auth.ts`, `server/hrdo/admin.ts`, `server/hrdo/analytics.ts` | `hrdo_users`, `hrdo_coe_requests`, `hrdo_coe_documents`, `hrdo_coe_history`, `hrdo_sessions` |
+| Late and Absences | `/leaves`, `/admin/late-absences`, `/director/late-absences` | `server/late-absences.ts` | `employee_sheet_mappings`, `attendance_logs`, `leave_balances`, `leave_discrepancy_flags`, `attendance_notifications`, `attendance_sync_logs`, `sheet_sources` |
+| System Access and Admin | `/admin`, `/profile` | `server/system-access.ts`, `server/auth.ts` | `users`, `system_access_history`, `sessions`, `analytics_pageviews` |
 
-## Vehicle reservation
+<Note>
+  Every server function re-checks the viewer's session and role on the server. Client-side menu visibility is only a convenience and never authorizes an action.
+</Note>
 
-Requisitioners create trip requests, destinations, passenger counts, schedules, purposes, and supporting request details. The transport approval chain is:
+## Core roles
 
-1. Head of Transport Services.
-2. Director for Administration.
-3. President.
+### Employee (requisitioner)
 
-The implementation supports return and resubmission, electronic signatures, vehicle and driver assignment, dispatch records, trip completion, official ticket images, public signed-token verification, trip archive search, and destination analytics.
+The Employee role maps to `users.role = 'requisitioner'` in the main VRTT system, `PermissionRole = 'employee'` in the Permission Slip module, and `hrdo_users.role = 'employee'` in the HRDO COE module.
 
-## Certificate of Employment
+**What it does**
 
-Internal employees use institutional HRDO accounts. Former employees and external verifiers use separate external Google OAuth credentials. HRDO staff can verify, process, request correction, reject, upload, prepare, mark ready, and release requests.
+- Submits vehicle trip requests with destinations, passenger counts, schedules, purpose, and department.
+- Edits a request only while it is still `pending_review` and before the Head of Transport Services has signed.
+- Resubmits a returned request; the resubmission increments `attempt` and restarts approval at the Head of Transport Services while keeping old signatures in `request_signatures` (filtered by the current attempt).
+- Submits Permission Slips with department, date, departure time, return time, reason, and signature.
+- Submits COE requests with purpose, copy type (`soft`, `original`, or `both`), and supporting note.
+- Views their own attendance logs, leave balances, and discrepancy flags on `/leaves`.
 
-Supported copy types include soft copy, original hard copy, or both. COE records retain history and deadlines.
+**Access**
 
-## Permission Slip
+- `/requests`, `/requests/new`, `/requests/$id`, `/revise/$id`, `/print/$id`
+- `/permission-slips`, `/permission-slips/$id`, `/permission-slips/profile`
+- `/hrdo/dashboard`, `/hrdo/coe`, `/hrdo/coe/$id`, `/hrdo/profile`
+- `/leaves`
 
-Employees submit department, date, departure time, return time, reason, and signature. Only the assigned director approval role can approve slips under the implemented Permission Slip rule. Module administrators and super administrators can view or manage access according to their separate permissions.
+**Restrictions**
 
-Approved slips can produce and store a receipt image, which may be sent to the employee by email.
+- Cannot view requests submitted by other requisitioners (`canViewRequest` enforces this server-side).
+- Cannot access admin pages, analytics, or system settings.
+- Cannot approve, reject, or dispatch any request.
 
-## Late and Absences
+### Administrator
 
-Institutional users can view:
+The Administrator role maps to `users.role = 'admin'`. It bridges the main VRTT system with read-only visibility into Permission Slips and Late and Absences.
 
-- Remaining emergency, sick, vacation, and bonus leave credits.
-- Lates and absences.
-- Synced employee mapping.
-- Attendance discrepancy flags.
-- Staff-group records.
-- Synchronization notifications.
+**What it does**
 
-Administrators and directors can manage staff mappings, synchronization, discrepancy resolution, and attendance operations according to configured access.
+- Views the admin portal (`/_authenticated/admin`) with operations overview cards for transportation, COE, permission slips, and late and absences.
+- Manages the vehicle fleet (`/_authenticated/vehicles`) and the phone directory (`/_authenticated/phone-directory`).
+- Views the trip archive and destination analytics (`/_authenticated/trip-archive`).
+- Views and bulk-downloads finalized receipts from all modules (`/_authenticated/receipts`).
+- Can access the Late and Absences admin dashboard (`/admin/late-absences`) to manage mappings, sync, and resolve discrepancy flags.
+- Gets read-only access to the Permission Slip queue via `canViewPermissionQueue` when mapped through the admin portal.
 
-# Role model
+**Access**
 
-| Role | Main capabilities |
+- `/admin`, `/vehicles`, `/trip-archive`, `/receipts`, `/phone-directory`, `/admin/late-absences`
+- `server/system-access.ts`: `listAdminOperationsOverview`
+- `server/analytics.ts`: `getTripArchiveFn`, `recordPageViewFn`
+- `server/admin-receipts.ts`: `listAdminReceiptsFn`, `bulkDownloadAdminReceiptsFn`
+
+**Restrictions**
+
+- Cannot approve or reject vehicle requests (administrators are not part of the approval workflow).
+- Cannot complete the Head of Transport Services review stage (`workflow.test.ts` verifies this).
+- Cannot manage Super Admin flags or Permission Slip signatories.
+
+### Super Admin
+
+The Super Admin role is a flag on the main account: `users.is_super_admin = 1`. It grants cross-module visibility without assigning workflow signatory powers.
+
+**What it does**
+
+- Sees everything an Administrator sees, plus:
+  - System-wide user totals, module stats, and recent access history (`listSuperAdminOverview`).
+  - Permission Slip signatory management (`canManagePermissionSignatories`).
+  - COE processor account management (`canManageHrdoAccounts`).
+  - System access assignment (`setSystemAccessAssignmentFn`): granting or revoking `super_admin` and `permission_slip_admin` flags.
+- Access is never blocked by stage-role checks because `isSuperAdmin` is checked separately.
+
+**Access**
+
+- `/admin`, plus every route visible to Administrators.
+- `server/system-access.ts`: `listSystemAccessUsersFn`, `listSuperAdminOverviewFn`, `setSystemAccessAssignmentFn`
+- `server/permission/index.ts`: signatory CRUD functions (`listPermissionSignatoriesFn`, `assignPermissionSignatoryFn`, `removePermissionSignatoryFn`)
+- `server/hrdo/admin.ts`: `listHrdoProcessorAccountsFn`, `createHrdoProcessorAccountFn`, `resetHrdoProcessorPasswordFn`
+
+**Restrictions**
+
+- Cannot sign as Head of Transport Services, Director, or President unless also explicitly assigned in `main_signatory_assignments`.
+- Cannot submit vehicle requests or Permission Slips (those require `requisitioner` or `employee` roles in their respective modules).
+
+### Transport Head
+
+The Transport Head maps to `users.role = 'transport_head'` and is the first stage in the VRTT approval workflow.
+
+**What it does**
+
+- Reviews new requests (`pending_review`) and either approves (forwards to Director) or returns them.
+- Records vehicle assignment, vehicle type, plate number, and driver name during review.
+- Can view all requests and the request queue.
+- Can manage vehicles.
+- Can send the official trip ticket after final approval.
+
+**Access**
+
+- `/_authenticated/requests/$id`, `/_authenticated/print/$id`
+- `/_authenticated/vehicles`
+- `/_authenticated/trip-archive`
+- `server/requests.ts`: `approveRequest`, `rejectRequest`, `sendTripTicket`
+
+**Restrictions**
+
+- Can only act on the `review` stage. The Director and President stages are blocked by `canActOnStage (role === stageRole)` and the assignment checks in `server/requests.ts`.
+
+### Director
+
+The Director maps to `users.role = 'director'` and is the second stage in the VRTT workflow.
+
+**What it does**
+
+- Recommends approved requests (`pending_recommendation`) and either forwards to the President or returns them.
+- Can view all requests.
+- Can view the executive Late and Absences dashboard (`/director/late-absences`).
+
+**Access**
+
+- `/_authenticated/requests/$id`, `/_authenticated/print/$id`
+- `/director/late-absences`
+- `server/requests.ts`: `approveRequest`, `rejectRequest`
+- `server/late-absences.ts`: `listDirectorAttendance`
+
+**Restrictions**
+
+- Can only act on the `recommend` stage.
+- Cannot manage vehicles.
+
+### President
+
+The President maps to `users.role = 'president'` and is the final stage in the VRTT workflow.
+
+**What it does**
+
+- Grants final approval (`pending_approval`) or returns the request.
+- Sends the official trip ticket after approval.
+- Can view all requests.
+
+**Access**
+
+- `/_authenticated/requests/$id`, `/_authenticated/print/$id`
+- `server/requests.ts`: `approveRequest`, `rejectRequest`
+
+**Restrictions**
+
+- Can only act on the `approve` stage.
+- Cannot manage vehicles.
+
+### HRDO Processor
+
+The HRDO Processor maps to `hrdo_users.role = 'hrdo_staff'` or `'hrdo_admin'`. These accounts live in a separate authentication system with their own session cookie (`loa_hrdo_session`).
+
+**What it does**
+
+- Processes the COE queue from submission to release.
+- Verifies requests (`verifyCoeRequest`), marks them viewed, starts processing, requests corrections, rejects, uploads signed documents, marks ready for pickup, and releases.
+- `hrdo_admin` can additionally manage processor accounts (`listHrdoProcessorAccountsFn`, `createHrdoProcessorAccountFn`).
+
+**Access**
+
+- `/hrdo/requests`, `/hrdo/history`, `/hrdo/analytics`
+- `server/hrdo/coe.ts`: all staff functions (`verifyCoeRequest`, `startCoeProcessing`, `uploadCoeDocument`, `markCoeReady`, `releaseCoeDocument`, etc.)
+- `server/hrdo/admin.ts`: `createHrdoProcessorAccountFn`, `resetHrdoProcessorPasswordFn` (for `hrdo_admin` and Super Admins)
+
+**Restrictions**
+
+- Cannot act on VRTT or Permission Slip workflows.
+- External viewers (`is_external = true`) are limited to `/hrdo/profile`, `/hrdo/coe`, and `/hrdo/coe/$id`.
+
+### Department Signatory
+
+The Department Signatory is the Permission Slip approval authority. It maps to entries in `permission_slip_signatories` where the account is given `PermissionRole = 'director'`.
+
+**What it does**
+
+- Views the pending Permission Slip queue (`listPendingPermissionSlipsFn`).
+- Approves or rejects slips (`approvePermissionSlipFn`, `rejectPermissionSlipFn`).
+- Sends and persists receipt images (`sendPermissionSlipReceiptFn`, `persistPermissionSlipReceiptFn`).
+
+**Access**
+
+- `/permission-slips`, `/permission-slips/$id`
+- `server/permission/index.ts`: `approvePermissionSlip`, `rejectPermissionSlip`, `listPendingPermissionSlips`
+
+**Restrictions**
+
+- Only Super Admins can assign or remove signatories (`canManagePermissionSignatories`).
+- Central `admin` and `super_admin` roles can view the queue read-only but cannot approve.
+
+## Supporting roles
+
+### Transport Staff
+
+Maps to `users.role = 'transport_staff'`. Supports operational dispatch after a request is approved.
+
+- Can view all requests (`canViewAllRequests`).
+- Can manage vehicles (`canManageVehicles`).
+- Can send the official trip ticket (`canViewAllRequests` is sufficient).
+- Can fill dispatch fields `dispatchedBy`, `userSignatureName`, `odometerStart`, `odometerEnd`, and `driverName` (`DISPATCH_PERMISSIONS`).
+
+### Assistant (alternate signatory)
+
+Maps to `users.role = 'assistant'`. An assistant is assigned to a specific stage through `signatory_assistants` and can sign on behalf of the main signatory.
+
+- Can view all requests.
+- Can sign with their own authenticated identity, but the UI labels the signature as the alternate for the configured stage.
+- Cannot approve stages they are not assigned to.
+
+### Guard on Duty
+
+Maps to `users.role = 'guard'`.
+
+- Can view all requests.
+- Can record `timeOut` and `timeIn` on the dispatch record (`DISPATCH_PERMISSIONS`).
+
+### Driver
+
+Maps to `users.role = 'driver'`.
+
+- Can view all requests.
+- Can update `odometerStart`, `odometerEnd`, `driverReport`, and `driverName` on the dispatch record.
+
+### External COE user
+
+Maps to `hrdo_users.is_external = true`. These are former employees or third-party verifiers who authenticate with personal Google accounts.
+
+- Can access `/hrdo/profile`, `/hrdo/coe`, and `/hrdo/coe/$id` only (`canExternalHrdoViewerAccessPath`).
+- Can submit and track their own COE requests.
+- Cannot view the HRDO staff queue or analytics.
+
+## Permission matrix
+
+| Capability | Employee | Admin | Super Admin | Transport Head | Director | President | HRDO Processor | Dept Signatory |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Submit vehicle request | Yes | No | No | No | No | No | No | No |
+| Review vehicle request (Head of Transport) | No | No | No | Yes | No | No | No | No |
+| Recommend vehicle request | No | No | No | No | Yes | No | No | No |
+| Approve vehicle request (President) | No | No | No | No | No | Yes | No | No |
+| Manage vehicles | No | Yes | Yes | Yes | No | No | No | No |
+| Dispatch fields (transport) | No | No | No | Yes | No | No | No | No |
+| Send trip ticket | No | No | No | Yes | No | Yes | No | No |
+| Submit permission slip | Yes | No | No | No | No | No | No | No |
+| Approve permission slip | No | No | No | No | No | No | No | Yes |
+| Manage permission signatories | No | No | Yes | No | No | No | No | No |
+| Process COE | No | No | No | No | No | No | Yes | No |
+| Manage COE processor accounts | No | No | Yes | No | No | No | Yes (hrdo_admin) | No |
+| Admin portal | No | Yes | Yes | No | No | No | No | No |
+| Site analytics (trip archive) | No | Yes | Yes | Yes | No | No | No | No |
+| Receipts archive | No | Yes | Yes | No | No | No | No | No |
+| System access assignment | No | No | Yes | No | No | No | No | No |
+| Late and absences admin | No | Yes | Yes | No | Yes (director view) | No | No | No |
+
+## Role enum and titles
+
+`src/lib/types.ts` defines the main `Role` union type:
+
+```ts
+type Role =
+  | "requisitioner"
+  | "department_head"
+  | "transport_head"
+  | "director"
+  | "president"
+  | "transport_staff"
+  | "assistant"
+  | "guard"
+  | "driver"
+  | "admin";
+```
+
+`src/lib/workflow.ts` maps each role to a display title:
+
+| Role | Title |
 | --- | --- |
-| Requisitioner | Vehicle request submission and personal trip tracking. |
-| Transport Head | Initial vehicle-request review and fleet assignment. |
-| Director | Recommendation or director-stage approval, plus assigned module operations. |
-| President | Final trip-ticket approval. |
-| Transport Staff | Operational and dispatch support according to access rules. |
-| Guard | Assigned operational verification support. |
-| Driver | Assigned trip operational support. |
-| Assistant | Alternate signatory operations for configured stages. |
-| Admin | Central administration for assigned and permitted modules. |
-| Super Admin | Organization-wide module access management and overview. |
-| HRDO employee | COE request submission and personal request tracking. |
-| HRDO staff | COE verification and processing queue operations. |
-| HRDO admin | HRDO account and processor administration. |
-| Permission Slip employee | Submit and view personal Permission Slips. |
-| Permission Slip signatory | Approve or reject assigned Permission Slips. |
+| `requisitioner` | Requestor |
+| `department_head` | HRDO Department Head |
+| `transport_head` | Head of Transport Services |
+| `director` | Director for Administration |
+| `president` | President |
+| `transport_staff` | Transport Personnel |
+| `assistant` | Alternate Signatory |
+| `guard` | Guard on Duty |
+| `driver` | Driver |
+| `admin` | System Administrator |
 
-Role strings are stored in separate account tables where modules use dedicated authentication. Server functions do not rely only on client-side menus or UI visibility.
+<Warning>
+  `department_head` exists in the enum but is not part of the VRTT approval workflow (`STAGES`). The module uses `transport_head`, `director`, and `president` for the three approval stages. `department_head` is reserved for internal HRDO structural grouping.
+</Warning>
+
+## VRTT workflow stages
+
+`src/lib/workflow.ts` defines the approval order:
+
+| Stage key | Role | Status | Label |
+| --- | --- | --- | --- |
+| `review` | `transport_head` | `pending_review` | Reviewed By |
+| `recommend` | `director` | `pending_recommendation` | Recommending Approval |
+| `approve` | `president` | `pending_approval` | Approved By |
+
+A returned request moves to `returned` status. After resubmission, `attempt` increments and the request restarts at `pending_review`. Previous signatures stay in the database but are filtered out of the current attempt view.
+
+Dispatch fields are controlled by `DISPATCH_PERMISSIONS` in `src/lib/workflow.ts`:
+
+| Field | Allowed roles |
+| --- | --- |
+| `dispatchedBy` | `transport_staff`, `transport_head` |
+| `timeOut` | `guard` |
+| `timeIn` | `guard` |
+| `userSignatureName` | `transport_staff`, `transport_head` |
+| `odometerStart` | `driver`, `transport_staff` |
+| `odometerEnd` | `driver`, `transport_staff` |
+| `driverReport` | `driver` |
+| `driverName` | `driver`, `transport_staff` |

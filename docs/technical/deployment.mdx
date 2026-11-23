@@ -1,91 +1,210 @@
 ---
-title: Deployment and Operations
-description: Installation, production deployment, configuration, administration, backup, and recovery.
+title: "Deployment and Operations"
+description: "Setup procedures, production build, database operations, backup, monitoring, and runbook tasks for the LOA HRDO systems."
 ---
 
-# Local setup
+## Prerequisites
 
-Requirements:
+- Node.js 20 or newer
+- npm
+- MySQL or MariaDB (Laragon locally)
+- A configured `.env` file (see [Environment Variables](/technical/environment))
 
-- Node.js 20 or newer.
-- npm.
-- MySQL or MariaDB.
+## Local setup
 
-Setup:
+<Steps>
+  <Step title="Install dependencies">
+    ```bash
+    npm install
+    ```
+  </Step>
+  <Step title="Create the database and app user">
+    ```bash
+    npm run db:setup
+    ```
+
+    This connects as MySQL root, creates the database with `utf8mb4_unicode_ci`, creates a limited application user granted only SELECT, INSERT, UPDATE, DELETE, applies `scripts/schema.sql`, and writes credentials to `.env`. It never prints the generated password.
+  </Step>
+  <Step title="Seed the initial administrator">
+    ```bash
+    npm run db:seed
+    ```
+
+    This creates the initial administrator `admin@loa.edu.ph` and document header configuration. It prints the initial password once. The administrator must change it at first sign-in. Existing accounts are not deleted.
+  </Step>
+  <Step title="Start the development server">
+    ```bash
+    npm run dev
+    ```
+
+    The dev server runs on port `8080`.
+  </Step>
+</Steps>
+
+## First-run administrator tasks
+
+After setup, the administrator must complete the following before the system can process requests.
+
+<Steps>
+  <Step title="Change the administrator password">
+    Sign in as `admin@loa.edu.ph` with the printed initial password and set a new password.
+  </Step>
+  <Step title="Create signatory accounts">
+    From Profile, create the Head of Transport Services, Director for Administration, and President accounts. Each receives an emailed temporary password and must change it at first sign-in.
+  </Step>
+  <Step title="Assign workflow signatories">
+    Assign the created accounts to the review, recommend, and approve stages.
+  </Step>
+  <Step title="Connect the Gmail sender">
+    See the Gmail sender connection section below.
+  </Step>
+</Steps>
+
+## Gmail sender connection
+
+<Steps>
+  <Step title="Configure the OAuth client">
+    Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env`. Add `http://localhost:8080/api/gmail/callback` as an authorized redirect URI on the OAuth client.
+  </Step>
+  <Step title="Set the sender address">
+    Set `GOOGLE_SENDER_EMAIL=hrdo.desk@lyceumalabang.edu.ph`.
+  </Step>
+  <Step title="Authorize the sender account">
+    Start the dev server and visit `/api/gmail/connect`. Authorize the `hrdo.desk@lyceumalabang.edu.ph` account. The callback rejects a different account and saves only the refresh token.
+  </Step>
+  <Step title="Restart the server">
+    Restart the dev server so the new refresh token is loaded.
+  </Step>
+</Steps>
+
+<Note>
+  The Gmail connection endpoint is available only on localhost in non-production. If the sender was connected before email identity verification was added, reconnect it so Google grants the email identity scope as well as Gmail send permission.
+</Note>
+
+## Google OAuth configuration
+
+The system uses up to two OAuth clients.
+
+| Client | Purpose | Consent screen | Redirect URIs |
+| --- | --- | --- | --- |
+| Institutional (`GOOGLE_CLIENT_ID`) | Google sign-in for requisitioners; Gmail sender | Internal | `GOOGLE_SIGNIN_REDIRECT_URI`, `GOOGLE_REDIRECT_URI` |
+| External (`GOOGLE_EXTERNAL_CLIENT_ID`) | Former employees and verifiers on `/coe` | External | `GOOGLE_SIGNIN_REDIRECT_URI` |
+
+<Steps>
+  <Step title="Register redirect URIs">
+    Add the localhost and production equivalents of both callback paths to each client. If the external client is not configured, the COE flow falls back to the institutional client.
+  </Step>
+  <Step title="Add test users">
+    If any consent screen is in testing mode, list every requisitioner and verifier as a test user.
+  </Step>
+  <Step title="Configure environment variables">
+    Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_EXTERNAL_CLIENT_ID`, and `GOOGLE_EXTERNAL_CLIENT_SECRET` in `.env`.
+  </Step>
+</Steps>
+
+## Google Sheets attendance setup
+
+<Steps>
+  <Step title="Create service account">
+    Create a Google service account, download its JSON key, and share the three staff-group spreadsheets with the service account email.
+  </Step>
+  <Step title="Set environment variables">
+    Set `GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON` to the JSON key content, and set the three `LATE_ABSENCES_*_SPREADSHEET_ID` variables to the respective sheet IDs.
+  </Step>
+  <Step title="Configure the webhook secret">
+    Set `LATE_ABSENCES_WEBHOOK_SECRET` and configure the sending system to include it in the `x-webhook-secret` header when posting to `/api/sheets/webhook`.
+  </Step>
+</Steps>
+
+## Production build and deploy
+
+<Steps>
+  <Step title="Run tests">
+    ```bash
+    npm test
+    ```
+  </Step>
+  <Step title="Build the application">
+    ```bash
+    npm run build
+    ```
+
+    This produces a Nitro output in `.output` that can be served directly by the Nitro server.
+  </Step>
+  <Step title="Set production environment">
+    Ensure `SITE_URL` uses HTTPS. The session cookie is marked `Secure` automatically when the protocol is HTTPS.
+  </Step>
+  <Step title="Synchronize secrets across instances">
+    `TICKET_VERIFICATION_SECRET` must be identical on all application instances. QR verification will fail if instances use different secrets.
+  </Step>
+  <Step title="Size the connection pool">
+    Adjust `DB_CONNECTION_LIMIT` and `DB_MAX_IDLE` based on the deployment's concurrency and database server capacity.
+  </Step>
+</Steps>
+
+<Warning>
+  Do not expose OAuth credentials, refresh tokens, or `TICKET_VERIFICATION_SECRET` with a `VITE_` prefix. Those values would be included in the client bundle.
+</Warning>
+
+## Schema updates
+
+`npm run db:setup` is idempotent. It uses `CREATE DATABASE IF NOT EXISTS`, `CREATE USER IF NOT EXISTS`, and `ALTER TABLE` migrations that only add missing columns, indexes, and constraints. It does not delete data. You can re-run it safely after pulling a new release.
+
+Before applying schema updates in production, back up the database. After running `db:setup`, verify that foreign keys and constraints are intact.
+
+## Backup and restore
+
+### Database backup
+
+Use `mysqldump` with the following options to ensure consistent, complete dumps, including binary data:
 
 ```bash
-npm install
-npm run db:setup
-npm run db:seed
-npm run dev
+mysqldump -u <root_user> -p \
+  --single-transaction \
+  --routines \
+  --hex-blob \
+  <database_name> > backup_$(date +%Y%m%d_%H%M%S).sql
 ```
 
-`db:setup` creates tables and a limited application database user. `db:seed` creates initial administrator and document configuration data. Initial passwords must be changed immediately.
+The `--hex-blob` flag is required because the schema stores binary data such as `MEDIUMBLOB` receipt images in `permission_slips.receipt_image`.
 
-# Deployment procedure
-
-1. Prepare the server and database.
-2. Configure `.env` or hosting platform environment variables.
-3. Run database setup and migrations.
-4. Seed initial accounts only when creating or initializing an environment.
-5. Install dependencies.
-6. Run tests and production build.
-7. Deploy the application.
-8. Configure public callback and OAuth redirect URIs.
-9. Authorize the Gmail sender.
-10. Test database, authentication, email, QR verification, and attendance sync.
-
-Run:
+### Database restore
 
 ```bash
-npm test
-npm run build
+mysql -u <root_user> -p <database_name> < backup_file.sql
 ```
 
-# Database deployment
+After restore, verify environment values, email and OAuth configuration, `TICKET_VERIFICATION_SECRET` consistency, document integrity, and one successful workflow in staging before allowing production traffic.
 
-Back up existing data before schema updates. Apply `scripts/schema.sql` or approved migrations in transaction-safe batches. Verify foreign keys and constraints after deployment.
+### Backup schedule and retention (recommended)
 
-The initial seed should not delete existing accounts or records. Preserve request, signature, COE, and Permission Slip history during upgrades.
+| Frequency | Retention | Scope |
+| --- | --- | --- |
+| Daily | 7 days | Full database dump |
+| Weekly | 4 weeks | Full database dump with verification restore test |
+| Monthly | 12 months | Full database dump archived off-site |
 
-# Administrator operations
+These schedules and retention periods are institutional recommendations. Adjust them based on operational requirements and storage capacity.
 
-Administrators are responsible for:
+## Monitoring
 
-- Account creation and password resets.
-- Signatory assignments and assistant accounts.
-- Permission Slip access assignments.
-- HRDO processor account management.
-- Vehicle and fleet records.
-- Trip archive and receipt records.
-- Attendance mappings and discrepancy handling.
-- Module configuration.
-- Failed notification and synchronization review.
+| Source | What to watch |
+| --- | --- |
+| `DB_SLOW_QUERY_MS` | Queries exceeding the threshold are logged. Investigate slow paths, missing indexes, or pool exhaustion. |
+| `attendance_sync_logs` | Review sync results and errors after each Google Sheets webhook or manual sync. |
+| `notifications.email_status` | Check `pending`, `sent`, and `failed` counts. Retry ticket delivery from the print page when needed. Mail failure does not undo the underlying database action. |
+| Application logs | OAuth callback failures, session and lockout trends, disk use for uploaded documents and backups. |
 
-Super administrators manage organization-wide access and module-administration assignments.
+## Operational runbook tasks
 
-# Monitoring
-
-Monitor:
-
-- Application and server error logs.
-- Database connection and slow-query metrics.
-- Failed approval-email delivery.
-- OAuth callback failures.
-- Google Sheets synchronization failures.
-- Permission Slip receipt delivery failures.
-- Session and account lockout trends.
-- Disk use for uploaded documents and backups.
-
-# Backup and recovery
-
-Create regular database backups and document backups according to institutional retention requirements. Backups should include:
-
-- User and session tables.
-- Vehicle and trip records.
-- Signatures and request history.
-- HRDO requests and uploaded documents.
-- Permission Slips and receipt images.
-- Attendance and synchronization records.
-
-Recovery should verify database configuration, environment values, email and OAuth configuration, QR signing secret, document integrity, and one successful workflow in staging before production restoration.
+| Task | Responsible role | How to perform |
+| --- | --- | --- |
+| Create or reset a user password | Administrator | Use the Profile page to issue a one-time temporary password. The user is signed out of all sessions and must choose a new password at next sign-in. |
+| Assign signatory assistants | Administrator | From Profile, create assistant accounts and assign them as alternate signatories per stage. |
+| Manage Permission Slip signatories | Super Admin | Add or remove signatories in the Permission Slip admin page. Only Super Admins can manage signatories. |
+| Manage HRDO processor accounts | Super Admin, central admin | Create or reset processor accounts from the system access or HRDO admin pages. |
+| Update vehicle records | Transport Head, Transport Personnel, Admin | Add, update, or remove vehicles from the Vehicles page. |
+| Handle attendance discrepancies | Admin, Director | Review flagged discrepancies on `/admin/late-absences` or `/director/late-absences` and resolve or escalate. |
+| Retry failed ticket email | Transport Personnel | From the print page, resend the official trip ticket to the requisitioner. |
+| Review trip archive and analytics | Admin | Use Trip Archive & Analytics to search by ticket, destination, requester, driver, or vehicle; filter by travel dates; and review totals, completed trips, daily activity, and destination counts. |
+| Verify QR ticket validity | Guard, any verifier | Scan the QR code or visit `/verify-ticket/$token`. The server checks the HMAC signature against the database and shows the authoritative request data. |

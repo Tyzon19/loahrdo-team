@@ -1,0 +1,62 @@
+---
+title: "Version History"
+description: "Release log and changelog for the LOA HRDO Desk documentation and system."
+sidebarTitle: "Version History"
+---
+
+This page is Part IX of the technical documentation. It records verified releases and provides guidance for documenting future versions.
+
+---
+
+## Releases
+
+<Update label="2026-11-23" description="Documentation v1.0">
+  **Commit:** `ec4c17d` : "Expand full system documentation"
+
+  This release completes the initial technical documentation for the LOA HRDO Desk. It covers:
+
+  - Part I: System Overview (project context, stakeholders, scope)
+  - Part II: Architecture (client-server structure, data flow, workflow diagrams)
+  - Part III: Modules and Roles (service modules, role permissions, operational boundaries)
+  - Part IV: Database and API (MySQL ERD, schema reference, TanStack Start server functions, HTTP routes)
+  - Part V: Security and Tech Stack (authentication, RBAC, sessions, CSP headers, dependency list)
+  - Part VI: Quality Assurance (Vitest suites, coverage areas, acceptance checklist)
+  - Part VII: Deployment and Operations (installation, environment variables, production deployment, backup, monitoring)
+  - Part VIII: User Manuals (employee, approver, HRDO processor, and administrator procedures)
+  - Part IX: Support (troubleshooting, escalation guidance, and this version history)
+
+  The documentation is published through Mintlify and is aligned with the codebase as of commit `ec4c17d`.
+</Update>
+
+---
+
+## How to record future versions
+
+When a new release is deployed, add a new `<Update>` block at the top of this page with the following:
+
+1. **Label:** Use the release date in `YYYY-MM-DD` format.
+2. **Description:** Use a short version tag (for example, "v1.1", "v1.2", "v2.0").
+3. **Body:** List the changes in plain language. Include any of the following that apply:
+   - New features or modules
+   - API or route changes
+   - Database schema changes
+   - Role or permission changes
+   - Security updates
+   - Dependency upgrades
+   - Documentation corrections or additions
+   - Bug fixes with affected areas
+
+Keep the list concise and verifiable. Link to related technical pages when a change affects architecture, modules, database, or API.
+
+Example format for the next entry:
+
+```mdx
+<Update label="2026-12-01" description="v1.1">
+  - Added new report export feature to the trip archive
+  - Updated `DB_CONNECTION_LIMIT` default from 5 to 10
+  - Fixed attendance sync webhook timeout for large spreadsheets
+  - Documentation: added environment variable reference for new `REPORT_EXPORT_SECRET`
+</Update>
+```
+
+If a release contains breaking changes, prefix the description with "BREAKING" and add a `<Warning>` inside the update body explaining what administrators must do before upgrading.

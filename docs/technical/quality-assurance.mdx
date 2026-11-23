@@ -1,86 +1,392 @@
 ---
-title: QA and Test Cases
-description: Test coverage from src/test with unit, integration, security, routing, and workflow cases.
+title: "Quality Assurance and Testing"
+description: "Test strategy, automation coverage, validation rules, and acceptance checklist for the LOA HRDO system."
+sidebarTitle: "Quality Assurance"
 ---
 
-# Test strategy
+The LOA HRDO system is tested with an automated suite of 161 cases across 23 test files, plus manual user acceptance testing before each release. All tests run in Vitest with jsdom and Testing Library.
 
-Run the complete suite with:
+## Test strategy and tooling
+
+The project uses **Vitest** as the test runner with the following stack:
+
+| Tool | Purpose |
+| --- | --- |
+| Vitest | Test runner and assertion library |
+| jsdom | Browser-like DOM environment for component tests |
+| @testing-library/react | React component queries and user-event simulation |
+| @testing-library/jest-dom | Custom DOM matchers (`toBeInTheDocument`, etc.) |
+
+### Commands
 
 ```bash
+# Run the full suite once
 npm test
+
+# Run in watch mode during development
+npm run test:watch
+
+# Lint and format checks
+npm run lint
+npm run format
 ```
 
-The suite uses Vitest and Testing Library under `src/test`. Tests cover server rules, workflow transitions, validation, email templates, OAuth eligibility, receipt handling, route behavior, archive filtering, and ticket verification.
+### Configuration
 
-# Routing and access
+`vitest.config.ts` sets `environment: "jsdom"`, `globals: true`, and a setup file at `src/test/setup.ts`. The setup file stubs `window.scrollTo` and `window.matchMedia` so components that depend on them render without errors. Tests are discovered from `src/**/*.{test,spec}.{ts,tsx}`.
 
-Representative coverage includes:
+## Coverage summary
 
-- Public routes, authenticated dashboard routes, and unknown-path fallback.
-- Requisitioners viewing only their own records.
-- Approvers and operational staff seeing assigned queues.
-- Central administrator access without accidental signatory authority.
-- External HRDO accounts being blocked from staff routes.
+| Test file | Area | Cases |
+| --- | --- | --- |
+| `access.test.ts` | Role-based access control | 5 |
+| `permission-access.test.ts` | Permission Slip access rules | 6 |
+| `hrdo-external-access.test.ts` | External HRDO route guards | 2 |
+| `super-admin-overview.test.ts` | System access summaries | 2 |
+| `name.test.ts` | Formal name prefixes | 5 |
+| `workflow.test.ts` | Vehicle workflow transitions | 11 |
+| `validation.test.ts` | Input validation and schemas | 25 |
+| `password.test.ts` | Password hashing | 3 |
+| `google-signin.test.ts` | Google sign-in eligibility and redirects | 16 |
+| `email-template.test.ts` | Email HTML and plain-text rendering | 12 |
+| `gmail.test.ts` | Gmail API delivery and failures | 9 |
+| `permission-flow.test.ts` | Permission Slip schemas and formatting | 9 |
+| `permission-receipt.test.ts` | Permission Slip receipt archiving | 1 |
+| `coe-dashboard.test.ts` | COE request dashboards and filtering | 15 |
+| `coe-template-format.test.ts` | COE template and compensation wording | 4 |
+| `admin-receipts.test.ts` | Receipt archive search, preview, bulk ZIP | 10 |
+| `late-absences.test.ts` | Attendance sync and name matching | 4 |
+| `destination-search.test.ts` | Destination autocomplete and validation | 5 |
+| `destination-analytics.test.ts` | Trip analytics grouping and limits | 3 |
+| `app-routing.test.tsx` | Route matching and fallbacks | 4 |
+| `errors.test.ts` | Zod error message normalization | 4 |
+| `request-errors.test.ts` | Client disconnect handling | 2 |
+| `ticket-verification.test.ts` | QR ticket HMAC verification | 4 |
+| **Total** |  | **161** |
 
-# Vehicle workflow tests
+## Access control
 
-Coverage includes the Head of Transport → Director → President sequence, rejection reasons, administrator restrictions, return emails, alternate identity, requisitioner editing, resubmission, and preservation of prior signatures.
+| ID | Test case | Source file | Expected result | Status |
+| --- | --- | --- | --- | --- |
+| TC-ACC-01 | lets a requisitioner see only their own requests | `access.test.ts` | `canViewAllRequests` returns false for requisitioners | Automated |
+| TC-ACC-02 | lets approvers and operational staff see the request queue | `access.test.ts` | `canViewAllRequests` returns true for approvers, transport staff, assistants, guards, drivers, and admins | Automated |
+| TC-ACC-03 | keeps request submission and fleet management role-specific | `access.test.ts` | `canSubmitRequests` is true only for requisitioners; `canManageVehicles` is true only for super admin, transport head, transport staff, and admin | Automated |
+| TC-ACC-04 | grants Super Admin system access without granting workflow signatory roles | `access.test.ts` | Super Admin passes `canAccessAdminPortal` and `canViewSiteAnalytics` without receiving `APPROVER_ROLES` | Automated |
+| TC-ACC-05 | allows central Admins into the portal without granting it to ordinary employees | `access.test.ts` | `canAccessAdminPortal` is true for admin role but false for requisitioner and operational staff | Automated |
+| TC-ACC-06 | gives the designated HRDO director approval powers in this system | `permission-access.test.ts` | `isPermissionHead` matches `PERMISSION_HEAD_EMAIL` and `canManagePermissionSignatories` is false for directors | Automated |
+| TC-ACC-07 | allows only Super Admins to manage Permission Slip signatories | `permission-access.test.ts` | `canManagePermissionSignatories` returns true only for super admins | Automated |
+| TC-ACC-08 | treats every other institutional account as an ordinary employee | `permission-access.test.ts` | `permissionRoleFor` returns `employee` for non-director, non-admin accounts | Automated |
+| TC-ACC-09 | only the director profile can review slips | `permission-access.test.ts` | `canViewPermissionQueue` includes the director but excludes ordinary employees | Automated |
+| TC-ACC-10 | lets module Admins and Super Admins view the queue without granting approval | `permission-access.test.ts` | Admins and super admins see the queue in read-only mode; directors retain approval power | Automated |
+| TC-ACC-11 | maps central admins to read-only Permission Slip access | `permission-access.test.ts` | Permission Slip portal access for admin role is read-only without signatory rights | Automated |
+| TC-ACC-12 | allows former employees to open their profile from the COE portal | `hrdo-external-access.test.ts` | External accounts can access `/hrdo/profile` and `/hrdo/coe` routes | Automated |
+| TC-ACC-13 | keeps staff-only routes unavailable to external accounts | `hrdo-external-access.test.ts` | External accounts are blocked from staff routes such as `/hrdo/dashboard` | Automated |
+| TC-ACC-14 | summarizes system totals, modules, recent users, and access activity | `super-admin-overview.test.ts` | Super Admin overview aggregates counts across all modules and access history | Automated |
+| TC-ACC-15 | summarizes Admin / HR operations across existing modules | `super-admin-overview.test.ts` | Admin overview shows scoped totals for modules the admin can operate | Automated |
+| TC-ACC-16 | separates a Super Admin name prefix from the name parts | `name.test.ts` | Prefixes like "Dr.", "Atty.", "Engr." are parsed and stored separately from the name | Automated |
+| TC-ACC-17 | keeps ordinary names without prefixes unchanged | `name.test.ts` | Names without prefixes pass through unmodified | Automated |
+| TC-ACC-18 | exposes the supported official prefixes | `name.test.ts` | The supported prefix list includes medical, legal, and engineering titles | Automated |
+| TC-ACC-19 | joins a selected prefix with the account name | `name.test.ts` | Display name combines prefix and name with proper spacing | Automated |
+| TC-ACC-20 | supports Attorney names as a formal prefix | `name.test.ts` | "Atty." is recognized and handled like other prefixes | Automated |
 
-Validation tests cover request completeness, Philippine mobile numbers, date ranges, times, destinations, passenger limits, control characters, signatory assistants, main signatory assignments, driver names, and trip archive filters.
+## Vehicle workflow
 
-# Ticket verification
+| ID | Test case | Source file | Expected result | Status |
+| --- | --- | --- | --- | --- |
+| TC-VWF-01 | keeps the President's title separate from the configured approver name | `workflow.test.ts` | Stage label uses the fixed title, not the assigned signatory's display name | Automated |
+| TC-VWF-02 | follows Head of Transport → Director → President order | `workflow.test.ts` | Approval stages advance sequentially: review, recommend, approve | Automated |
+| TC-VWF-03 | requires a rejection reason | `workflow.test.ts` | Reject action fails when no reason is provided | Automated |
+| TC-VWF-04 | does not allow administrators to complete the initial review stage | `workflow.test.ts` | Admin role is blocked from acting on the review stage | Automated |
+| TC-VWF-05 | creates a return email for the original requisitioner | `workflow.test.ts` | Return workflow generates a notification addressed to the requester | Automated |
+| TC-VWF-06 | allows the assigned alternate to return a request with their own identity | `workflow.test.ts` | Alternate signatory's identity is recorded on a returned request | Automated |
+| TC-VWF-07 | allows the requisitioner to edit a request only before transport review | `workflow.test.ts` | Update is allowed when status is `pending_review`; blocked afterward | Automated |
+| TC-VWF-08 | allows an assigned alternate to sign with their own authenticated identity | `workflow.test.ts` | Alternate signature is accepted and linked to their user record | Automated |
+| TC-VWF-09 | allows the assigned main signatory to act without changing their system role | `workflow.test.ts` | Main signatory can approve without having the stage role in their user record | Automated |
+| TC-VWF-10 | allows the assigned main signatory to return a request with their own identity | `workflow.test.ts` | Main signatory return is recorded under their own identity | Automated |
+| TC-VWF-11 | restarts at the Head of Transport after resubmission and keeps old signatures separate | `workflow.test.ts` | Resubmit resets status to `pending_review`, increments attempt, and archives prior signatures | Automated |
 
-Tests verify signed approval claims, changed payload rejection, invalid signatures, MySQL timestamp normalization, and binding verification references to approved dates and destinations.
+## Validation
 
-# Permission Slip tests
+| ID | Test case | Source file | Expected result | Status |
+| --- | --- | --- | --- | --- |
+| TC-VAL-01 | accepts a PNG data URL for a request id | `validation.test.ts` | `sendTripTicketSchema` passes with a valid PNG base64 data URL and UUID | Automated |
+| TC-VAL-02 | rejects non-PNG images | `validation.test.ts` | `sendTripTicketSchema` fails when the image is JPEG or lacks the PNG prefix | Automated |
+| TC-VAL-03 | rejects a missing id | `validation.test.ts` | `sendTripTicketSchema` fails when the request id is absent | Automated |
+| TC-VAL-04 | rejects short or single-class passwords | `validation.test.ts` | `passwordIssues` flags passwords shorter than 12 characters or missing character classes | Automated |
+| TC-VAL-05 | accepts a strong passphrase | `validation.test.ts` | `password` schema accepts a 12+ character string with lowercase, uppercase, number, and symbol | Automated |
+| TC-VAL-06 | accepts a complete request | `validation.test.ts` | `requestInputSchema` passes with all required fields valid | Automated |
+| TC-VAL-07 | rejects invalid numbers and preserves an empty optional value | `validation.test.ts` | `normalizePhilippineMobileNumber` returns null for invalid input and empty string for empty input | Automated |
+| TC-VAL-08 | rejects an end date before the start date | `validation.test.ts` | `requestInputSchema` fails when `dateEnd` is earlier than `dateStart` | Automated |
+| TC-VAL-09 | rejects invalid time, empty destinations and excessive passengers | `validation.test.ts` | `requestInputSchema` fails for malformed time, zero destinations, or more than 60 passengers | Automated |
+| TC-VAL-10 | rejects control characters in free text | `validation.test.ts` | `requestInputSchema` fails when purpose or destinations contain control characters | Automated |
+| TC-VAL-11 | accepts blank names and trims configured names | `validation.test.ts` | `signatoryAssistantsSchema` accepts empty strings and trims whitespace for assistant names | Automated |
+| TC-VAL-12 | accepts explicitly unassigned stages when one assistant is assigned | `validation.test.ts` | `signatoryAssistantsSchema` allows `null` user IDs for unassigned stages | Automated |
+| TC-VAL-13 | rejects names longer than the database limit | `validation.test.ts` | `signatoryAssistantsSchema` fails when names exceed 120 characters | Automated |
+| TC-VAL-14 | accepts account details without a selectable role | `validation.test.ts` | `createAssistantAccountSchema` passes without requiring a role field | Automated |
+| TC-VAL-15 | normalizes unassigned stages and validates selected account ids | `validation.test.ts` | `mainSignatoriesSchema` converts empty values to `null` and validates UUIDs | Automated |
+| TC-VAL-16 | only allows main approval stages for new main signatory accounts | `validation.test.ts` | `createMainSignatoryAccountSchema` restricts `stage` to review, recommend, or approve | Automated |
+| TC-VAL-17 | accepts an optional assigned driver name during approval | `validation.test.ts` | `approveSchema` accepts a driver name up to 120 characters and allows omission | Automated |
+| TC-VAL-18 | accepts a user ID and rejects malformed IDs | `validation.test.ts` | `resetUserPasswordSchema` accepts a UUID and rejects non-UUID strings | Automated |
+| TC-VAL-19 | only allows the configured domains | `validation.test.ts` | `emailDomainAllowed` returns true only for domains in `ALLOWED_EMAIL_DOMAINS` | Automated |
+| TC-VAL-20 | accepts a six-digit code for a valid email | `validation.test.ts` | `registrationOtpSchema` passes with a six-digit numeric code and institutional email | Automated |
+| TC-VAL-21 | rejects malformed codes and non-institutional email addresses | `validation.test.ts` | `registrationOtpSchema` fails for codes that are not six digits or emails outside the allowed domain | Automated |
+| TC-VAL-22 | allows requisitioner self-registration only for the Lyceum domain | `validation.test.ts` | Self-registration is valid only for `@lyceumalabang.edu.ph` addresses | Automated |
+| TC-VAL-23 | accepts grouped paths and rejects query strings | `validation.test.ts` | `analyticsPathSchema` accepts clean paths and rejects paths with query parameters | Automated |
+| TC-VAL-24 | accepts date ranges, search, and pagination | `validation.test.ts` | `tripArchiveFilterSchema` passes with valid from/to dates, query text, and page number | Automated |
+| TC-VAL-25 | rejects reversed date ranges and invalid page numbers | `validation.test.ts` | `tripArchiveFilterSchema` fails when `from` is after `to` or page is negative | Automated |
 
-Coverage includes:
+## Authentication and passwords
 
-- Valid and invalid slip creation.
-- Approval and receipt schemas.
-- Signatory institutional email eligibility.
-- UUID validation.
-- Director-only approval behavior.
-- Admin and super-admin queue boundaries.
-- Receipt archive preview.
-- Receipt base64 attachment and employee email delivery.
+| ID | Test case | Source file | Expected result | Status |
+| --- | --- | --- | --- | --- |
+| TC-AUT-01 | stores a salted scrypt hash instead of the password | `password.test.ts` | Passwords are hashed with scrypt (N=16384, r=8, p=1, keylen=64) and a 16-byte random salt | Automated |
+| TC-AUT-02 | verifies the correct password and rejects a wrong one | `password.test.ts` | `verifyPassword` returns true for the correct password and false for an incorrect one using `timingSafeEqual` | Automated |
+| TC-AUT-03 | rejects malformed stored hashes | `password.test.ts` | Hash strings with invalid format or parameters are rejected | Automated |
 
-# COE tests
+## Google sign-in and OAuth
 
-Coverage includes account access, employee summaries, HR workload summaries, deadline urgency, status filtering, search, copy types, correction or rejection rules, combined-copy delivery, and release conditions.
+| ID | Test case | Source file | Expected result | Status |
+| --- | --- | --- | --- | --- |
+| TC-OAU-01 | accepts an institutional requisitioner account regardless of case | `google-signin.test.ts` | Google sign-in accepts `@lyceumalabang.edu.ph` addresses in any casing | Automated |
+| TC-OAU-02 | refuses personal and non-institutional addresses | `google-signin.test.ts` | Personal Gmail addresses and other domains are rejected | Automated |
+| TC-OAU-03 | reports the institutional-email requirement before account lookup | `google-signin.test.ts` | Domain validation happens before querying the database | Automated |
+| TC-OAU-04 | accepts institutional addresses even when no account record exists yet | `google-signin.test.ts` | New institutional accounts are allowed for sign-up flow | Automated |
+| TC-OAU-05 | blocks institutional accounts in the former employee and verifier flow | `google-signin.test.ts` | External COE mode rejects institutional addresses | Automated |
+| TC-OAU-06 | refuses staff accounts | `google-signin.test.ts` | Staff roles (transport head, director, president, etc.) are refused for Google sign-in | Automated |
+| TC-OAU-07 | keeps only same-site paths | `google-signin.test.ts` | Redirect target is sanitized to same-origin paths only | Automated |
+| TC-OAU-08 | sends new Google-only accounts to full-name completion before password setup | `google-signin.test.ts` | Accounts without a local password are redirected to complete profile | Automated |
+| TC-OAU-09 | keeps temporary-password accounts on the required password-change step | `google-signin.test.ts` | Accounts with `must_change_password` are forced to change password | Automated |
+| TC-OAU-10 | returns completed Google accounts to their safe requested page | `google-signin.test.ts` | Post-authentication redirect returns to the originally requested page | Automated |
+| TC-OAU-11 | uses a separate external OAuth client for former employees and verifiers | `google-signin.test.ts` | External COE sign-in uses `GOOGLE_EXTERNAL_CLIENT_ID` and `GOOGLE_EXTERNAL_CLIENT_SECRET` | Automated |
+| TC-OAU-12 | falls back to the shared OAuth client when no external client is configured | `google-signin.test.ts` | Missing external credentials fall back to the standard Google OAuth client | Automated |
+| TC-OAU-13 | starts OAuth on the callback host so state cookies reach the callback | `google-signin.test.ts` | OAuth initiation URL matches the callback origin to ensure cookie delivery | Automated |
+| TC-OAU-14 | uses the current local origin when SITE_URL points to another local port | `google-signin.test.ts` | Local development uses the request origin rather than `SITE_URL` when ports differ | Automated |
+| TC-OAU-15 | uses the configured public origin for non-local requests | `google-signin.test.ts` | Production uses `SITE_URL` as the OAuth origin | Automated |
+| TC-OAU-16 | explains each failure code and falls back to a generic message | `google-signin.test.ts` | Error messages map known failure codes and provide a fallback for unknown codes | Automated |
 
-Template tests verify peso conversion, centavos, comma-formatted values, supported compensation, and filename or MIME handling.
+## Email and Gmail
 
-# Authentication tests
+| ID | Test case | Source file | Expected result | Status |
+| --- | --- | --- | --- | --- |
+| TC-EMA-01 | separates return reasons from the notification body | `email-template.test.ts` | Return reason is rendered in a distinct warning block, separate from the main message | Automated |
+| TC-EMA-02 | renders a responsive HTML email and a plain-text alternative | `email-template.test.ts` | Email output contains both HTML and plain-text parts | Automated |
+| TC-EMA-03 | renders a branded OTP email in HTML and plain text | `email-template.test.ts` | Registration OTP email uses branded styling with a visible six-digit code in both formats | Automated |
+| TC-EMA-04 | uses standard verification copy and escapes user-controlled content | `email-template.test.ts` | User names and emails are HTML-escaped in the OTP email template | Automated |
+| TC-EMA-05 | rejects malformed codes and invalid expiry values | `email-template.test.ts` | Template function throws for non-numeric OTP codes or invalid expiry timestamps | Automated |
+| TC-EMA-06 | renders a branded signatory welcome email with a forced password-change notice | `email-template.test.ts` | Welcome email includes temporary password, login URL, and a must-change-password warning | Automated |
+| TC-EMA-07 | uses password-reset copy for account recovery emails | `email-template.test.ts` | Recovery email contains a six-digit code and instructions, not a password | Automated |
+| TC-EMA-08 | includes escaped trip details and the inline approved ticket image | `email-template.test.ts` | Trip ticket email contains destination, date, time, and an inline PNG of the approved ticket | Automated |
+| TC-EMA-09 | uses the correct destination for returned and approval-action emails | `email-template.test.ts` | Multi-destination requests show the primary destination in notifications | Automated |
+| TC-EMA-10 | escapes the return reason inside the warning block | `email-template.test.ts` | Return reason text is HTML-escaped before insertion into the warning block | Automated |
+| TC-EMA-11 | escapes message content before inserting it into HTML | `email-template.test.ts` | Free-text message fields are escaped to prevent injection | Automated |
+| TC-EMA-12 | rejects invalid or unsafe application URLs | `email-template.test.ts` | Email template rejects URLs that do not match the configured `SITE_URL` | Automated |
+| TC-EMA-13 | sends the workflow message to its configured recipient using the verified sender | `gmail.test.ts` | Gmail API sends the message to the correct recipient from `GOOGLE_SENDER_EMAIL` | Automated |
+| TC-EMA-14 | keeps the approved trip-ticket image inline without embedding the logo | `gmail.test.ts` | Ticket image is attached inline but the logo is not embedded as a separate part | Automated |
+| TC-EMA-15 | emails a generated temporary password to the account address | `gmail.test.ts` | Temporary password is delivered to the newly created account's email | Automated |
+| TC-EMA-16 | highlights a COE rejection reason in the red warning style and escapes its contents | `gmail.test.ts` | COE rejection email renders the reason in a styled warning block with HTML escaping | Automated |
+| TC-EMA-17 | adds a root message id for the first COE status email | `gmail.test.ts` | Initial COE notification sets a `Message-Id` header for threading | Automated |
+| TC-EMA-18 | reports missing approved sender configuration before attempting delivery | `gmail.test.ts` | Delivery fails early with a clear error when Gmail sender is not configured | Automated |
+| TC-EMA-19 | sends without requiring the OpenID userinfo endpoint during delivery | `gmail.test.ts` | Gmail send flow works without an extra userinfo call | Automated |
+| TC-EMA-20 | explains how to restore Gmail send permission after a Gmail API authorization failure | `gmail.test.ts` | Error message instructs the admin to reconnect via `/api/gmail/connect` | Automated |
+| TC-EMA-21 | sends a Permission Slip receipt to the employee with its PNG attachment | `gmail.test.ts` | Approved Permission Slip receipt is emailed with a base64 PNG attachment | Automated |
 
-Google sign-in tests verify institutional and personal account eligibility, redirect safety, external OAuth credentials, callback origins, account completion, forced password changes, and failure messages.
+## Permission Slip
 
-Password tests verify scrypt hashing and reject malformed hashes or incorrect passwords.
+| ID | Test case | Source file | Expected result | Status |
+| --- | --- | --- | --- | --- |
+| TC-PER-01 | validates createPermissionSchema with valid date, times, reason and signature | `permission-flow.test.ts` | `createPermissionSchema` passes with all required fields | Automated |
+| TC-PER-02 | rejects createPermissionSchema when the department is missing | `permission-flow.test.ts` | `createPermissionSchema` fails when department is empty or too short | Automated |
+| TC-PER-03 | rejects createPermissionSchema when reason is shorter than 5 chars | `permission-flow.test.ts` | `createPermissionSchema` fails when reason is fewer than 5 characters | Automated |
+| TC-PER-04 | validates approvePermissionSchema without requiring email or receiptImage upfront | `permission-flow.test.ts` | `approvePermissionSchema` passes with only id and signature | Automated |
+| TC-PER-05 | validates sendPermissionReceiptSchema with base64 receipt png | `permission-flow.test.ts` | `sendPermissionReceiptSchema` passes with a valid PNG data URL | Automated |
+| TC-PER-06 | rejects invalid id or missing signature | `permission-flow.test.ts` | Permission slip approval fails for non-UUID ids or missing signature images | Automated |
+| TC-PER-07 | formats receipt times using Philippine 12-hour notation | `permission-flow.test.ts` | Receipt display converts 24-hour times to 12-hour AM/PM format | Automated |
+| TC-PER-08 | accepts institutional signatory accounts and rejects non-institutional emails | `permission-flow.test.ts` | `createPermissionSignatorySchema` accepts `@lyceumalabang.edu.ph` and rejects others | Automated |
+| TC-PER-09 | requires a UUID when removing signatory access | `permission-flow.test.ts` | `permissionSignatoryIdSchema` rejects non-UUID values | Automated |
+| TC-PER-10 | allows a Super Admin receipt archive from the central receipts page | `permission-receipt.test.ts` | Archived Permission Slip PNG is retrievable by super admins from the receipts module | Automated |
 
-# Email and receipt tests
+## COE
 
-Coverage includes HTML and plain-text email templates, user-controlled escaping, branded OTP email, temporary-password email, trip-ticket images, Gmail sender configuration, Gmail API failures, Permission Slip delivery, and inbox notifications.
+| ID | Test case | Source file | Expected result | Status |
+| --- | --- | --- | --- | --- |
+| TC-COE-01 | allows Super Admins to manage COE accounts without changing employee role | `coe-dashboard.test.ts` | Super Admin can create and reset HRDO processor accounts | Automated |
+| TC-COE-02 | maps central admins to COE account management access | `coe-dashboard.test.ts` | Admin role has read access to COE processor management | Automated |
+| TC-COE-03 | counts every request in exactly one card | `coe-dashboard.test.ts` | Employee summary cards partition requests into distinct buckets with no overlap | Automated |
+| TC-COE-04 | groups correction requests and rejections under Needs Action | `coe-dashboard.test.ts` | `correction_requested` and `rejected` statuses appear in the Needs Action card | Automated |
+| TC-COE-05 | counts each queue and keeps deadline urgency separate | `coe-dashboard.test.ts` | HR workload summary shows pending, under review, and processing counts separately | Automated |
+| TC-COE-06 | flags overdue and due-soon open requests only | `coe-dashboard.test.ts` | Deadline urgency is computed only for open requests, not for completed ones | Automated |
+| TC-COE-07 | closes the deadline once the request is completed | `coe-dashboard.test.ts` | Deadline urgency is removed after status changes to `released` or `rejected` | Automated |
+| TC-COE-08 | reports overdue, due soon and on track | `coe-dashboard.test.ts` | Deadline categories align with `COE_PROCESSING_DAYS=3` and `COE_DUE_SOON_HOURS=24` | Automated |
+| TC-COE-09 | filters by status | `coe-dashboard.test.ts` | Status filter narrows the list to the selected COE status | Automated |
+| TC-COE-10 | searches by request ID, purpose, employee name and Employee ID | `coe-dashboard.test.ts` | Search matches across ID, purpose, name, and employee identifier fields | Automated |
+| TC-COE-11 | filters by department, type of copy and deadline | `coe-dashboard.test.ts` | Combined filters work for department, copy type (soft, original, both), and deadline range | Automated |
+| TC-COE-12 | returns everything for the all filter | `coe-dashboard.test.ts` | All-filter selection removes status constraints and returns the full list | Automated |
+| TC-COE-13 | allows correction or rejection while a new request is being viewed | `coe-dashboard.test.ts` | Processor actions are available for `pending` and `under_review` statuses | Automated |
+| TC-COE-14 | uses the final COE email as the combined-copy delivery step | `coe-dashboard.test.ts` | Combined-copy requests complete delivery via the final email notification | Automated |
+| TC-COE-15 | offers release only once the printed copy is ready | `coe-dashboard.test.ts` | Release action is available only after `ready_for_pickup` or equivalent print readiness | Automated |
+| TC-COE-16 | converts pesos, comma-formatted values, and centavos | `coe-template-format.test.ts` | Compensation amount is rendered in words for whole pesos, comma values, and centavos | Automated |
+| TC-COE-17 | does not produce words for empty, malformed, or unsupported values | `coe-template-format.test.ts` | Invalid or missing compensation amounts render as empty or fallback text | Automated |
+| TC-COE-18 | includes compensation when explicitly selected in the request description | `coe-template-format.test.ts` | Compensation wording appears only when the request explicitly requests it | Automated |
+| TC-COE-19 | does not enable compensation because the free-text note mentions it | `coe-template-format.test.ts` | Casual mention of compensation in free text does not trigger the compensation section | Automated |
 
-# Attendance tests
+## Receipts
 
-Coverage includes June-to-May attendance cycles, supported event codes, name matching, staff sheet mappings, and synchronization edge cases.
+| ID | Test case | Source file | Expected result | Status |
+| --- | --- | --- | --- | --- |
+| TC-REC-01 | denies receipt archive access to non-admin accounts | `admin-receipts.test.ts` | Receipt archive endpoints reject requisitioners and non-privileged roles | Automated |
+| TC-REC-02 | allows Super Admins to list receipts | `admin-receipts.test.ts` | Super Admin can query receipts across all modules | Automated |
+| TC-REC-03 | searches receipt archives by person name or department | `admin-receipts.test.ts` | Name and department queries filter the receipt list | Automated |
+| TC-REC-04 | lists receipts for the selected system and date range | `admin-receipts.test.ts` | System filter (VRTT, Permission Slip, COE) and date range narrow results | Automated |
+| TC-REC-05 | returns a released COE document only to an admin | `admin-receipts.test.ts` | COE document preview is gated to admin and super admin roles | Automated |
+| TC-REC-06 | returns a finalized Vehicle Trip Ticket image for preview | `admin-receipts.test.ts` | Approved trip ticket PNG is returned for preview | Automated |
+| TC-REC-07 | creates a bulk ZIP for selected receipts | `admin-receipts.test.ts` | `bulkDownloadAdminReceiptsFn` generates a ZIP of selected receipt images | Automated |
+| TC-REC-08 | does not return a COE document before it is ready for release | `admin-receipts.test.ts` | Unreleased COE documents are blocked from preview | Automated |
+| TC-REC-09 | returns an approved Permission Slip for its receipt preview | `admin-receipts.test.ts` | Approved Permission Slip is shown in the receipt preview panel | Automated |
+| TC-REC-10 | returns the archived Permission Slip PNG instead of regenerating HTML | `admin-receipts.test.ts` | When `receipt_image` exists, the archived PNG is served directly | Automated |
 
-# Admin and analytics tests
+## Attendance
 
-Coverage includes super-admin totals, module totals, access history, receipt archive permissions, receipt search and date ranges, bulk ZIP downloads, destination normalization, analytics limits, and destination search validation.
+| ID | Test case | Source file | Expected result | Status |
+| --- | --- | --- | --- | --- |
+| TC-ATT-01 | maps the June-to-May cycle and supported codes to dated events | `late-absences.test.ts` | Attendance sync produces dated leave/absence events for the fiscal year | Automated |
+| TC-ATT-02 | ignores unsupported values and empty employee rows | `late-absences.test.ts` | Unknown event codes and blank rows are skipped during sync | Automated |
+| TC-ATT-03 | matches a registration name to the surname-first staff sheet format | `late-absences.test.ts` | Name matching aligns registered `Last, First M.` with sheet columns | Automated |
+| TC-ATT-04 | requires a unique surname, first name, and middle initial match | `late-absences.test.ts` | Ambiguous or duplicate name matches are rejected | Automated |
 
-# Acceptance checklist
+## Destinations and analytics
 
-Before release:
+| ID | Test case | Source file | Expected result | Status |
+| --- | --- | --- | --- | --- |
+| TC-DES-01 | uses only the Philippine place name for the saved value | `destination-search.test.ts` | Destination autocomplete stores the Philippine locality without region suffix | Automated |
+| TC-DES-02 | excludes international results and caps Philippine results at five | `destination-search.test.ts` | Only Philippine destinations are returned, limited to five suggestions | Automated |
+| TC-DES-03 | deduplicates saved and live destinations case-insensitively with normalized whitespace | `destination-search.test.ts` | Duplicate destinations are collapsed regardless of case or extra spaces | Automated |
+| TC-DES-04 | matches saved destination names by initials and partial keywords | `destination-search.test.ts` | Search matches by acronym or partial word (e.g., "ala" matches "Alabang") | Automated |
+| TC-DES-05 | requires three characters and limits search text | `destination-search.test.ts` | `destinationSearchSchema` rejects queries shorter than 3 or longer than 100 characters | Automated |
+| TC-DES-06 | combines legacy address suffixes and casing under the common place name | `destination-analytics.test.ts` | Analytics normalizes variants such as "Alabang, Muntinlupa" and "ALABANG" into one place | Automated |
+| TC-DES-07 | counts a multi-stop request once per destination and sorts by trip count | `destination-analytics.test.ts` | Each destination in a multi-stop request is counted once; results are sorted descending | Automated |
+| TC-DES-08 | limits the chart data to twenty destinations | `destination-analytics.test.ts` | Destination analytics returns at most 20 places for chart rendering | Automated |
 
-1. Run `npm test`.
-2. Run `npm run build`.
-3. Test vehicle submission and approval in a browser.
-4. Test COE request and document release.
-5. Test Permission Slip approval and receipt delivery.
-6. Test attendance synchronization and discrepancy resolution.
-7. Test desktop and mobile layouts.
-8. Verify external OAuth callback hosts and redirect URIs.
-9. Verify Gmail sender authorization.
-10. Verify database setup against a clean environment.
+## Routing and errors
+
+| ID | Test case | Source file | Expected result | Status |
+| --- | --- | --- | --- | --- |
+| TC-ROU-01 | matches the public landing page for / | `app-routing.test.tsx` | Route `/` resolves to the public landing component | Automated |
+| TC-ROU-02 | matches public auth and privacy pages | `app-routing.test.tsx` | Routes `/login`, `/register`, `/forgot-password`, `/privacy`, and `/terms-of-service` resolve correctly | Automated |
+| TC-ROU-03 | matches the authenticated dashboard and request routes | `app-routing.test.tsx` | Authenticated routes such as `/dashboard`, `/requests`, and `/requests/new` are registered | Automated |
+| TC-ROU-04 | falls back to the root 404 for unknown paths | `app-routing.test.tsx` | Unmatched paths render the root catch-all 404 layout | Automated |
+| TC-ROU-05 | replaces default Zod length errors with plain language | `errors.test.ts` | `normalizeFieldError` converts generic Zod length messages to user-friendly text | Automated |
+| TC-ROU-06 | normalizes default maximum-length and missing-value errors | `errors.test.ts` | Default max-length and required messages are rewritten into plain language | Automated |
+| TC-ROU-07 | normalizes default option, object and number messages | `errors.test.ts` | Invalid enum, object shape, and number errors return readable messages | Automated |
+| TC-ROU-08 | preserves custom validation messages | `errors.test.ts` | Explicitly defined Zod messages are not overwritten by the normalizer | Automated |
+| TC-ROU-09 | recognizes aborted requests | `request-errors.test.ts` | AbortError and request cancellation are detected and handled gracefully | Automated |
+| TC-ROU-10 | does not suppress unrelated server errors | `request-errors.test.ts` | Non-abort errors are re-thrown so they surface to the user | Automated |
+
+## Ticket verification
+
+| ID | Test case | Source file | Expected result | Status |
+| --- | --- | --- | --- | --- |
+| TC-TVR-01 | round-trips server-signed approval claims | `ticket-verification.test.ts` | Token created with HMAC-SHA256 and base64url verifies successfully | Automated |
+| TC-TVR-02 | rejects tokens with a changed payload, signature, or secret | `ticket-verification.test.ts` | Tampered tokens fail verification via `timingSafeEqual` | Automated |
+| TC-TVR-03 | normalizes MySQL approval timestamps | `ticket-verification.test.ts` | MySQL `YYYY-MM-DD HH:MM:SS` strings are parsed and displayed consistently | Automated |
+| TC-TVR-04 | binds the verification reference to the official dates and destinations | `ticket-verification.test.ts` | QR verification link shows the exact approved dates and destinations from the database | Automated |
+
+## Validation rules
+
+The system validates inputs with Zod schemas in `src/lib/validation.ts` and `src/lib/permission-schema.ts`. The following table summarizes the key rules.
+
+| Field / Schema | Rule | Error message |
+| --- | --- | --- |
+| Email (all) | Trim, lowercase, 3 to 190 chars, valid format | "Enter a valid email address." |
+| Password | 12 to 128 chars, lowercase, uppercase, number, symbol | "Password must contain at least 12 characters, a lower-case letter, an upper-case letter, a number, a symbol." |
+| Login password | 1 to 200 chars | "Enter your password." |
+| Person name | Trim, 2 to 120 chars, letters/spaces/periods/apostrophes/hyphens only | "Enter your full name." / "Names must be 120 characters or fewer." / "Use letters, spaces, periods, apostrophes or hyphens only." |
+| Department | Trim, 2 to 190 chars | "Enter your department or office." / "Department must be 190 characters or fewer." |
+| Registration OTP email | Must be `@lyceumalabang.edu.ph` | "Use your @lyceumalabang.edu.ph address." |
+| Registration OTP code | Exactly six digits | "Enter the six-digit verification code." |
+| Recovery code | Exactly six digits | "Enter the six-digit recovery code." |
+| Philippine mobile number | 11 digits starting with `09`, or `+63` format | Invalid numbers return `null`; empty input returns `""` |
+| Request destinations | Array, 1 to 10 items, 2 to 200 chars each, no control characters | "Enter your destinations." / "You can add up to 10 destinations." / "Destinations contain invalid characters." |
+| Passengers | Integer, 1 to 60 | "Enter the number of passengers." / "Enter a whole number of passengers." / "Enter at least one passenger." / "For more than 60 passengers, please file separate requests." |
+| Date range | `YYYY-MM-DD` format, end date on or after start date | "Choose a valid date." / "The end date must be on or after the start date." |
+| Time needed | `HH:MM`, 24-hour | "Choose the time the vehicle is needed." |
+| Purpose | Trim, 5 to 1000 chars, no control characters | "Describe the purpose of travel (at least 5 characters)." / "Purpose must be 1,000 characters or fewer." / "Purpose contains invalid characters." |
+| Vehicle plate number | Trim, uppercase, 2 to 32 chars, letters/digits/spaces/hyphens only | "Enter the plate number." / "Plate numbers may use letters, digits, spaces and hyphens only." |
+| Request id | Valid UUID | "Invalid request reference." |
+| Signature image | `data:image/png` or `data:image/jpeg`, min 50 bytes, max 2 MB | "A signature is required." / "The signature image is too large." / "The signature image is not valid." |
+| Trip ticket image | `data:image/png`, min 100 bytes, max 6 MB | "The trip ticket photo is missing." / "The trip ticket photo is too large." / "The trip ticket photo is not valid." |
+| Rejection reason | Trim, 5 to 1000 chars | "Please give a reason (at least 5 characters)." / "The reason must be 1,000 characters or fewer." |
+| Destination search | Trim, 3 to 100 chars | "Enter at least 3 characters to search previous destinations." / "Search text must be 100 characters or fewer." |
+| Analytics path | Trim, 1 to 180 chars, safe path characters only | "Invalid analytics path." |
+| Permission Slip department | Trim, 2 to 190 chars | "Enter your department or office." / "The department or office name is too long." |
+| Permission Slip date | `YYYY-MM-DD`, valid calendar date | "Choose a valid date." |
+| Permission Slip time out / time in | `HH:MM`, 24-hour | "Choose a valid time out." / "Choose a valid time in." |
+| Permission Slip reason | Trim, 5 to 500 chars | "State the reason for going out." |
+| Permission Slip signature | `data:image/png` or `data:image/jpeg`, min 100 bytes, max 2 MB | "An electronic signature is required." / "The signature image is too large." / "The signature image is not valid." |
+| Permission Slip receipt | `data:image/png`, max 4 MB | "The permission slip file is too large." / "The permission slip file is not valid." |
+| Permission Slip signatory email | `@lyceumalabang.edu.ph`, valid format, max 190 chars | "Enter a valid institutional email." / "Use your @lyceumalabang.edu.ph address." |
+| Permission Slip signatory name | Trim, 2 to 120 chars, letters/spaces/periods/apostrophes/hyphens only | "Enter the signatory's full name." / "Names must be 120 characters or fewer." |
+| Trip archive filters | Date range optional; if both provided, end must be on or after start; page 0 to 10000 | "The end date must be on or after the start date." |
+
+## Manual user acceptance test checklist
+
+Run through the checklist below on a staging environment before each production release.
+
+<Steps>
+  <Step title="Run automated suite">
+    Execute `npm test` and confirm all 161 cases pass. Run `npm run lint` with zero errors.
+  </Step>
+  <Step title="Build verification">
+    Run `npm run build` and confirm the production bundle compiles without errors.
+  </Step>
+  <Step title="Vehicle submission and approval">
+    Create a VRTT request as a requisitioner. Verify the Head of Transport reviews, the Director recommends, and the President approves. Confirm the QR code appears on the approved ticket and that `/api/verify-ticket/$token` validates it.
+  </Step>
+  <Step title="Return and resubmission">
+    Return a request at the review stage with a reason. Confirm the requisitioner can edit and resubmit. Verify prior signatures are archived and the attempt counter increments.
+  </Step>
+  <Step title="Trip ticket email and print">
+    After approval, send the trip ticket image via email. Confirm the inline PNG is delivered to the requester. Test retry from the print page.
+  </Step>
+  <Step title="COE request and document release">
+    Submit a COE request, move it through processing to ready-for-pickup, and release it. Verify the released document is accessible only to admins and that the employee receives status emails.
+  </Step>
+  <Step title="COE template and compensation">
+    Request a COE with the compensation option selected. Verify the amount is rendered in words on the generated template.
+  </Step>
+  <Step title="Permission Slip approval and receipt">
+    Submit a Permission Slip, approve it as the director, and send the receipt. Confirm the PNG receipt is archived and emailed to the employee.
+  </Step>
+  <Step title="Attendance synchronization">
+    Trigger a sync for each staff group (Non-Teaching, College, Basic Ed). Verify the June-to-May cycle is respected and that employee names map correctly from the Google Sheets.
+  </Step>
+  <Step title="Attendance discrepancy resolution">
+    Raise a discrepancy flag from the employee page. Resolve it from the admin page and confirm the notification is marked read.
+  </Step>
+  <Step title="Role-based access">
+    Log in as each role (requisitioner, department head, transport head, director, president, transport staff, guard, driver, admin, super admin) and confirm visible menus and queues match role permissions.
+  </Step>
+  <Step title="Password policy and lockout">
+    Attempt login with 5 wrong passwords. Confirm the account locks for 15 minutes. Test a password change with a valid 12-character mixed password.
+  </Step>
+  <Step title="Google sign-in">
+    Sign in with an institutional Google account. Confirm profile completion prompts for new accounts and redirect safety for same-site paths.
+  </Step>
+  <Step title="Gmail sender authorization">
+    On staging, verify the Gmail sender is connected via `/api/gmail/connect` and that mail delivery reflects `email_status` as sent.
+  </Step>
+  <Step title="Receipt archive and bulk download">
+    As a super admin, search receipts by name and date range. Preview VRTT, COE, and Permission Slip receipts. Download a bulk ZIP and confirm all selected files are included.
+  </Step>
+  <Step title="Responsive layouts">
+    Test dashboard, request forms, approval screens, and COE pages on desktop (1920px), tablet (768px), and mobile (375px) viewports.
+  </Step>
+  <Step title="External COE access">
+    Sign in as a former employee with a personal Google account. Confirm access is limited to `/hrdo/profile`, `/hrdo/coe`, and `/hrdo/coe/$id`.
+  </Step>
+  <Step title="Database setup on clean environment">
+    Run `npm run db:setup` against a fresh MySQL instance. Confirm the database, limited user, schema, and `.env` are created. Run `npm run db:seed` and verify the initial admin account is created.
+  </Step>
+  <Step title="Security headers">
+    Verify CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, and Permissions-Policy are present on all responses.
+  </Step>
+</Steps>

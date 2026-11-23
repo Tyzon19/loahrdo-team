@@ -1,9 +1,7 @@
 ---
-title: System Overview
-description: Project context, objectives, scope, stakeholders, and system boundaries.
+title: "System Overview"
+description: "Project context, objectives, scope, stakeholders, and SDLC for the LOA HRDO Desk systems."
 ---
-
-# LOA HRDO Desk
 
 LOA HRDO Desk is an integrated operational platform for Lyceum of Alabang. It brings vehicle reservation and trip-ticket processing, Certificate of Employment requests, Permission Slip processing, and late-and-absence operations into role-based web services.
 
@@ -31,23 +29,66 @@ The system standardizes request submission, approval, document generation, recor
 - Send Gmail notifications and official attachments.
 - Support desktop and mobile browser use.
 
-## Stakeholders
+## Stakeholder matrix
 
-| Stakeholder | Responsibility |
-| --- | --- |
-| Institutional employees | Submit requests and track available service records. |
-| Requisitioners | Submit and revise vehicle requests. |
-| Transport Head | Review vehicle requests and assign fleet resources. |
-| Director | Perform the recommendation or approval stage assigned to the workflow. |
-| President | Perform final vehicle-request approval. |
-| HRDO staff | Process, verify, prepare, and release COE documents. |
-| Permission Slip signatories | Approve or reject submitted Permission Slips. |
-| Administrators | Manage module records, users, signatories, reports, and configuration. |
-| Super Administrator | Manage organization-wide system access. |
-| External former employees or verifiers | Request or verify eligible COE services with personal Google accounts. |
+The following table maps each stakeholder to their system role, responsibilities, and RACI-style participation in key activities.
+
+| Stakeholder | System role | Responsibilities | Submit request | Approve | Process COE | Manage accounts | Operate system |
+| :-- | :-- | :-- | :-- | :-- | :-- | :-- | :-- |
+| Requisitioner | `requisitioner` | Submit and revise vehicle requests; track personal trips | R | - | - | - | - |
+| Department Head | `department_head` | HRDO department oversight (not a workflow signatory) | - | - | - | A | - |
+| Transport Head | `transport_head` | Review vehicle requests; assign fleet resources; initial workflow signatory | - | R | - | - | - |
+| Director | `director` | Recommend or approve assigned workflow stages | - | R | - | - | - |
+| President | `president` | Final trip-ticket approval | - | R | - | - | - |
+| Transport Staff | `transport_staff` | Operational and dispatch support | - | - | - | - | R |
+| Guard | `guard` | Record time out and time in on dispatch forms | - | - | - | - | R |
+| Driver | `driver` | Record odometer readings and trip reports | - | - | - | - | R |
+| Assistant | `assistant` | Alternate signatory for configured stages | - | R | - | - | - |
+| Administrator | `admin` | Manage module records, users, signatories, reports, and configuration | - | - | A | R | A |
+| Super Administrator | `is_super_admin` | Manage organization-wide system access and cross-module oversight | - | - | A | A | R |
+| HRDO Staff / Processor | `hrdo_staff`, `hrdo_admin` | Verify, process, prepare, and release COE documents | - | - | R | A | - |
+| Permission Slip Signatory | `director` (Permission Slip) | Approve or reject submitted Permission Slips | - | R | - | - | - |
+| External verifier / former employee | `is_external` (HRDO) | Request or verify eligible COE services with personal Google accounts | R | - | - | - | - |
+
+<Note>
+  R = Responsible (performs the work), A = Accountable (approves or owns the outcome), - = not involved.
+</Note>
 
 ## Scope
 
-The implementation includes account authentication, account profiles, password recovery, OTP registration, role dashboards, request submission, approval stages, signatures, notifications, record history, document output, receipts, attendance synchronization, and module reports.
+### In scope
 
-The system depends on approved institutional policies and configured external services. It does not replace institutional authority, manual payroll policy, legal document requirements, or decisions made by designated approvers.
+- Account authentication (password, OTP, Google OAuth).
+- Account profiles, password recovery, and forced password changes.
+- Role dashboards and request queues.
+- Vehicle request submission, approval chain, return, resubmission, and dispatch.
+- Certificate of Employment request, verification, processing, correction, and release.
+- Permission Slip submission, director approval, receipt generation, and email delivery.
+- Late and absence attendance synchronization, mapping, discrepancy flags, and notifications.
+- Electronic signatures, decision history, and audit records.
+- Official trip tickets, QR verification, receipt archives, and bulk downloads.
+- Gmail API notification delivery and Google Sheets integration.
+- Analytics, reporting, and trip archive search.
+
+### Out of scope
+
+- Payroll computation or policy enforcement.
+- Legal document drafting outside COE templates.
+- Decisions that remain under institutional authority.
+- General HR information systems not related to the four modules.
+
+## Software development life cycle
+
+<Note>
+  The phases below reflect the delivery practices evidenced in the repository: Zod schema validation, Vitest unit and routing suites, `db:setup` and `db:seed` automation scripts, ESLint and Prettier enforcement, and iterative feature increments per module.
+</Note>
+
+| Phase | Activities | Key artifacts |
+| :-- | :-- | :-- |
+| Planning | Define module boundaries, role maps, and integration points. | Project scope, stakeholder matrix, architecture decisions. |
+| Requirements | Document workflows (VRTT, COE, Permission Slip, attendance), validation rules, and notification triggers. | Workflow tables, status enums, access rules, acceptance criteria. |
+| Design | Design database schema, API contracts, session stores, and security headers. | ERD, server-function signatures, route guards, CSP policy. |
+| Implementation | Build React 19 + TanStack Start routes, server functions, Zod validators, and Radix UI components. | Source code in `src/routes`, `src/server-functions.ts`, `src/lib/*`. |
+| Testing | Run Vitest suites covering access rules, workflow transitions, validation, email templates, OAuth, and ticket verification. | `src/test/*.test.ts` (~160 cases across 24 files), CI pass. |
+| Deployment | Run `npm run build`, configure environment variables, execute `db:setup`, authorize Gmail sender, and verify OAuth callbacks. | `.env`, production build, database schema, deployment checklist. |
+| Maintenance | Monitor logs, failed emails, sync errors, session trends, and disk use; apply backups and schema updates. | Backup scripts, sync logs, incident records, release notes. |

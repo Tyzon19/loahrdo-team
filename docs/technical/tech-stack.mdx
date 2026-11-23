@@ -1,0 +1,182 @@
+---
+title: "Technology Stack"
+description: "Runtime requirements, npm scripts, dependencies, devDependencies, and build tooling for the LOA HRDO systems."
+---
+
+The LOA HRDO systems are a full-stack TypeScript application built with React 19, TanStack Start, and Vite 8. The server runs on Node.js 20+ and connects to MySQL or MariaDB via mysql2.
+
+## Runtime requirements
+
+| Requirement | Recommended value |
+| --- | --- |
+| Node.js | 20 or newer |
+| Package manager | npm |
+| Database | MySQL or MariaDB (InnoDB, utf8mb4) |
+| Local database stack | Laragon (Windows) or equivalent |
+| Browser | Current Chrome, Edge, Firefox, or Safari |
+| Device | Desktop, tablet, or mobile with responsive layout |
+| Network | HTTPS in production |
+
+## npm scripts
+
+| Script | Command | Purpose |
+| --- | --- | --- |
+| `dev` | `vite dev` | Start the development server on port 8080 |
+| `build` | `vite build` | Production build |
+| `build:dev` | `vite build --mode development` | Development build |
+| `preview` | `vite preview` | Preview the production build |
+| `lint` | `eslint .` | Lint the entire project |
+| `format` | `prettier --write .` | Format the entire project |
+| `test` | `vitest run` | Run the test suite once |
+| `test:watch` | `vitest` | Run tests in watch mode |
+| `db:setup` | `node scripts/setup-db.mjs` | Create database, limited user, schema, and `.env` |
+| `db:seed` | `node scripts/seed-accounts.mjs` | Create initial admin account and doc config |
+
+## Dependencies
+
+### Framework and routing
+
+| Package | Version | Purpose |
+| --- | --- | --- |
+| `react` | `^19.2.0` | UI library |
+| `react-dom` | `^19.2.0` | React DOM renderer |
+| `@tanstack/react-router` | `1.170.41` | File-based routing |
+| `@tanstack/react-start` | `1.168.60` | Full-stack React framework (TanStack Start) |
+| `@tanstack/router-plugin` | `1.168.42` | Vite plugin for TanStack Router |
+| `@tanstack/react-query` | `^5.101.1` | Server-state caching and synchronization |
+
+### Data and validation
+
+| Package | Version | Purpose |
+| --- | --- | --- |
+| `mysql2` | `^3.24.6` | MySQL/MariaDB driver with Promise API |
+| `zod` | `^4.6.7` | Schema validation |
+| `react-hook-form` | `^7.91.0` | Form state management |
+| `@hookform/resolvers` | `^5.9.2` | Zod resolver for react-hook-form |
+| `date-fns` | `^4.1.0` | Date manipulation and formatting |
+
+### UI and styling
+
+| Package | Version | Purpose |
+| --- | --- | --- |
+| `tailwindcss` | `^4.2.1` | Utility-first CSS framework |
+| `@tailwindcss/vite` | `^4.2.1` | Tailwind Vite plugin |
+| `tailwind-merge` | `^3.5.0` | Merge Tailwind classes without conflicts |
+| `clsx` | `^2.1.1` | Conditional className construction |
+| `class-variance-authority` | `^0.7.1` | Component variant definitions |
+| `tw-animate-css` | `^1.3.4` | Tailwind CSS animations |
+| `lucide-react` | `^0.575.0` | Icon library |
+| `cmdk` | `^1.1.1` | Command palette component |
+| `vaul` | `^1.1.2` | Drawer component |
+| `input-otp` | `^1.4.2` | OTP input component |
+| `react-day-picker` | `^9.14.0` | Date picker component |
+| `embla-carousel-react` | `^8.6.0` | Carousel component |
+| `react-resizable-panels` | `^4.6.5` | Resizable panel layout |
+| `sonner` | `^2.0.8` | Toast notifications |
+| `recharts` | `^2.15.4` | Charting library |
+
+### Radix UI primitives
+
+| Package | Version | Purpose |
+| --- | --- | --- |
+| `@radix-ui/react-accordion` | `^1.2.12` | Accordion primitive |
+| `@radix-ui/react-alert-dialog` | `^1.1.15` | Alert dialog primitive |
+| `@radix-ui/react-aspect-ratio` | `^1.1.8` | Aspect ratio primitive |
+| `@radix-ui/react-avatar` | `^1.1.11` | Avatar primitive |
+| `@radix-ui/react-checkbox` | `^1.3.3` | Checkbox primitive |
+| `@radix-ui/react-collapsible` | `^1.1.12` | Collapsible primitive |
+| `@radix-ui/react-context-menu` | `^2.2.16` | Context menu primitive |
+| `@radix-ui/react-dialog` | `^1.1.15` | Dialog primitive |
+| `@radix-ui/react-dropdown-menu` | `^2.1.16` | Dropdown menu primitive |
+| `@radix-ui/react-hover-card` | `^1.1.15` | Hover card primitive |
+| `@radix-ui/react-label` | `^2.1.8` | Label primitive |
+| `@radix-ui/react-menubar` | `^1.1.16` | Menubar primitive |
+| `@radix-ui/react-navigation-menu` | `^1.2.14` | Navigation menu primitive |
+| `@radix-ui/react-popover` | `^1.1.15` | Popover primitive |
+| `@radix-ui/react-progress` | `^1.1.8` | Progress primitive |
+| `@radix-ui/react-radio-group` | `^1.3.8` | Radio group primitive |
+| `@radix-ui/react-scroll-area` | `^1.2.10` | Scroll area primitive |
+| `@radix-ui/react-select` | `^2.2.6` | Select primitive |
+| `@radix-ui/react-separator` | `^1.1.8` | Separator primitive |
+| `@radix-ui/react-slider` | `^1.3.6` | Slider primitive |
+| `@radix-ui/react-slot` | `^1.2.4` | Slot composition primitive |
+| `@radix-ui/react-switch` | `^1.2.6` | Switch primitive |
+| `@radix-ui/react-tabs` | `^1.1.13` | Tabs primitive |
+| `@radix-ui/react-toggle` | `^1.1.10` | Toggle primitive |
+| `@radix-ui/react-toggle-group` | `^1.1.11` | Toggle group primitive |
+| `@radix-ui/react-tooltip` | `^1.2.8` | Tooltip primitive |
+
+### Documents and media
+
+| Package | Version | Purpose |
+| --- | --- | --- |
+| `qrcode` | `^1.5.4` | QR code generation for trip tickets |
+| `html-to-image` | `^1.11.13` | Convert HTML elements to images (receipts, tickets) |
+| `jszip` | `^3.10.2` | Bulk receipt ZIP download |
+
+### Integrations
+
+| Package | Version | Purpose |
+| --- | --- | --- |
+| `googleapis` | `^190.0.0` | Gmail API and Google Sheets API client |
+
+### Utilities
+
+| Package | Version | Purpose |
+| --- | --- | --- |
+| `vite-tsconfig-paths` | `^6.0.2` | Vite path aliasing from tsconfig |
+
+## DevDependencies
+
+| Package | Version | Purpose |
+| --- | --- | --- |
+| `vite` | `^8.3.5` | Build tool and dev server |
+| `vitest` | `^4.1.10` | Test runner |
+| `jsdom` | `^20.0.3` | DOM environment for tests |
+| `@testing-library/react` | `^16.0.0` | React testing utilities |
+| `@testing-library/jest-dom` | `^6.6.0` | Custom Jest matchers for DOM |
+| `typescript` | `^5.8.3` | TypeScript compiler |
+| `typescript-eslint` | `^8.72.2` | TypeScript ESLint integration |
+| `@eslint/js` | `^9.32.0` | ESLint core |
+| `eslint` | `^9.32.0` | Linter |
+| `eslint-config-prettier` | `^10.1.1` | Disable conflicting ESLint rules |
+| `eslint-plugin-prettier` | `^5.2.6` | Run Prettier as an ESLint rule |
+| `eslint-plugin-react-hooks` | `^5.2.0` | React hooks lint rules |
+| `eslint-plugin-react-refresh` | `^0.4.20` | Fast refresh lint rules |
+| `prettier` | `^3.7.3` | Code formatter |
+| `@vitejs/plugin-react` | `^5.2.0` | React Fast Refresh for Vite |
+| `nitro` | `3.0.260603-beta` | Server engine for TanStack Start |
+| `@types/node` | `^22.16.5` | Node.js type definitions |
+| `@types/react` | `^19.2.0` | React type definitions |
+| `@types/react-dom` | `^19.2.0` | React DOM type definitions |
+| `@types/qrcode` | `^1.5.6` | QR code type definitions |
+| `globals` | `^15.15.0` | Global variable definitions for ESLint |
+
+## Overrides
+
+| Package | Override |
+| --- | --- |
+| `rolldown` | `1.2.1` |
+| `@typescript-eslint/typescript-estree` | `minimatch` `^11.0.1` |
+
+## Build tooling notes
+
+### Vite configuration
+
+`vite.config.ts` configures:
+
+- `tanstackStart` plugin with custom SSR error wrapper entry (`server.ts`)
+- `@vitejs/plugin-react` for React Fast Refresh
+- `@tailwindcss/vite` for Tailwind CSS processing
+- `vite-tsconfig-paths` for `@/` alias resolution
+- Dev server on port `8080` with `strictPort: true`
+- Allowed hosts: `localhost`, `127.0.0.1`, `*.trycloudflare.com`
+- File watcher ignores `.output/**` and `.nitro/**` to avoid lock errors
+
+### Nitro
+
+TanStack Start uses `nitro` (`3.0.260603-beta`) as its server engine. The custom `server.ts` entry wraps the default server entry to normalize catastrophic SSR errors and inject security headers on every response.
+
+### TypeScript
+
+The project uses TypeScript `^5.8.3` with path mapping (`@/*` -> `src/*`) and strict mode. All server functions are typed with Zod schemas and shared types in `src/lib/types.ts`.

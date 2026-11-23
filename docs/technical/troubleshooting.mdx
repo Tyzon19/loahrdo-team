@@ -1,95 +1,265 @@
 ---
-title: Troubleshooting and Support
-description: Common authentication, submission, email, attendance, database, and document issues.
+title: "Troubleshooting"
+description: "Common issues, error messages, and fixes for authentication, email, database, tickets, attendance, COE, and Permission Slips."
+sidebarTitle: "Troubleshooting"
 ---
 
-# Login and account problems
+This page is Part IX of the technical documentation. Use the sections below to diagnose and resolve common operational issues.
 
-## Institutional account rejected
+---
 
-Check that the account email is in an allowed configured domain and that the account exists in the applicable module. For former employees or external verifiers, use the external COE Google flow.
+## Sign-in and lockout
 
-## Account is locked
+<AccordionGroup>
+  <Accordion title="Account is locked after failed attempts">
+    **Symptom:** The sign-in page shows "Too many failed sign-in attempts. Try again in X minutes."
 
-Review failed login attempts and `locked_until`. An administrator or password recovery procedure may restore access according to institutional policy.
+    **Cause:** Five consecutive failed password attempts trigger a 15-minute lockout. The server stores `failed_attempts` and `locked_until` on the user row.
 
-## Password change is repeated
+    **Fix:** Wait for the lockout to expire, or ask an administrator to reset the password from `/profile`. A successful password reset clears `failed_attempts` and `locked_until`.
+  </Accordion>
 
-Confirm the password meets policy and that the forced-password-change operation completed. Retry session invalidation and sign in again.
+  <Accordion title="Password change keeps repeating">
+    **Symptom:** After changing the password, the system immediately asks for another change.
 
-## Google sign-in redirect fails
+    **Cause:** The `must_change_password` flag is still set, or the new password does not meet the policy (12-128 characters, lowercase, uppercase, number, symbol).
 
-Verify:
+    **Fix:** Ensure the new password satisfies all policy rules. If the loop continues, sign out and sign in again so the session refreshes.
+  </Accordion>
 
-- The callback URI matches the OAuth client.
-- `SITE_URL` matches the public origin.
-- State cookies reach the callback host.
-- The account is eligible for the selected OAuth mode.
-- The external consent screen and test users are configured correctly.
+  <Accordion title="Forgot-password code never arrives">
+    **Symptom:** The recovery code request succeeds, but no email is received.
 
-# Request submission problems
+    **Cause:** Gmail delivery may be failing, or the address is incorrect.
 
-## Submission is rejected
+    **Fix:** Check the email address for typos. Verify that `GOOGLE_SENDER_EMAIL` is authorized and that `GOOGLE_REFRESH_TOKEN` is present. Ask an administrator to check the server logs for `[gmail]` errors.
+  </Accordion>
+</AccordionGroup>
 
-Check required fields, date order, time format, destination, passenger count, reason length, and institutional email restrictions. Review Zod and server validation messages.
+---
 
-## Request is missing from a queue
+## Registration OTP
 
-Confirm that the request status matches the approver stage and that the account is assigned to that stage or as an alternate.
+<AccordionGroup>
+  <Accordion title="OTP not received">
+    **Symptom:** After clicking "Request verification code", no six-digit code arrives.
 
-## Returned request cannot be resubmitted
+    **Cause:** Gmail delivery failed, or the email domain is not allowed.
 
-Confirm that the request is within the requisitioner editing window and has not already been revised. Re-submit at the original transport-review stage.
+    **Fix:** Confirm the address ends with `@lyceumalabang.edu.ph`. Check spam folders. Ask an administrator to verify Gmail connectivity at `/api/gmail/connect`.
+  </Accordion>
 
-# Email delivery problems
+  <Accordion title="OTP rejected as incorrect">
+    **Symptom:** The entered code is rejected with "That code is incorrect. N attempts remaining."
 
-Confirm:
+    **Cause:** The code was typed incorrectly, expired, or exceeded the maximum attempts.
 
-- `GOOGLE_REFRESH_TOKEN` is present.
-- `GOOGLE_SENDER_EMAIL` matches the authorized Gmail sender.
-- Gmail send scopes remain authorized.
-- The recipient email is valid.
-- The application server can reach Google APIs.
-- Workflow delivery was not rejected by external Gmail configuration.
+    **Fix:** Codes expire in 10 minutes and allow 5 attempts. Click resend after 60 seconds and enter the new code carefully.
+  </Accordion>
+</AccordionGroup>
 
-Committed records remain committed when email delivery fails. Check notification and email status fields before retrying.
+---
 
-# Document and receipt problems
+## Google sign-in
 
-For missing COE documents, confirm the request is ready or released and that the user is authorized to retrieve it.
+<AccordionGroup>
+  <Accordion title="Google sign-in is not set up yet">
+    **Symptom:** The error message says "Google sign-in is not set up yet."
 
-For missing trip tickets, confirm the request is approved and the official ticket was sent or saved.
+    **Cause:** `GOOGLE_CLIENT_ID` or `GOOGLE_CLIENT_SECRET` is missing.
 
-For missing Permission Slip receipts, confirm the slip is approved and receipt image persistence or Gmail delivery completed.
+    **Fix:** Add the institutional OAuth credentials to `.env` and restart the server.
+  </Accordion>
 
-# Attendance synchronization problems
+  <Accordion title="Use your @lyceumalabang.edu.ph Google account">
+    **Symptom:** The error says "Use your @lyceumalabang.edu.ph Google account."
 
-Verify:
+    **Cause:** The signed-in Google account is not from the allowed institutional domain.
 
-- Service-account credentials.
-- Spreadsheet IDs and sheet names.
-- Employee name mapping.
-- Staff-group mapping.
-- Sync log status.
-- Webhook secret.
-- Google Sheets API access.
+    **Fix:** Sign in with an institutional Google account. Only requisitioners can use Google sign-in; staff accounts must use the module-specific password login.
+  </Accordion>
 
-# Database problems
+  <Accordion title="This is not a requisitioner account">
+    **Symptom:** The error says "This is not a requisitioner account."
 
-If setup fails, verify database credentials, database server availability, migration state, and the application database user's privileges.
+    **Cause:** The institutional Google account belongs to a user whose role is not `requisitioner`.
 
-Do not run seed operations against a production database unless approved as initial setup or controlled maintenance.
+    **Fix:** Use the correct module login (HRDO or Permission Slip) or ask an administrator to confirm the account role.
+  </Accordion>
 
-# Escalation
+  <Accordion title="Callback rejected: missing or mismatched OAuth state">
+    **Symptom:** After Google redirect, the callback fails with a state mismatch warning in the server logs.
 
-Record:
+    **Cause:** The `SITE_URL` does not match the callback origin, or state cookies did not reach the callback host.
 
-- User and module.
-- Time and request ID.
-- Browser and route.
-- Server log reference.
-- Database state.
-- Email or third-party error.
-- Whether the operation committed successfully.
+    **Fix:** Ensure `SITE_URL` matches the public origin exactly. For local development, use `http://localhost:8080`. Verify that `GOOGLE_SIGNIN_REDIRECT_URI` is registered on the OAuth client.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Email delivery and Gmail reconnect
+
+<AccordionGroup>
+  <Accordion title="Email status shows failed">
+    **Symptom:** A notification or receipt shows `email_status: failed`.
+
+    **Cause:** `GOOGLE_REFRESH_TOKEN` is missing, expired, or the sender account lost Gmail send authorization.
+
+    **Fix:**
+
+    1. Confirm `GOOGLE_SENDER_EMAIL` matches the authorized account.
+    2. Visit `/api/gmail/connect` (localhost only in non-production) and re-authorize the sender.
+    3. Check server logs for `[gmail] OAuth refresh failed` or `401/403` responses.
+    4. Retry the action (resend ticket, resend receipt) after reconnecting.
+  </Accordion>
+
+  <Accordion title="Account created, but its email was not sent">
+    **Symptom:** After creating a signatory or processor account, a toast says the account was created but the email was not sent.
+
+    **Cause:** Gmail delivery failed after the database transaction committed.
+
+    **Fix:** The account exists. Reconnect Gmail and reset the user's password from `/profile`; the reset email will be retried.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Database connection and setup errors
+
+<AccordionGroup>
+  <Accordion title="setup-db refuses a weak DB_PASSWORD">
+    **Symptom:** `npm run db:setup` prints "Refusing to use a weak DB_PASSWORD from .env (minimum 20 characters)."
+
+    **Cause:** The existing `.env` contains a `DB_PASSWORD` shorter than 20 characters.
+
+    **Fix:** Remove or increase `DB_PASSWORD` in `.env` to at least 20 characters, then rerun `npm run db:setup`. The script will generate a strong password if the variable is missing.
+  </Accordion>
+
+  <Accordion title="setup-db refuses a weak TICKET_VERIFICATION_SECRET">
+    **Symptom:** `npm run db:setup` prints "Refusing to use a weak TICKET_VERIFICATION_SECRET from .env (minimum 32 characters)."
+
+    **Cause:** The existing `.env` contains a `TICKET_VERIFICATION_SECRET` shorter than 32 bytes.
+
+    **Fix:** Remove or increase the secret to at least 32 characters, then rerun the script. The script generates a 32-byte base64url secret automatically when the variable is missing.
+  </Accordion>
+
+  <Accordion title="Database connection timeout">
+    **Symptom:** Application pages show a database error or timeout.
+
+    **Cause:** The MySQL server is unreachable, or the pool configuration is misaligned.
+
+    **Fix:** Verify `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASSWORD`. Check that the MySQL service is running (Laragon locally, or the production database host). Review `DB_CONNECTION_LIMIT` and `DB_QUEUE_LIMIT` if the pool is exhausted.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Ticket QR verification
+
+<AccordionGroup>
+  <Accordion title="Ticket verification returns 404">
+    **Symptom:** Scanning the QR code on a printed ticket leads to a page showing "valid: false" with HTTP 404.
+
+    **Cause:** The request is not in an approved, dispatched, or completed status; the approval timestamp does not match the token; or the ticket digest changed.
+
+    **Fix:** Confirm the request status in `/requests/$id`. If the request was returned or rejected, the ticket is invalid. If the request was approved but the ticket still fails, the token may have been tampered with or the `TICKET_VERIFICATION_SECRET` differs between instances.
+  </Accordion>
+
+  <Accordion title="Ticket verification returns 503">
+    **Symptom:** The verification endpoint returns HTTP 503 with "Ticket verification is unavailable."
+
+    **Cause:** A server-side exception occurred during verification, such as a missing `TICKET_VERIFICATION_SECRET`.
+
+    **Fix:** Check the server logs for `[ticket-verification]` errors. Ensure `TICKET_VERIFICATION_SECRET` is set and is at least 32 bytes on every server instance.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Attendance sync webhook
+
+<AccordionGroup>
+  <Accordion title="Webhook returns 401">
+    **Symptom:** The caller receives HTTP 401 with "Webhook authentication failed."
+
+    **Cause:** The `x-webhook-secret` header is missing or does not match `LATE_ABSENCES_WEBHOOK_SECRET`.
+
+    **Fix:** Confirm the secret header value matches the environment variable exactly. If `LATE_ABSENCES_WEBHOOK_SECRET` is not configured, set it in `.env` and restart.
+  </Accordion>
+
+  <Accordion title="Webhook returns 400">
+    **Symptom:** The caller receives HTTP 400 with an attendance-sync error.
+
+    **Cause:** The payload is malformed, the spreadsheet ID is missing, or the staff group is unsupported.
+
+    **Fix:** Verify the JSON body contains the expected fields. Confirm `LATE_ABSENCES_NON_TEACHING_SPREADSHEET_ID`, `LATE_ABSENCES_COLLEGE_SPREADSHEET_ID`, and `LATE_ABSENCES_BASIC_ED_SPREADSHEET_ID` are set. Check the server logs for `[late-absences-webhook]` details.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## COE uploads
+
+<AccordionGroup>
+  <Accordion title="Upload rejected: file too large">
+    **Symptom:** Uploading a signed COE document fails with a size error.
+
+    **Cause:** The file exceeds `COE_MAX_DOCUMENT_BYTES` (5 MB).
+
+    **Fix:** Compress or reduce the PDF/DOCX to under 5 MB, then retry.
+  </Accordion>
+
+  <Accordion title="Upload rejected: invalid format">
+    **Symptom:** The upload is rejected because of an unsupported MIME type.
+
+    **Cause:** Only PDF and DOCX are accepted.
+
+    **Fix:** Convert the document to PDF or DOCX and upload again.
+  </Accordion>
+
+  <Accordion title="COE request stays overdue">
+    **Symptom:** A request shows "overdue" even after the employee resubmits corrected information.
+
+    **Cause:** The deadline is fixed at submission time and is never reset by a correction.
+
+    **Fix:** Process the request as soon as possible. The overdue label is informational; it does not block further processing.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Permission Slips
+
+<AccordionGroup>
+  <Accordion title="Permission Slip submission rejected">
+    **Symptom:** The form shows validation errors and will not submit.
+
+    **Cause:** A required field is missing, the reason is shorter than 5 characters or longer than 500, or the signature is missing.
+
+    **Fix:** Fill in all fields, keep the reason between 5 and 500 characters, and draw or upload a signature.
+  </Accordion>
+
+  <Accordion title="Permission Slip receipt not sent">
+    **Symptom:** After approval, the employee did not receive the receipt email.
+
+    **Cause:** Gmail delivery failed, or the receipt image was not persisted.
+
+    **Fix:** From the slip detail page, click **Send receipt** to retry email delivery. If it still fails, reconnect Gmail and try again. The archived receipt image can also be downloaded directly.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Escalation checklist
+
+If an issue cannot be resolved with the fixes above, record the following before escalating:
+
+- User email and module (VRTT, HRDO, Permission Slip)
+- Time and request or slip ID
+- Browser and page route
+- Server log reference (look for `[gmail]`, `[ticket-verification]`, `[late-absences-webhook]`, or `[google-signin]`)
+- Database state (status, `locked_until`, `email_status`)
+- Whether the operation committed successfully (records exist even if email failed)
 
 Escalate authentication, database, OAuth, Gmail, or security incidents to the system administrator. Escalate approval or policy decisions to the designated organizational owner.

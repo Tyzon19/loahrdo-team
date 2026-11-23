@@ -1,55 +1,120 @@
 ---
-title: Architecture and Workflows
-description: Client-server architecture and Mermaid DFD, sequence, and activity diagrams.
+title: "Architecture and Workflows"
+description: "Layer stack, system architecture, data flow diagrams, and approval workflows for VRTT, Permission Slip, COE, and Late/Absences."
+sidebarTitle: "Architecture"
 ---
 
-# Architecture
+The LOA HRDO Desk is a single TypeScript application built on TanStack Start. Browser pages call server functions that enforce authentication and business rules, read and write a MySQL database, and integrate with Gmail, Google Sheets, and QR generation. This page shows the layer stack, system architecture, data flow diagrams, and detailed workflows for every module.
+
+## Layer stack
 
 | Layer | Implementation |
 | --- | --- |
-| Browser client | React 19, TanStack Router, TanStack Query, Radix UI components, Tailwind CSS |
+| Browser client | React 19, TanStack Router, TanStack Query, Radix UI, Tailwind CSS |
 | Application server | TanStack Start server functions and HTTP routes |
 | Language | TypeScript |
-| Primary database | MySQL or MariaDB through `mysql2` |
+| Primary database | MySQL or MariaDB via `mysql2` |
 | Validation | Zod schemas and server-side authorization |
-| Authentication | Password sessions, OTP registration, Google OAuth, and dedicated module sessions |
-| Integrations | Gmail, Google Sheets, QR generation, HTML-to-image |
+| Authentication | Password sessions, OTP registration, Google OAuth, module-specific session stores |
+| Integrations | Gmail API, Google Sheets, QR generation, HTML-to-image |
 | Testing | Vitest, Testing Library, jsdom |
-| Build and development | Vite and Nitro |
+| Build and development | Vite 8 and Nitro |
 
-## Component structure
+## System architecture
 
 ```mermaid
 flowchart LR
-    U[Employee or approver] --> R[React and TanStack Router]
-    R --> SF[TanStack server functions]
-    R --> API[HTTP routes and OAuth callbacks]
-    SF --> AUTH[Authentication and RBAC]
-    SF --> DB[(MySQL or MariaDB)]
-    SF --> DOC[Document and QR processing]
-    SF --> MAIL[Gmail]
-    SF --> SHEETS[Google Sheets]
+    U["Employee, approver, or admin"] --> R["Browser: React 19 + TanStack Router"]
+    R --> SF["TanStack server functions"]
+    R --> API["HTTP API routes"]
+    SF --> AUTH["Auth/session layer (3 cookie stores)"]
+    SF --> DB["MySQL/MariaDB"]
+    SF --> DOC["Document and QR processing"]
+    SF --> MAIL["Gmail API"]
+    SF --> SHEETS["Google Sheets"]
     API --> AUTH
     API --> DB
+    DOC --> QR["Public QR ticket verification"]
 ```
 
-The browser is not trusted for authorization. Route guards improve navigation, while server functions re-check sessions and role permissions before data access or state changes.
+The browser is not trusted for authorization. Route guards improve navigation, but every server function re-checks sessions and role permissions before data access or state changes.
 
-# Data flow
+### Session and cookie stores
+
+Three independent session tables support the three access paths:
+
+| Cookie name | Table | Scope |
+| --- | --- | --- |
+| `loa_session` | `sessions` | Main portal and VRTT |
+| `loa_hrdo_session` | `hrdo_sessions` | HRDO COE |
+| `loa_permission_session` | `permission_sessions` | Permission Slip |
+
+Sessions are random 256-bit tokens stored as SHA-256 hashes, `httpOnly`, `SameSite=Lax`, and `Secure` when `SITE_URL` is HTTPS. All sessions expire after 8 hours.
+
+## Data flow diagrams
+
+### DFD Level 0 (context)
 
 ```mermaid
 flowchart TD
-    Employee -->|account and request data| App[LOA HRDO Desk]
-    Approver -->|signature, decision, remarks| App
-    Admin -->|configuration and account changes| App
-    App -->|persisted records| DB[(MySQL)]
-    App -->|request and status messages| Gmail
-    Sheets[Google Sheets] -->|attendance records| App
-    App -->|official tickets, receipts, and documents| User[Authorized recipient]
-    App -->|verification token| QR[Public ticket verification]
+    E["Employee / requisitioner"] -->|"account, request, COE"| A["LOA HRDO Desk"]
+    A2["Approver / signatory"] -->|"signature, decision, remarks"| A
+    A3["Admin / transport staff"] -->|"configuration, accounts, dispatch"| A
+    S["Google Sheets"] -->|"attendance records"| A
+    A -->|"persisted records"| DB["MySQL"]
+    A -->|" tickets, receipts, documents"| MAIL["Gmail"]
+    A -->|"verification token"| V["Public ticket verification"]
+    A -->|"notifications"| E
+    A -->|"notifications"| A2
 ```
 
-# Vehicle approval sequence
+### DFD Level 1 (processes)
+
+```mermaid
+flowchart TD
+    U["User"] --> P1["P1: Authenticate"]
+    P1 --> DS1[("users / hrdo_users")]
+    P1 --> DS2[("sessions / hrdo_sessions / permission_sessions")]
+
+    U --> P2["P2: Vehicle requests"]
+    P2 --> DS3[("requests")]
+    P2 --> DS4[("request_signatures")]
+    P2 --> DS5[("request_history")]
+    P2 --> DS6[("request_returns")]
+    P2 --> DS7[("dispatch_records")]
+    P2 --> DS8[("vehicles")]
+    P2 --> DS9[("notifications")]
+    P2 --> MAIL["Gmail"]
+    P2 --> QR["QR verification token"]
+
+    U --> P3["P3: Permission slips"]
+    P3 --> DS10[("permission_slips")]
+    P3 --> DS11[("permission_slip_signatories")]
+    P3 --> DS12[("permission_history")]
+    P3 --> MAIL
+
+    U --> P4["P4: COE processing"]
+    P4 --> DS13[("hrdo_coe_requests")]
+    P4 --> DS14[("hrdo_coe_documents")]
+    P4 --> DS15[("hrdo_coe_history")]
+    P4 --> MAIL
+
+    U --> P5["P5: Attendance sync"]
+    S["Google Sheets"] --> P5
+    P5 --> DS16[("sheet_sources")]
+    P5 --> DS17[("employee_sheet_mappings")]
+    P5 --> DS18[("attendance_logs")]
+    P5 --> DS19[("leave_balances")]
+    P5 --> DS20[("leave_discrepancy_flags")]
+
+    U --> P6["P6: Notifications"]
+    P6 --> DS9
+    P6 --> DS21[("attendance_notifications")]
+```
+
+## Vehicle Reservation and Trip Ticket workflow
+
+### VRTT approval sequence
 
 ```mermaid
 sequenceDiagram
@@ -58,57 +123,182 @@ sequenceDiagram
     participant T as Transport Head
     participant D as Director
     participant P as President
-    participant G as Gmail
+    participant TS as Transport Staff
+    participant G as Guard
+    participant DR as Driver
+    participant M as Gmail
 
-    R->>S: Submit vehicle request
-    S->>T: Create pending review notification
-    T->>S: Review, assign vehicle and driver
-    S->>D: Create pending recommendation
-    D->>S: Approve or return
-    S->>P: Create pending final approval
-    P->>S: Approve or reject
-    S->>G: Send official ticket or status email
-    G-->>R: Receive ticket or decision
+    R->>S: Submit request (CREATE)
+    S->>T: Notification: pending review
+    T->>S: Review, assign vehicle/driver
+    S->>D: Notification: pending recommendation
+    D->>S: Approve or return with reason
+    alt Returned
+        S->>R: Notification: returned with reason
+        R->>S: Revise and resubmit (attempt + 1)
+        S->>T: Notification: pending review
+    else Approved by Director
+        S->>P: Notification: pending final approval
+        P->>S: Approve or return
+    end
+    P->>S: Final approve
+    S->>M: Email approved requester + transport staff
+    M-->>R: Receive trip ticket link
+    TS->>S: Record dispatch info
+    G->>S: Record time out / time in
+    DR->>S: Record odometer and driver report
+    S->>S: Status becomes completed
 ```
 
-# Permission Slip activity
+Return requires a reason of at least 5 characters. Resubmission increments `attempt`, restarts at the Head of Transport Services, and leaves old signatures on the previous attempt. Requisitioners can edit only before the Head of Transport signs. Approved tickets carry a QR verification link verified at `/api/verify-ticket/$token` with HMAC-SHA256 signed base64url claims.
+
+### VRTT status state diagram
 
 ```mermaid
-flowchart TD
-    Start([Employee signs in]) --> Form[Enter department, date, time and reason]
-    Form --> Validate{Valid and complete?}
-    Validate -->|No| Form
-    Validate -->|Yes| Submit[Submit signed request]
-    Submit --> Queue[Pending signatory queue]
-    Queue --> Decision{Signatory decision}
-    Decision -->|Approve| Receipt[Generate and archive receipt]
-    Receipt --> Email[Send receipt to employee]
-    Decision -->|Reject| Reject[Save rejection reason]
-    Reject --> History[Update request history]
-    Email --> History
-    History --> End([Request complete])
+stateDiagram-v2
+    [*] --> pending_review: Submit
+    pending_review --> pending_recommendation: Reviewed by Transport Head
+    pending_review --> returned: Returned by Transport Head
+    pending_recommendation --> pending_approval: Recommended by Director
+    pending_recommendation --> returned: Returned by Director
+    pending_approval --> approved: Approved by President
+    pending_approval --> returned: Returned by President
+    returned --> pending_review: Resubmit by Requisitioner
+    approved --> dispatched: Dispatched by Transport Staff
+    dispatched --> completed: Trip completed
+    completed --> [*]
 ```
 
-# COE activity
+Real statuses and their labels:
+
+| Status | Label |
+| --- | --- |
+| `pending_review` | Awaiting Transport Review |
+| `pending_recommendation` | Awaiting Recommendation |
+| `pending_approval` | Awaiting Final Approval |
+| `returned` | Returned |
+| `approved` | Approved |
+| `dispatched` | Dispatched |
+| `completed` | Trip Completed |
+
+## Permission Slip workflow
+
+### Permission Slip activity flow
+
+```mermaid placement="bottom-left" actions={true}
+flowchart TD
+    Start(["Employee signs in"]) --> Form["Enter department, date, time, reason"]
+    Form --> Validate{"Valid and complete?"}
+    Validate -->|No| Form
+    Validate -->|Yes| Submit["Submit signed request"]
+    Submit --> Queue["Pending signatory queue"]
+    Queue --> Decision{"Signatory decision"}
+    Decision -->|Approve| Receipt["Generate and archive receipt PNG"]
+    Receipt --> Email["Email receipt to employee"]
+    Decision -->|Reject| Reject["Save rejection with reason"]
+    Reject --> History["Update permission_history"]
+    Email --> History
+    History --> End(["Request complete"])
+```
+
+Permission Slip roles: `employee` and `director`. Accounts assigned in `permission_slip_signatories` receive the `director` role and can approve or reject. Only Super Admins manage signatories. Module admins and Super Admins can view the queue read-only without approval power. Reason length is 5 to 500 characters. Receipts are generated as PNGs, archived in `receipt_image`, and emailed to the employee in Philippine 12-hour notation.
+
+## Certificate of Employment workflow
+
+### COE sequence diagram
 
 ```mermaid
 sequenceDiagram
     participant E as Employee or external requester
     participant S as HRDO server
     participant H as HRDO staff
-    participant G as Gmail
+    participant M as Gmail
 
     E->>S: Submit COE request
-    S->>H: Add to HRDO processing queue
+    S->>H: Add to queue (status: pending)
+    H->>S: View request (status: under_review)
     H->>S: Verify or request correction
     alt Correction needed
-        S->>G: Send correction request
-        G-->>E: Receive correction instructions
-        E->>S: Resubmit corrected request
-    else Processing
+        S->>M: Send correction request email
+        M-->>E: Receive instructions
+        E->>S: Resubmit corrected details
+        S->>H: Return to queue
+    else Verified
+        H->>S: Start processing (status: processing)
         H->>S: Prepare or upload document
-        S->>G: Send status or template
-        G-->>E: Receive requestor review or document
-        H->>S: Mark ready or release
+        S->>M: Send template for review
+        M-->>E: Receive filled template
+        E->>S: Approve template or request fix
+    end
+    H->>S: Mark ready for pickup
+    S->>M: Notify employee
+    alt Employee collects document
+        H->>S: Record release with receiver name
+        S->>M: Confirm release
     end
 ```
+
+### COE status state diagram
+
+```mermaid
+stateDiagram-v2
+    [*] --> pending: Submit
+    pending --> under_review: Viewed by HRDO
+    under_review --> correction_requested: Needs correction
+    under_review --> processing: Verified
+    correction_requested --> resubmitted: Corrected by requester
+    resubmitted --> under_review: Returned to review
+    processing --> awaiting_review: Template sent
+    awaiting_review --> processing: Fix requested
+    awaiting_review --> ready_for_pickup: Approved by requester
+    ready_for_pickup --> released: Document collected
+    released --> [*]
+    under_review --> rejected: Rejected
+    processing --> rejected: Rejected
+    rejected --> [*]
+```
+
+Real COE statuses and labels:
+
+| Status | Staff label | Requestor label |
+| --- | --- | --- |
+| `pending` | New | Submitted |
+| `under_review` | Under review | Under review |
+| `correction_requested` | Correction requested | Needs action |
+| `processing` | Under processing | Processing |
+| `awaiting_review` | Awaiting requestor review | Awaiting your review |
+| `ready_for_pickup` | Ready for pickup | Ready for pickup |
+| `released` | Released | Released |
+| `rejected` | Rejected | Not approved |
+
+HRDO policy: `COE_PROCESSING_DAYS = 3`. The deadline is fixed at submission and never reset by a correction. `COE_DUE_SOON_HOURS = 24` marks requests approaching deadline.
+
+## Late/Absences sync workflow
+
+### Sheets webhook and sync sequence
+
+```mermaid
+sequenceDiagram
+    participant S as Google Sheets
+    participant W as Webhook POST /api/sheets/webhook
+    participant SV as Server
+    participant DB as MySQL
+
+    S->>W: POST with x-webhook-secret
+    W->>SV: Validate header against env secret
+    alt Invalid secret
+        SV-->>W: 401 auth failure
+    else Valid
+        SV->>S: Read staff matrix via service account
+        S-->>SV: Raw rows
+        SV->>SV: Parse matrix and match names
+        SV->>DB: Upsert attendance_logs, leave_balances
+        SV->>DB: Write attendance_sync_logs, attendance_notifications
+        SV->>DB: Notify directors of changes
+        SV-->>W: 200 ok true
+    end
+```
+
+The server accepts a `POST /api/sheets/webhook` with the `x-webhook-secret` header. Three staff groups are supported: `NON_TEACHING`, `COLLEGE`, and `BASIC_ED`, each with its own spreadsheet ID from environment variables (`LATE_ABSENCES_*_SPREADSHEET_ID`). The sync parses the Google Sheets staff matrix, maps sheet names to users by surname-first matching, and upserts `attendance_logs` and `leave_balances`. Directors and affected employees receive `attendance_notifications`. Employees can raise `leave_discrepancy_flags` that HR resolves through `/admin/late-absences`.
+
+Attendance codes include: `S` (Sick Leave), `V` (Vacation Leave), `E` (Emergency Leave), `B` (Birthday Leave), `M` (Maternity Leave), `P` (Paternity Leave), `SP` (Solo Parent Leave), `SIL` (Service Incentive Leave), `HS` (Half-Day Sick), `HV` (Half-Day Vacation), `HE` (Half-Day Emergency), `L` and `LATE` (Late Entry). The cycle runs June to May with a base allocation of 17 leave days.

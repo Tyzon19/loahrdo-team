@@ -1,99 +1,270 @@
 ---
-title: API and Server Functions
-description: TanStack Start operations, HTTP routes, validation, authentication, and integrations.
+title: "API and Server Functions"
+sidebarTitle: "API and server functions"
+description: "Reference for every TanStack Start server function, HTTP API route, and page route in the LOA HRDO systems."
 ---
 
-# Server-function architecture
+## How server functions work
 
-The application exposes typed TanStack Start server functions through `src/server-functions.ts`. These functions import implementation modules dynamically and use `runSafely` to normalize server errors into user-facing results.
+All application operations are exported from `src/server-functions.ts`. Each one is created with `createServerFn` from `@tanstack/react-start`.
 
-Server functions use HTTP methods where appropriate:
-
-- `GET` for reads and session lookups.
-- `POST` for login, submission, approval, configuration, and document operations.
-
-Input-bearing functions use validators and Zod schemas before server logic is executed.
-
-# Authentication operations
-
-| Area | Operations |
+| Aspect | Behavior |
 | --- | --- |
-| Main account | login, logout, profile update, password change, recovery, OTP registration |
-| Google OAuth | institutional requisitioner sign-in and external former-employee sign-in |
-| HRDO | dedicated login, logout, profile, OTP, password recovery, and account session |
-| Permission Slip | dedicated login, logout, profile, password change, and session lookup |
+| Definition | `createServerFn({ method: "GET" })` for reads without input, `createServerFn({ method: "POST" })` for everything that accepts input or changes data |
+| Input | Functions that take input declare `.validator((input: unknown) => input)`. The raw input is passed to the server module, which parses it with Zod schemas from `src/lib/validation.ts` and `src/lib/permission-schema.ts` |
+| Implementation | Each handler dynamically imports its module (for example `await import("./server/requests")`) so server-only code such as `mysql2`, `googleapis`, and `node:crypto` never ships to the browser |
+| Error handling | Handlers are wrapped in `runSafely`, which converts thrown errors into safe, user-facing messages |
+| Authorization | Every implementation reads the session cookie and re-checks the role on the server. Client-side checks only hide controls |
 
-Sensitive operations call `requireViewer`, `requireHrdoViewer`, or `requirePermissionViewer` before database access.
+<Note>
+  Server functions are called from React components as typed RPCs. They are not a public REST API and must not be called by third-party systems. External integrations use the [HTTP API routes](#http-api-routes) below.
+</Note>
 
-# Vehicle operations
+## Server function reference
 
-Server functions support:
+### Bootstrap
 
-- Request submission and destination suggestions.
-- Request listing, filtering, and detail lookup.
-- Review, recommendation, and final approval.
-- Request return and requisitioner resubmission.
-- Vehicle and fleet management.
-- Driver assignment and dispatch.
-- Trip completion.
-- Official ticket generation and delivery.
-- Trip archive and analytics.
-- Phone-directory and signatory configuration.
-- Notification read state.
-- Receipt and bulk receipt downloads.
+| Function | Method | Implementation | Purpose |
+| --- | --- | --- | --- |
+| `bootstrapFn` | GET | `server/auth`, `server/hrdo/auth`, `server/permission/auth` | Returns the current `viewer`, `hrdoViewer`, `permissionViewer`, and the GA4 measurement ID for the shell |
 
-Public HTTP verification uses a signed ticket token and is not a general data-access endpoint.
+### Main account authentication (`server/auth`)
 
-# Permission Slip operations
+Uses the `loa_session` cookie and the `users`, `sessions`, and `registration_otps` tables.
 
-The Permission Slip server module supports:
+| Function | Method | Purpose |
+| --- | --- | --- |
+| `loginFn` | POST | Email and password sign-in with lockout after 5 failures |
+| `requestRegistrationOtpFn` | POST | Sends a six-digit OTP to an `@lyceumalabang.edu.ph` address |
+| `verifyRegistrationOtpFn` | POST | Verifies the OTP and creates the requisitioner account |
+| `requestPasswordRecoveryFn` | POST | Emails a password recovery code |
+| `resetPasswordWithRecoveryCodeFn` | POST | Sets a new password with a valid recovery code |
+| `logoutFn` | POST | Deletes the session and clears the cookie |
+| `changePasswordFn` | POST | Changes the password, clears `must_change_password` |
+| `updateProfileFn` | POST | Updates name, department, and phone number |
+| `completeProfileNameFn` | POST | Completes the full name for Google-only accounts |
 
-- Create and list submitted slips.
-- List pending approval slips.
-- Read an authorized slip.
-- Approve or reject with signatory identity.
-- Store approval or rejection history.
-- Persist and send receipt images.
-- Add, remove, or list signatory accounts.
-- Separate Permission Slip profile and password operations.
+### HRDO portal authentication (`server/hrdo/auth`)
 
-# HRDO operations
+Uses the `loa_hrdo_session` cookie and the `hrdo_users` and `hrdo_sessions` tables.
 
-HRDO server functions support:
+| Function | Method | Purpose |
+| --- | --- | --- |
+| `hrdoLoginFn` | POST | HRDO portal sign-in |
+| `requestHrdoPasswordRecoveryFn` | POST | Emails an HRDO recovery code |
+| `resetHrdoPasswordWithRecoveryCodeFn` | POST | Resets an HRDO password with a recovery code |
+| `hrdoLogoutFn` | POST | Ends the HRDO session |
+| `hrdoChangePasswordFn` | POST | Changes an HRDO account password |
+| `hrdoUpdateProfileFn` | POST | Updates the HRDO profile |
+| `hrdoCompleteProfileNameFn` | POST | Completes the full name after Google sign-in |
 
-- Employee and processor account operations.
-- COE submission and resubmission.
-- Internal, external, staff, and admin request access.
-- Status, correction, rejection, and verification actions.
-- Template generation and Word template sending.
-- Manual or uploaded document delivery.
-- Ready-for-pickup and released states.
-- Document retrieval and release history.
-- COE analytics and dashboard search.
+### Permission Slip authentication (`server/permission/auth`)
 
-# Attendance operations
+Uses the `loa_permission_session` cookie and the `permission_sessions` table. Accounts are the shared institutional `users` records.
 
-Attendance operations support:
+| Function | Method | Purpose |
+| --- | --- | --- |
+| `permissionLoginFn` | POST | Signs in to the Permission Slip system |
+| `permissionLogoutFn` | POST | Ends the Permission Slip session |
+| `permissionUpdateProfileFn` | POST | Updates profile details |
+| `permissionChangePasswordFn` | POST | Changes the password |
 
-- Staff-group Google Sheets synchronization.
-- Employee mapping.
-- Leave-balance retrieval.
-- Attendance-log listing.
-- Discrepancy submission and resolution.
-- Notification listing and read state.
-- Synchronization logging and webhook updates.
+### Permission Slips (`server/permission`)
 
-# HTTP routes
+| Function | Method | Access | Purpose |
+| --- | --- | --- | --- |
+| `submitPermissionSlipFn` | POST | Employee | Submits a slip (date, time out, time in, reason, signature) |
+| `listMyPermissionSlipsFn` | GET | Employee | Lists the viewer's own slips |
+| `listPendingPermissionSlipsFn` | GET | Signatory, module Admin, Super Admin | Lists slips with `pending_approval` |
+| `getPermissionSlipFn` | POST | Owner, signatory, admins | Returns one slip |
+| `approvePermissionSlipFn` | POST | Signatory | Approves a slip with the signatory signature |
+| `rejectPermissionSlipFn` | POST | Signatory | Rejects a slip with a reason |
+| `sendPermissionSlipReceiptFn` | POST | Signatory | Emails the PNG receipt to the employee |
+| `persistPermissionSlipReceiptFn` | POST | Signatory | Saves the PNG receipt to `permission_slips.receipt_image` |
+| `listPermissionSignatoriesFn` | GET | Super Admin | Lists assigned signatories |
+| `listPermissionSignatoryCandidatesFn` | GET | Super Admin | Lists accounts that can be assigned |
+| `assignPermissionSignatoryFn` | POST | Super Admin | Assigns an existing account as signatory |
+| `createPermissionSignatoryFn` | POST | Super Admin | Creates an institutional account and assigns it |
+| `removePermissionSignatoryFn` | POST | Super Admin | Removes signatory access (UUID required) |
 
-Important route groups include:
+### Certificate of Employment (`server/hrdo/coe`)
 
-- `/api/auth/google` and `/api/auth/google/callback`.
-- `/api/gmail/callback`.
-- `/api/leaves/webhook`.
-- `/verify-ticket/$token`.
-- `/leaves`.
-- `/permission-slips/*`.
-- `/hrdo/*`.
-- `/dashboard`, `/admin`, and trip archive routes.
+| Function | Method | Access | Purpose |
+| --- | --- | --- | --- |
+| `submitCoeRequestFn` | POST | Employee, external user | Submits a COE request with purpose, note, and copy type |
+| `listMyCoeRequestsFn` | GET | Employee, external user | Lists the viewer's requests |
+| `getCoeRequestFn` | POST | Owner, HRDO Processor | Returns one request |
+| `resubmitCoeRequestFn` | POST | Owner | Resubmits after `correction_requested` |
+| `listAllCoeRequestsFn` | GET | HRDO Processor | Lists all requests |
+| `searchStaffCoeRequestsFn` | POST | HRDO Processor | Searches and filters the queue |
+| `listCoeHistoryFn` | GET | HRDO Processor | Lists `hrdo_coe_history` events |
+| `markCoeViewedFn` | POST | HRDO Processor | Records that staff opened the request |
+| `verifyCoeRequestFn` | POST | HRDO Processor | Verifies employment details |
+| `requestCoeCorrectionFn` | POST | HRDO Processor | Asks the requester to correct details |
+| `rejectCoeRequestFn` | POST | HRDO Processor | Rejects with a reason |
+| `startCoeProcessingFn` | POST | HRDO Processor | Moves the request to `processing` |
+| `generateCoeTemplateFn` | POST | HRDO Processor | Builds the COE document template |
+| `sendCoeTemplateFn` | POST | HRDO Processor | Emails the template or final soft copy |
+| `uploadCoeDocumentFn` | POST | HRDO Processor | Uploads the signed PDF or DOCX (5 MB max) |
+| `uploadCoeManualDeliveryFn` | POST | HRDO Processor | Records a manually delivered copy |
+| `markCoeReadyFn` | POST | HRDO Processor | Sets `ready_for_pickup` |
+| `releaseCoeDocumentFn` | POST | HRDO Processor | Releases the printed copy and records who received it |
+| `getCoeDocumentFn` | POST | Owner, HRDO Processor | Downloads the stored document |
 
-OAuth callbacks verify host, state, account eligibility, and redirect safety. Gmail callbacks require approved sender authorization.
+### HRDO administration and analytics
+
+| Function | Method | Implementation | Access | Purpose |
+| --- | --- | --- | --- | --- |
+| `listHrdoProcessorAccountsFn` | GET | `server/hrdo/admin` | `hrdo_admin`, central Admin, Super Admin | Lists processor accounts |
+| `createHrdoProcessorAccountFn` | POST | `server/hrdo/admin` | Same | Creates a processor account |
+| `resetHrdoProcessorPasswordFn` | POST | `server/hrdo/admin` | Same | Issues a temporary password |
+| `getHrdoCoeAnalyticsFn` | GET | `server/hrdo/analytics` (`getCoeAnalytics`) | HRDO Processor | COE volume and turnaround analytics |
+
+### Vehicle requests (`server/requests`)
+
+| Function | Method | Access | Purpose |
+| --- | --- | --- | --- |
+| `listRequestsFn` | POST | Requisitioner (own), operational roles (all) | Lists requests with filters |
+| `getDestinationSuggestionsFn` | POST | Signed-in users | Destination autocomplete (3 or more characters) |
+| `getRequestFn` | POST | Owner, operational roles | Request detail (`getRequestDetail`) |
+| `getPrintableRequestFn` | POST | Owner, operational roles | Printable trip ticket (`getPrintableRequestDetail`) |
+| `submitRequestFn` | POST | Requisitioner | Creates a request in `pending_review` |
+| `updatePendingRequestFn` | POST | Requisitioner | Edits a request before transport review |
+| `approveRequestFn` | POST | Stage signatory or assigned alternate | Signs the current stage |
+| `rejectRequestFn` | POST | Stage signatory or assigned alternate | Returns the request with a reason |
+| `resubmitRequestFn` | POST | Requisitioner | Resubmits a returned request (new attempt) |
+| `sendTripTicketFn` | POST | Transport staff, admins | Emails the official trip ticket image |
+| `dashboardStatsFn` | GET | Signed-in users | Dashboard counters |
+| `listVehiclesFn` | GET | Signed-in users | Lists vehicles |
+| `addVehicleFn` | POST | `canManageVehicles` | Adds a vehicle |
+| `updateVehicleFn` | POST | `canManageVehicles` | Updates a vehicle |
+| `deleteVehicleFn` | POST | `canManageVehicles` | Deletes a vehicle |
+
+### Signatories and directory (`server/signatories`)
+
+| Function | Method | Access | Purpose |
+| --- | --- | --- | --- |
+| `getSignatoryAssistantsFn` | GET | Admin | Reads alternate signatories per stage |
+| `getPhoneDirectoryFn` | GET | Signed-in users | Reads the LOA phone directory |
+| `saveSignatoryPhoneNumberFn` | POST | Admin | Saves a signatory phone number |
+| `saveSignatoryAssistantsFn` | POST | Admin | Assigns alternates to stages |
+| `saveMainSignatoriesFn` | POST | Admin | Assigns main signatories to `review`, `recommend`, `approve` |
+| `createAssistantAccountFn` | POST | Admin | Creates an `assistant` account and emails a temporary password |
+| `createMainSignatoryAccountFn` | POST | Admin | Creates a main signatory account |
+| `resetUserPasswordFn` | POST | Admin | Issues a one-time temporary password and ends sessions |
+
+### System access, receipts, notifications, analytics
+
+| Function | Method | Implementation | Access | Purpose |
+| --- | --- | --- | --- | --- |
+| `listSystemAccessUsersFn` | GET | `server/system-access` | Super Admin | Lists accounts and module assignments |
+| `listSuperAdminOverviewFn` | GET | `server/system-access` | Super Admin | System totals, modules, recent users, access activity |
+| `listAdminOperationsOverviewFn` | GET | `server/system-access` | Admin, Super Admin | Admin and HR operations summary |
+| `setSystemAccessAssignmentFn` | POST | `server/system-access` | Super Admin | Grants or revokes `super_admin` or `admin`, logged in `system_access_history` |
+| `listAdminReceiptsFn` | POST | `server/admin-receipts` | Admin, Super Admin | Searches receipts by system and date range |
+| `getAdminReceiptPreviewFn` | POST | `server/admin-receipts` | Admin, Super Admin | Previews a trip ticket, Permission Slip, or released COE |
+| `bulkDownloadAdminReceiptsFn` | POST | `server/admin-receipts` | Admin, Super Admin | Builds a ZIP of selected receipts with `jszip` |
+| `listNotificationsFn` | GET | `server/notifications` | Signed-in users | Lists the viewer's notifications |
+| `notificationImageFn` | POST | `server/notifications` | Recipient | Returns the attachment image |
+| `officialTripTicketImageFn` | POST | `server/notifications` | Owner, operational roles | Returns the official trip ticket image |
+| `markNotificationReadFn` | POST | `server/notifications` | Recipient | Sets `read_at` |
+| `markApprovalNoticeReadFn` | POST | `server/notifications` | Recipient | Dismisses the approval notice |
+| `recordPageViewFn` | POST | `server/analytics` | Anyone | Records a path in `analytics_pageviews` |
+| `getTripArchiveFn` | POST | `server/analytics` | Admin, Super Admin | Trip archive search and analytics |
+
+### Late and absences (`server/late-absences`)
+
+| Function | Method | Access | Purpose |
+| --- | --- | --- | --- |
+| `listMyAttendanceFn` | GET | Employee | Own attendance logs and leave balances |
+| `listAttendanceAdminFn` | POST | Admin | Attendance by staff group |
+| `listDirectorAttendanceFn` | POST | Director | Director attendance view |
+| `syncAttendanceGroupFn` | POST | Admin | Syncs one staff group from Google Sheets (`syncStaffGroup`) |
+| `saveAttendanceMappingFn` | POST | Admin | Maps an account to a sheet employee name |
+| `createAttendanceFlagFn` | POST | Employee | Raises a discrepancy flag |
+| `resolveAttendanceFlagFn` | POST | Admin | Replies to and resolves a flag |
+| `listAttendanceNotificationsFn` | GET | Employee | Lists attendance notifications |
+| `markAttendanceNotificationReadFn` | POST | Employee | Marks an attendance notification read |
+
+## HTTP API routes
+
+HTTP routes are file routes in `src/routes/api.*.ts` with `server.handlers`. All responses set `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`.
+
+### GET /api/auth/google
+
+Starts Google sign-in with PKCE.
+
+| Item | Detail |
+| --- | --- |
+| Query | `mode` (`requisitioner` default, `hrdo`, or `external`), `redirect` (same-site path to return to) |
+| Behavior | Generates a 32-byte `state` and PKCE verifier, sets short-lived httpOnly cookies, redirects to Google with `scope=openid email profile`, `code_challenge_method=S256`, `prompt=select_account` |
+| Credentials | `external` mode uses `GOOGLE_EXTERNAL_CLIENT_ID`/`SECRET`, falling back to the shared client |
+| Errors | `302` to `/login?error=google_unavailable` (or `/coe?error=...`) when credentials or the redirect URI are invalid |
+
+### GET /api/auth/google/callback
+
+Completes Google sign-in.
+
+| Item | Detail |
+| --- | --- |
+| Query | `code`, `state`, or `error` from Google |
+| Checks | State compared to the cookie with a constant-time check, code exchanged with the PKCE verifier, Google-verified email required, domain and role rules applied per mode |
+| Success | Creates the session and redirects to the safe requested page, `/complete-profile`, or the password-change step |
+| Failure | `302` to `/login`, `/hrdo/login`, or `/coe` with `error` set to `google_session`, `google_denied`, `google_unavailable`, `google_token`, `google_configuration`, `google_profile`, `google_role`, or `google_server` |
+
+### GET /api/gmail/connect
+
+Authorizes the HRDO sender mailbox. Local development only.
+
+| Item | Detail |
+| --- | --- |
+| Availability | `404` when `NODE_ENV=production` or the host is not `localhost` or `127.0.0.1` |
+| Requires | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` (localhost URL ending in `/api/gmail/callback`), `GOOGLE_SENDER_EMAIL`; otherwise `503` |
+| Behavior | Sets `gmail_oauth_state` (httpOnly, `Max-Age=600`) and redirects to Google with `gmail.send` and email scopes, `access_type=offline`, `prompt=consent`, `login_hint` set to the sender |
+
+### GET /api/gmail/callback
+
+| Item | Detail |
+| --- | --- |
+| Behavior | Validates state, exchanges the code, confirms the Google account matches `GOOGLE_SENDER_EMAIL`, and writes only `GOOGLE_REFRESH_TOKEN` to `.env` |
+| Responses | HTML pages: `200` on success, `404` when not local, `503` when not configured, error pages when Google returns no code or a different account |
+
+### POST /api/sheets/webhook
+
+Receives Late/Absences sheet changes.
+
+```http
+POST /api/sheets/webhook
+Content-Type: application/json
+x-webhook-secret: <LATE_ABSENCES_WEBHOOK_SECRET>
+```
+
+| Status | Body |
+| --- | --- |
+| `200` | `{ "ok": true, "result": { ... } }` |
+| `401` | `{ "ok": false, "error": "..." }` when the secret fails authentication |
+| `400` | `{ "ok": false, "error": "..." }` for any other sync failure |
+
+The handler calls `syncFromWebhook(secret, body)` in `server/late-absences`.
+
+### GET /api/verify-ticket/`$token`
+
+Verifies the QR code on an official trip ticket.
+
+| Status | Body |
+| --- | --- |
+| `200` | `{ "valid": true, "ticket": { ... } }` with the authoritative request date, travel dates, and destinations |
+| `404` | `{ "valid": false }` |
+| `503` | `{ "error": "Ticket verification is unavailable." }` |
+
+Also sets `Referrer-Policy: no-referrer`. Tokens are HMAC-SHA256 signed with `TICKET_VERIFICATION_SECRET`. See [Security](/technical/security).
+
+## Page routes
+
+| Area | Routes |
+| --- | --- |
+| Public | `/`, `/login`, `/register`, `/forgot-password`, `/complete-profile`, `/coe`, `/privacy`, `/terms-of-service`, `/service/$slug`, `/verify-ticket/$token` |
+| Vehicle requests (authenticated) | `/dashboard`, `/requests`, `/requests/new`, `/requests/$id`, `/revise/$id`, `/print/$id`, `/notifications`, `/profile`, `/change-password`, `/phone-directory`, `/vehicles`, `/receipts`, `/trip-archive`, `/admin` |
+| HRDO and COE | `/hrdo`, `/hrdo/login`, `/hrdo/forgot-password`, `/hrdo/complete-profile`, `/hrdo/change-password`, `/hrdo/dashboard`, `/hrdo/coe`, `/hrdo/coe/$id`, `/hrdo/requests`, `/hrdo/history`, `/hrdo/analytics`, `/hrdo/profile` |
+| Permission Slips | `/permission-slips`, `/permission-slips/login`, `/permission-slips/$id`, `/permission-slips/profile` |
+| Attendance | `/leaves`, `/admin/late-absences`, `/director/late-absences` |
