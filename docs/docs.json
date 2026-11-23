@@ -28,11 +28,41 @@
     "directory": "card",
     "groups": [
       {
-        "group": "HRDO Systems",
+        "group": "System Documentation",
+        "icon": "book-open",
+        "expanded": true,
+        "pages": [
+          "technical/overview",
+          "technical/architecture",
+          "technical/modules"
+        ]
+      },
+      {
+        "group": "Data and Integration",
+        "icon": "database",
+        "expanded": true,
+        "pages": [
+          "technical/database",
+          "technical/api",
+          "technical/security"
+        ]
+      },
+      {
+        "group": "Operations",
+        "icon": "settings",
+        "expanded": true,
+        "pages": [
+          "technical/quality-assurance",
+          "technical/deployment",
+          "technical/manuals",
+          "technical/troubleshooting"
+        ]
+      },
+      {
+        "group": "HRDO Services",
         "icon": "layers",
         "expanded": true,
         "pages": [
-          "technical-documentation",
           "certificate-of-employment",
           "permission-slip",
           "vehicle-trip-ticket"

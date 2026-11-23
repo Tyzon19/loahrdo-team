@@ -1,0 +1,91 @@
+---
+title: Deployment and Operations
+description: Installation, production deployment, configuration, administration, backup, and recovery.
+---
+
+# Local setup
+
+Requirements:
+
+- Node.js 20 or newer.
+- npm.
+- MySQL or MariaDB.
+
+Setup:
+
+```bash
+npm install
+npm run db:setup
+npm run db:seed
+npm run dev
+```
+
+`db:setup` creates tables and a limited application database user. `db:seed` creates initial administrator and document configuration data. Initial passwords must be changed immediately.
+
+# Deployment procedure
+
+1. Prepare the server and database.
+2. Configure `.env` or hosting platform environment variables.
+3. Run database setup and migrations.
+4. Seed initial accounts only when creating or initializing an environment.
+5. Install dependencies.
+6. Run tests and production build.
+7. Deploy the application.
+8. Configure public callback and OAuth redirect URIs.
+9. Authorize the Gmail sender.
+10. Test database, authentication, email, QR verification, and attendance sync.
+
+Run:
+
+```bash
+npm test
+npm run build
+```
+
+# Database deployment
+
+Back up existing data before schema updates. Apply `scripts/schema.sql` or approved migrations in transaction-safe batches. Verify foreign keys and constraints after deployment.
+
+The initial seed should not delete existing accounts or records. Preserve request, signature, COE, and Permission Slip history during upgrades.
+
+# Administrator operations
+
+Administrators are responsible for:
+
+- Account creation and password resets.
+- Signatory assignments and assistant accounts.
+- Permission Slip access assignments.
+- HRDO processor account management.
+- Vehicle and fleet records.
+- Trip archive and receipt records.
+- Attendance mappings and discrepancy handling.
+- Module configuration.
+- Failed notification and synchronization review.
+
+Super administrators manage organization-wide access and module-administration assignments.
+
+# Monitoring
+
+Monitor:
+
+- Application and server error logs.
+- Database connection and slow-query metrics.
+- Failed approval-email delivery.
+- OAuth callback failures.
+- Google Sheets synchronization failures.
+- Permission Slip receipt delivery failures.
+- Session and account lockout trends.
+- Disk use for uploaded documents and backups.
+
+# Backup and recovery
+
+Create regular database backups and document backups according to institutional retention requirements. Backups should include:
+
+- User and session tables.
+- Vehicle and trip records.
+- Signatures and request history.
+- HRDO requests and uploaded documents.
+- Permission Slips and receipt images.
+- Attendance and synchronization records.
+
+Recovery should verify database configuration, environment values, email and OAuth configuration, QR signing secret, document integrity, and one successful workflow in staging before production restoration.

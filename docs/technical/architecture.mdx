@@ -1,0 +1,114 @@
+---
+title: Architecture and Workflows
+description: Client-server architecture and Mermaid DFD, sequence, and activity diagrams.
+---
+
+# Architecture
+
+| Layer | Implementation |
+| --- | --- |
+| Browser client | React 19, TanStack Router, TanStack Query, Radix UI components, Tailwind CSS |
+| Application server | TanStack Start server functions and HTTP routes |
+| Language | TypeScript |
+| Primary database | MySQL or MariaDB through `mysql2` |
+| Validation | Zod schemas and server-side authorization |
+| Authentication | Password sessions, OTP registration, Google OAuth, and dedicated module sessions |
+| Integrations | Gmail, Google Sheets, QR generation, HTML-to-image |
+| Testing | Vitest, Testing Library, jsdom |
+| Build and development | Vite and Nitro |
+
+## Component structure
+
+```mermaid
+flowchart LR
+    U[Employee or approver] --> R[React and TanStack Router]
+    R --> SF[TanStack server functions]
+    R --> API[HTTP routes and OAuth callbacks]
+    SF --> AUTH[Authentication and RBAC]
+    SF --> DB[(MySQL or MariaDB)]
+    SF --> DOC[Document and QR processing]
+    SF --> MAIL[Gmail]
+    SF --> SHEETS[Google Sheets]
+    API --> AUTH
+    API --> DB
+```
+
+The browser is not trusted for authorization. Route guards improve navigation, while server functions re-check sessions and role permissions before data access or state changes.
+
+# Data flow
+
+```mermaid
+flowchart TD
+    Employee -->|account and request data| App[LOA HRDO Desk]
+    Approver -->|signature, decision, remarks| App
+    Admin -->|configuration and account changes| App
+    App -->|persisted records| DB[(MySQL)]
+    App -->|request and status messages| Gmail
+    Sheets[Google Sheets] -->|attendance records| App
+    App -->|official tickets, receipts, and documents| User[Authorized recipient]
+    App -->|verification token| QR[Public ticket verification]
+```
+
+# Vehicle approval sequence
+
+```mermaid
+sequenceDiagram
+    participant R as Requisitioner
+    participant S as Server
+    participant T as Transport Head
+    participant D as Director
+    participant P as President
+    participant G as Gmail
+
+    R->>S: Submit vehicle request
+    S->>T: Create pending review notification
+    T->>S: Review, assign vehicle and driver
+    S->>D: Create pending recommendation
+    D->>S: Approve or return
+    S->>P: Create pending final approval
+    P->>S: Approve or reject
+    S->>G: Send official ticket or status email
+    G-->>R: Receive ticket or decision
+```
+
+# Permission Slip activity
+
+```mermaid
+flowchart TD
+    Start([Employee signs in]) --> Form[Enter department, date, time and reason]
+    Form --> Validate{Valid and complete?}
+    Validate -->|No| Form
+    Validate -->|Yes| Submit[Submit signed request]
+    Submit --> Queue[Pending signatory queue]
+    Queue --> Decision{Signatory decision}
+    Decision -->|Approve| Receipt[Generate and archive receipt]
+    Receipt --> Email[Send receipt to employee]
+    Decision -->|Reject| Reject[Save rejection reason]
+    Reject --> History[Update request history]
+    Email --> History
+    History --> End([Request complete])
+```
+
+# COE activity
+
+```mermaid
+sequenceDiagram
+    participant E as Employee or external requester
+    participant S as HRDO server
+    participant H as HRDO staff
+    participant G as Gmail
+
+    E->>S: Submit COE request
+    S->>H: Add to HRDO processing queue
+    H->>S: Verify or request correction
+    alt Correction needed
+        S->>G: Send correction request
+        G-->>E: Receive correction instructions
+        E->>S: Resubmit corrected request
+    else Processing
+        H->>S: Prepare or upload document
+        S->>G: Send status or template
+        G-->>E: Receive requestor review or document
+        H->>S: Mark ready or release
+    end
+```

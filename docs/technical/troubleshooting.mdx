@@ -1,0 +1,95 @@
+---
+title: Troubleshooting and Support
+description: Common authentication, submission, email, attendance, database, and document issues.
+---
+
+# Login and account problems
+
+## Institutional account rejected
+
+Check that the account email is in an allowed configured domain and that the account exists in the applicable module. For former employees or external verifiers, use the external COE Google flow.
+
+## Account is locked
+
+Review failed login attempts and `locked_until`. An administrator or password recovery procedure may restore access according to institutional policy.
+
+## Password change is repeated
+
+Confirm the password meets policy and that the forced-password-change operation completed. Retry session invalidation and sign in again.
+
+## Google sign-in redirect fails
+
+Verify:
+
+- The callback URI matches the OAuth client.
+- `SITE_URL` matches the public origin.
+- State cookies reach the callback host.
+- The account is eligible for the selected OAuth mode.
+- The external consent screen and test users are configured correctly.
+
+# Request submission problems
+
+## Submission is rejected
+
+Check required fields, date order, time format, destination, passenger count, reason length, and institutional email restrictions. Review Zod and server validation messages.
+
+## Request is missing from a queue
+
+Confirm that the request status matches the approver stage and that the account is assigned to that stage or as an alternate.
+
+## Returned request cannot be resubmitted
+
+Confirm that the request is within the requisitioner editing window and has not already been revised. Re-submit at the original transport-review stage.
+
+# Email delivery problems
+
+Confirm:
+
+- `GOOGLE_REFRESH_TOKEN` is present.
+- `GOOGLE_SENDER_EMAIL` matches the authorized Gmail sender.
+- Gmail send scopes remain authorized.
+- The recipient email is valid.
+- The application server can reach Google APIs.
+- Workflow delivery was not rejected by external Gmail configuration.
+
+Committed records remain committed when email delivery fails. Check notification and email status fields before retrying.
+
+# Document and receipt problems
+
+For missing COE documents, confirm the request is ready or released and that the user is authorized to retrieve it.
+
+For missing trip tickets, confirm the request is approved and the official ticket was sent or saved.
+
+For missing Permission Slip receipts, confirm the slip is approved and receipt image persistence or Gmail delivery completed.
+
+# Attendance synchronization problems
+
+Verify:
+
+- Service-account credentials.
+- Spreadsheet IDs and sheet names.
+- Employee name mapping.
+- Staff-group mapping.
+- Sync log status.
+- Webhook secret.
+- Google Sheets API access.
+
+# Database problems
+
+If setup fails, verify database credentials, database server availability, migration state, and the application database user's privileges.
+
+Do not run seed operations against a production database unless approved as initial setup or controlled maintenance.
+
+# Escalation
+
+Record:
+
+- User and module.
+- Time and request ID.
+- Browser and route.
+- Server log reference.
+- Database state.
+- Email or third-party error.
+- Whether the operation committed successfully.
+
+Escalate authentication, database, OAuth, Gmail, or security incidents to the system administrator. Escalate approval or policy decisions to the designated organizational owner.

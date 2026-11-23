@@ -1,0 +1,99 @@
+---
+title: API and Server Functions
+description: TanStack Start operations, HTTP routes, validation, authentication, and integrations.
+---
+
+# Server-function architecture
+
+The application exposes typed TanStack Start server functions through `src/server-functions.ts`. These functions import implementation modules dynamically and use `runSafely` to normalize server errors into user-facing results.
+
+Server functions use HTTP methods where appropriate:
+
+- `GET` for reads and session lookups.
+- `POST` for login, submission, approval, configuration, and document operations.
+
+Input-bearing functions use validators and Zod schemas before server logic is executed.
+
+# Authentication operations
+
+| Area | Operations |
+| --- | --- |
+| Main account | login, logout, profile update, password change, recovery, OTP registration |
+| Google OAuth | institutional requisitioner sign-in and external former-employee sign-in |
+| HRDO | dedicated login, logout, profile, OTP, password recovery, and account session |
+| Permission Slip | dedicated login, logout, profile, password change, and session lookup |
+
+Sensitive operations call `requireViewer`, `requireHrdoViewer`, or `requirePermissionViewer` before database access.
+
+# Vehicle operations
+
+Server functions support:
+
+- Request submission and destination suggestions.
+- Request listing, filtering, and detail lookup.
+- Review, recommendation, and final approval.
+- Request return and requisitioner resubmission.
+- Vehicle and fleet management.
+- Driver assignment and dispatch.
+- Trip completion.
+- Official ticket generation and delivery.
+- Trip archive and analytics.
+- Phone-directory and signatory configuration.
+- Notification read state.
+- Receipt and bulk receipt downloads.
+
+Public HTTP verification uses a signed ticket token and is not a general data-access endpoint.
+
+# Permission Slip operations
+
+The Permission Slip server module supports:
+
+- Create and list submitted slips.
+- List pending approval slips.
+- Read an authorized slip.
+- Approve or reject with signatory identity.
+- Store approval or rejection history.
+- Persist and send receipt images.
+- Add, remove, or list signatory accounts.
+- Separate Permission Slip profile and password operations.
+
+# HRDO operations
+
+HRDO server functions support:
+
+- Employee and processor account operations.
+- COE submission and resubmission.
+- Internal, external, staff, and admin request access.
+- Status, correction, rejection, and verification actions.
+- Template generation and Word template sending.
+- Manual or uploaded document delivery.
+- Ready-for-pickup and released states.
+- Document retrieval and release history.
+- COE analytics and dashboard search.
+
+# Attendance operations
+
+Attendance operations support:
+
+- Staff-group Google Sheets synchronization.
+- Employee mapping.
+- Leave-balance retrieval.
+- Attendance-log listing.
+- Discrepancy submission and resolution.
+- Notification listing and read state.
+- Synchronization logging and webhook updates.
+
+# HTTP routes
+
+Important route groups include:
+
+- `/api/auth/google` and `/api/auth/google/callback`.
+- `/api/gmail/callback`.
+- `/api/leaves/webhook`.
+- `/verify-ticket/$token`.
+- `/leaves`.
+- `/permission-slips/*`.
+- `/hrdo/*`.
+- `/dashboard`, `/admin`, and trip archive routes.
+
+OAuth callbacks verify host, state, account eligibility, and redirect safety. Gmail callbacks require approved sender authorization.

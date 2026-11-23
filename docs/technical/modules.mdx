@@ -1,0 +1,74 @@
+---
+title: Modules and User Roles
+description: Implemented service modules, role permissions, and operational boundaries.
+---
+
+# Module inventory
+
+## Public and shared services
+
+- Public service dashboard.
+- Password and OTP account registration.
+- Institutional account login and password recovery.
+- Google OAuth sign-in.
+- User profile management.
+- Forced temporary-password changes.
+- Notifications and account sessions.
+- Privacy and terms pages.
+
+## Vehicle reservation
+
+Requisitioners create trip requests, destinations, passenger counts, schedules, purposes, and supporting request details. The transport approval chain is:
+
+1. Head of Transport Services.
+2. Director for Administration.
+3. President.
+
+The implementation supports return and resubmission, electronic signatures, vehicle and driver assignment, dispatch records, trip completion, official ticket images, public signed-token verification, trip archive search, and destination analytics.
+
+## Certificate of Employment
+
+Internal employees use institutional HRDO accounts. Former employees and external verifiers use separate external Google OAuth credentials. HRDO staff can verify, process, request correction, reject, upload, prepare, mark ready, and release requests.
+
+Supported copy types include soft copy, original hard copy, or both. COE records retain history and deadlines.
+
+## Permission Slip
+
+Employees submit department, date, departure time, return time, reason, and signature. Only the assigned director approval role can approve slips under the implemented Permission Slip rule. Module administrators and super administrators can view or manage access according to their separate permissions.
+
+Approved slips can produce and store a receipt image, which may be sent to the employee by email.
+
+## Late and Absences
+
+Institutional users can view:
+
+- Remaining emergency, sick, vacation, and bonus leave credits.
+- Lates and absences.
+- Synced employee mapping.
+- Attendance discrepancy flags.
+- Staff-group records.
+- Synchronization notifications.
+
+Administrators and directors can manage staff mappings, synchronization, discrepancy resolution, and attendance operations according to configured access.
+
+# Role model
+
+| Role | Main capabilities |
+| --- | --- |
+| Requisitioner | Vehicle request submission and personal trip tracking. |
+| Transport Head | Initial vehicle-request review and fleet assignment. |
+| Director | Recommendation or director-stage approval, plus assigned module operations. |
+| President | Final trip-ticket approval. |
+| Transport Staff | Operational and dispatch support according to access rules. |
+| Guard | Assigned operational verification support. |
+| Driver | Assigned trip operational support. |
+| Assistant | Alternate signatory operations for configured stages. |
+| Admin | Central administration for assigned and permitted modules. |
+| Super Admin | Organization-wide module access management and overview. |
+| HRDO employee | COE request submission and personal request tracking. |
+| HRDO staff | COE verification and processing queue operations. |
+| HRDO admin | HRDO account and processor administration. |
+| Permission Slip employee | Submit and view personal Permission Slips. |
+| Permission Slip signatory | Approve or reject assigned Permission Slips. |
+
+Role strings are stored in separate account tables where modules use dedicated authentication. Server functions do not rely only on client-side menus or UI visibility.

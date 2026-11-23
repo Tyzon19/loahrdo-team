@@ -1,0 +1,53 @@
+---
+title: System Overview
+description: Project context, objectives, scope, stakeholders, and system boundaries.
+---
+
+# LOA HRDO Desk
+
+LOA HRDO Desk is an integrated operational platform for Lyceum of Alabang. It brings vehicle reservation and trip-ticket processing, Certificate of Employment requests, Permission Slip processing, and late-and-absence operations into role-based web services.
+
+## Organizational context
+
+The Physical Facilities Management Office operates vehicle reservation and trip-ticket services. HRDO operates employee Certificate of Employment and attendance-related services. The platform gives each office an independent workflow while sharing institutional authentication, account management, MySQL data, notification delivery, and administrative oversight.
+
+## Current process and problems addressed
+
+The replacement system removes or reduces paper routing, scattered records, manual status tracking, duplicate account data, and inconsistent document delivery. Request owners, approvers, and administrators can view the current state and retained history from a central application.
+
+## Purpose
+
+The system standardizes request submission, approval, document generation, record retention, notifications, and role-specific administration across the included employee-service modules.
+
+## Objectives
+
+- Provide authenticated institutional and eligible external user access.
+- Automate validation and sequential approval workflows.
+- Generate official trip tickets and COE-related documents.
+- Maintain signatures, decision history, and audit messages.
+- Restrict operations through server-side role checks.
+- Provide search, archive, analytics, receipts, and reporting.
+- Preserve records for authorized operational use.
+- Send Gmail notifications and official attachments.
+- Support desktop and mobile browser use.
+
+## Stakeholders
+
+| Stakeholder | Responsibility |
+| --- | --- |
+| Institutional employees | Submit requests and track available service records. |
+| Requisitioners | Submit and revise vehicle requests. |
+| Transport Head | Review vehicle requests and assign fleet resources. |
+| Director | Perform the recommendation or approval stage assigned to the workflow. |
+| President | Perform final vehicle-request approval. |
+| HRDO staff | Process, verify, prepare, and release COE documents. |
+| Permission Slip signatories | Approve or reject submitted Permission Slips. |
+| Administrators | Manage module records, users, signatories, reports, and configuration. |
+| Super Administrator | Manage organization-wide system access. |
+| External former employees or verifiers | Request or verify eligible COE services with personal Google accounts. |
+
+## Scope
+
+The implementation includes account authentication, account profiles, password recovery, OTP registration, role dashboards, request submission, approval stages, signatures, notifications, record history, document output, receipts, attendance synchronization, and module reports.
+
+The system depends on approved institutional policies and configured external services. It does not replace institutional authority, manual payroll policy, legal document requirements, or decisions made by designated approvers.

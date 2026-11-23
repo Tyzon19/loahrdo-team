@@ -1,0 +1,86 @@
+---
+title: QA and Test Cases
+description: Test coverage from src/test with unit, integration, security, routing, and workflow cases.
+---
+
+# Test strategy
+
+Run the complete suite with:
+
+```bash
+npm test
+```
+
+The suite uses Vitest and Testing Library under `src/test`. Tests cover server rules, workflow transitions, validation, email templates, OAuth eligibility, receipt handling, route behavior, archive filtering, and ticket verification.
+
+# Routing and access
+
+Representative coverage includes:
+
+- Public routes, authenticated dashboard routes, and unknown-path fallback.
+- Requisitioners viewing only their own records.
+- Approvers and operational staff seeing assigned queues.
+- Central administrator access without accidental signatory authority.
+- External HRDO accounts being blocked from staff routes.
+
+# Vehicle workflow tests
+
+Coverage includes the Head of Transport → Director → President sequence, rejection reasons, administrator restrictions, return emails, alternate identity, requisitioner editing, resubmission, and preservation of prior signatures.
+
+Validation tests cover request completeness, Philippine mobile numbers, date ranges, times, destinations, passenger limits, control characters, signatory assistants, main signatory assignments, driver names, and trip archive filters.
+
+# Ticket verification
+
+Tests verify signed approval claims, changed payload rejection, invalid signatures, MySQL timestamp normalization, and binding verification references to approved dates and destinations.
+
+# Permission Slip tests
+
+Coverage includes:
+
+- Valid and invalid slip creation.
+- Approval and receipt schemas.
+- Signatory institutional email eligibility.
+- UUID validation.
+- Director-only approval behavior.
+- Admin and super-admin queue boundaries.
+- Receipt archive preview.
+- Receipt base64 attachment and employee email delivery.
+
+# COE tests
+
+Coverage includes account access, employee summaries, HR workload summaries, deadline urgency, status filtering, search, copy types, correction or rejection rules, combined-copy delivery, and release conditions.
+
+Template tests verify peso conversion, centavos, comma-formatted values, supported compensation, and filename or MIME handling.
+
+# Authentication tests
+
+Google sign-in tests verify institutional and personal account eligibility, redirect safety, external OAuth credentials, callback origins, account completion, forced password changes, and failure messages.
+
+Password tests verify scrypt hashing and reject malformed hashes or incorrect passwords.
+
+# Email and receipt tests
+
+Coverage includes HTML and plain-text email templates, user-controlled escaping, branded OTP email, temporary-password email, trip-ticket images, Gmail sender configuration, Gmail API failures, Permission Slip delivery, and inbox notifications.
+
+# Attendance tests
+
+Coverage includes June-to-May attendance cycles, supported event codes, name matching, staff sheet mappings, and synchronization edge cases.
+
+# Admin and analytics tests
+
+Coverage includes super-admin totals, module totals, access history, receipt archive permissions, receipt search and date ranges, bulk ZIP downloads, destination normalization, analytics limits, and destination search validation.
+
+# Acceptance checklist
+
+Before release:
+
+1. Run `npm test`.
+2. Run `npm run build`.
+3. Test vehicle submission and approval in a browser.
+4. Test COE request and document release.
+5. Test Permission Slip approval and receipt delivery.
+6. Test attendance synchronization and discrepancy resolution.
+7. Test desktop and mobile layouts.
+8. Verify external OAuth callback hosts and redirect URIs.
+9. Verify Gmail sender authorization.
+10. Verify database setup against a clean environment.
