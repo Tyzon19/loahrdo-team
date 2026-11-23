@@ -32,6 +32,7 @@
         "icon": "layers",
         "expanded": true,
         "pages": [
+          "technical-documentation",
           "certificate-of-employment",
           "permission-slip",
           "vehicle-trip-ticket"
