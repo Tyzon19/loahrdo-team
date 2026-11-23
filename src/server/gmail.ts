@@ -1,6 +1,4 @@
 import { randomBytes } from "node:crypto";
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import {
   renderEmailTemplate,
   renderRegistrationOtpEmail,
@@ -14,8 +12,6 @@ import { publicSiteUrl, serverEnvOptional } from "./env";
 interface GoogleTokenResponse {
   access_token?: string;
 }
-
-const LOGO_CONTENT_ID = "loa-header-logo";
 
 export type EmailDeliveryResult =
   | {
@@ -175,7 +171,6 @@ function createMimeMessage(
   subject: string,
   text: string,
   html: string,
-  logo: Buffer | undefined,
   ticketImage?: Buffer,
   ticketFilename?: string,
   attachments: EmailAttachment[] = [],
@@ -191,87 +186,13 @@ function createMimeMessage(
         ...(thread.references ? [`References: <${thread.references}>`] : []),
       ]
     : [];
-
-  if (!attachments.length && !logo && !ticketImage) {
-    return [
-      `To: ${recipient}`,
-      `Subject: ${encodedHeader(subject)}`,
-      "MIME-Version: 1.0",
-      ...threadHeaders,
-      `Content-Type: multipart/alternative; boundary="${alternativeBoundary}"`,
-      "",
-      `--${alternativeBoundary}`,
-      'Content-Type: text/plain; charset="UTF-8"',
-      "Content-Transfer-Encoding: base64",
-      "",
-      base64(text),
-      `--${alternativeBoundary}`,
-      'Content-Type: text/html; charset="UTF-8"',
-      "Content-Transfer-Encoding: base64",
-      "",
-      base64(html),
-      `--${alternativeBoundary}--`,
-      "",
-    ].join("\r\n");
-  }
-
-  if (!attachments.length) {
-    const parts = [
-      `To: ${recipient}`,
-      `Subject: ${encodedHeader(subject)}`,
-      "MIME-Version: 1.0",
-      ...threadHeaders,
-      `Content-Type: multipart/related; boundary="${relatedBoundary}"`,
-      "",
-      `--${relatedBoundary}`,
-      `Content-Type: multipart/alternative; boundary="${alternativeBoundary}"`,
-      "",
-      `--${alternativeBoundary}`,
-      'Content-Type: text/plain; charset="UTF-8"',
-      "Content-Transfer-Encoding: base64",
-      "",
-      base64(text),
-      `--${alternativeBoundary}`,
-      'Content-Type: text/html; charset="UTF-8"',
-      "Content-Transfer-Encoding: base64",
-      "",
-      base64(html),
-      `--${alternativeBoundary}--`,
-    ];
-
-    if (logo) {
-      parts.push(
-        `--${relatedBoundary}`,
-        'Content-Type: image/png; name="loa-loading.png"',
-        "Content-Transfer-Encoding: base64",
-        `Content-ID: <${LOGO_CONTENT_ID}>`,
-        'Content-Disposition: inline; filename="loa-loading.png"',
-        "",
-        base64(logo),
-      );
-    }
-
-    if (ticketImage && ticketFilename && ticketContentId) {
-      parts.push(
-        `--${relatedBoundary}`,
-        `Content-Type: image/png; name="${ticketFilename}"`,
-        "Content-Transfer-Encoding: base64",
-        `Content-ID: <${ticketContentId}>`,
-        `Content-Disposition: inline; filename="${ticketFilename}"`,
-        "",
-        base64(ticketImage),
-      );
-    }
-
-    parts.push(`--${relatedBoundary}--`, "");
-    return parts.join("\r\n");
-  }
-
-  const mixedBoundary = `loa_mixed_${randomBytes(18).toString("hex")}`;
-  const relatedParts = [
-    `Content-Type: multipart/related; boundary="${relatedBoundary}"`,
-    "",
-    `--${relatedBoundary}`,
+  const headers = [
+    `To: ${recipient}`,
+    `Subject: ${encodedHeader(subject)}`,
+    "MIME-Version: 1.0",
+    ...threadHeaders,
+  ];
+  const alternativeParts = [
     `Content-Type: multipart/alternative; boundary="${alternativeBoundary}"`,
     "",
     `--${alternativeBoundary}`,
@@ -286,29 +207,36 @@ function createMimeMessage(
     base64(html),
     `--${alternativeBoundary}--`,
   ];
+  const bodyParts =
+    ticketImage && ticketFilename && ticketContentId
+      ? [
+          `Content-Type: multipart/related; boundary="${relatedBoundary}"`,
+          "",
+          `--${relatedBoundary}`,
+          ...alternativeParts,
+          `--${relatedBoundary}`,
+          `Content-Type: image/png; name="${ticketFilename}"`,
+          "Content-Transfer-Encoding: base64",
+          `Content-ID: <${ticketContentId}>`,
+          `Content-Disposition: inline; filename="${ticketFilename}"`,
+          "",
+          base64(ticketImage),
+          `--${relatedBoundary}--`,
+        ]
+      : alternativeParts;
 
-  if (logo) {
-    relatedParts.push(
-      `--${relatedBoundary}`,
-      'Content-Type: image/png; name="loa-loading.png"',
-      "Content-Transfer-Encoding: base64",
-      `Content-ID: <${LOGO_CONTENT_ID}>`,
-      'Content-Disposition: inline; filename="loa-loading.png"',
-      "",
-      base64(logo),
-    );
+  if (!attachments.length) {
+    return [...headers, ...bodyParts, ""].join("\r\n");
   }
-  relatedParts.push(`--${relatedBoundary}--`, "");
 
+  const mixedBoundary = `loa_mixed_${randomBytes(18).toString("hex")}`;
   const parts = [
-    `To: ${recipient}`,
-    `Subject: ${encodedHeader(subject)}`,
-    "MIME-Version: 1.0",
-    ...threadHeaders,
+    ...headers,
     `Content-Type: multipart/mixed; boundary="${mixedBoundary}"`,
     "",
     `--${mixedBoundary}`,
-    ...relatedParts,
+    ...bodyParts,
+    "",
   ];
 
   for (const attachment of attachments) {
@@ -319,6 +247,7 @@ function createMimeMessage(
       `Content-Disposition: attachment; filename="${attachment.filename}"`,
       "",
       base64(attachment.content),
+      "",
     );
   }
 
@@ -367,7 +296,6 @@ async function createNotificationMime(
   message: EmailMessage,
   request: VehicleRequest,
   siteUrl: URL,
-  logo: Buffer,
   ticketImage?: Buffer,
 ): Promise<string> {
   if (!validEmail(message.toEmail)) {
@@ -381,7 +309,6 @@ async function createNotificationMime(
     ticketImage
       ? `/print/${encodeURIComponent(request.id)}`
       : `/requests/${encodeURIComponent(request.id)}`,
-    LOGO_CONTENT_ID,
     ticketContentId,
     {
       department: request.department,
@@ -398,7 +325,6 @@ async function createNotificationMime(
     rendered.subject,
     rendered.text,
     rendered.html,
-    logo,
     ticketImage,
     ticketImage ? `${request.number}-trip-ticket.png` : undefined,
   );
@@ -411,11 +337,9 @@ async function deliverNotifications(
 ): Promise<EmailDeliveryResult> {
   let token: string;
   let siteUrl: URL;
-  let logo: Buffer;
   try {
     token = await accessToken();
     siteUrl = siteUrlForEmail();
-    logo = await readFile(join(process.cwd(), "public", "loa-loading.png"));
   } catch (error) {
     const message =
       error instanceof AppError
@@ -444,7 +368,7 @@ async function deliverNotifications(
   const recipientResults: EmailRecipientResult[] = [];
   for (const message of messages) {
     try {
-      const mime = await createNotificationMime(message, request, siteUrl, logo, ticketImage);
+      const mime = await createNotificationMime(message, request, siteUrl, ticketImage);
       await sendMimeMessage(token, mime);
       delivered += 1;
       recipientResults.push({ notificationId: message.id, sent: true });
@@ -559,7 +483,6 @@ export async function sendCoeReleaseEmail(input: {
       html,
       undefined,
       undefined,
-      undefined,
       input.attachment ? [input.attachment] : [],
     );
     await sendMimeMessage(token, mime);
@@ -668,7 +591,6 @@ export async function sendCoeStatusEmail(input: {
       html,
       undefined,
       undefined,
-      undefined,
       input.attachment ? [input.attachment] : [],
       thread,
     );
@@ -754,7 +676,7 @@ export async function sendCoeProcessorNotification(input: {
     `;
 
     const token = await accessToken();
-    const mime = createMimeMessage(input.recipientEmail, subject, text, html, undefined);
+    const mime = createMimeMessage(input.recipientEmail, subject, text, html);
     await sendMimeMessage(token, mime);
     return { sent: true, delivered: 1, failed: 0 };
   } catch (error) {
@@ -797,18 +719,14 @@ export async function sendTemporaryPasswordEmail(input: {
         ...(input.systemName ? { systemName: input.systemName } : {}),
         ...(input.accountAction ? { accountAction: input.accountAction } : {}),
       },
-      LOGO_CONTENT_ID,
+      new URL("/loa-loading.png", siteUrl.origin).toString(),
     );
-    const [token, logo] = await Promise.all([
-      accessToken(),
-      readFile(join(process.cwd(), "public", "loa-loading.png")),
-    ]);
+    const token = await accessToken();
     const mime = createMimeMessage(
       input.recipientEmail,
       rendered.subject,
       rendered.text,
       rendered.html,
-      logo,
     );
     await sendMimeMessage(token, mime);
     return { sent: true, delivered: 1, failed: 0 };
@@ -839,21 +757,13 @@ export async function sendRegistrationOtpEmail(
   if (!validEmail(recipient)) {
     throw new AppError("The verification email recipient is invalid.");
   }
+  const siteUrl = siteUrlForEmail();
   const token = await accessToken();
   const email = renderRegistrationOtpEmail(
     { recipientName, code, expiresInMinutes },
-    LOGO_CONTENT_ID,
+    new URL("/loa-loading.png", siteUrl.origin).toString(),
   );
-  let logo: Buffer;
-  try {
-    logo = await readFile(join(process.cwd(), "public", "loa-loading.png"));
-  } catch (error) {
-    console.error(
-      `[gmail] Could not read the email logo: ${error instanceof Error ? error.name : "unknown"}`,
-    );
-    throw new AppError("We couldn't prepare the verification email. Please try again later.");
-  }
-  const mime = createMimeMessage(recipient, email.subject, email.text, email.html, logo);
+  const mime = createMimeMessage(recipient, email.subject, email.text, email.html);
   await sendMimeMessage(token, mime);
 }
 
@@ -901,6 +811,7 @@ export async function sendPermissionSlipEmail(input: {
       reason: escapeHtml(input.reason),
       message: escapeHtml(message),
       actionUrl: escapeHtml(actionUrl),
+      logoUrl: escapeHtml(new URL("/loa-loading.png", siteUrl.origin).toString()),
     };
     const text = [
       `Dear ${input.recipientName},`,
@@ -918,14 +829,12 @@ export async function sendPermissionSlipEmail(input: {
       "",
       "Lyceum of Alabang Human Resource Development Office",
     ].join("\n");
-    const html = `<!doctype html><html lang="en"><body style="margin:0;background:#f3f5f8;padding:32px 12px;font-family:Arial,sans-serif;color:#172033"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center"><table role="presentation" width="600" style="width:100%;max-width:600px;background:#fff;border:1px solid #e2e7ef;border-radius:8px"><tr><td style="padding:30px 32px"><img src="cid:${LOGO_CONTENT_ID}" width="190" alt="Lyceum of Alabang" style="display:block;max-width:100%;height:auto"><h1 style="margin:28px 0 12px;color:#1f3b68;font-size:22px">Permission Slip</h1><p>Dear ${safe.recipientName},</p><p>${safe.message}</p><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin:20px 0"><tr><td style="padding:8px;border-bottom:1px solid #e5e9f0;color:#687386">Name</td><td style="padding:8px;border-bottom:1px solid #e5e9f0;font-weight:700">${safe.employeeName}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #e5e9f0;color:#687386">Department</td><td style="padding:8px;border-bottom:1px solid #e5e9f0;font-weight:700">${safe.department}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #e5e9f0;color:#687386">Date</td><td style="padding:8px;border-bottom:1px solid #e5e9f0;font-weight:700">${safe.requestedDate}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #e5e9f0;color:#687386">Time</td><td style="padding:8px;border-bottom:1px solid #e5e9f0;font-weight:700">${safe.timeOut} — ${safe.timeIn}</td></tr><tr><td style="padding:8px;color:#687386;vertical-align:top">Reason</td><td style="padding:8px;font-weight:700">${safe.reason}</td></tr></table><p><a href="${safe.actionUrl}" style="display:inline-block;background:#1f3b68;color:#fff;padding:13px 22px;border-radius:5px;text-decoration:none;font-weight:700">${input.kind === "head_review" ? "Review Permission Slip" : "View Permission Slip"}</a></p><p style="margin-top:28px;color:#687386;font-size:12px">This is an automated notification from Lyceum of Alabang HRDO.</p></td></tr></table></td></tr></table></body></html>`;
-    const logo = await readFile(join(process.cwd(), "public", "loa-loading.png"));
+    const html = `<!doctype html><html lang="en"><body style="margin:0;background:#f3f5f8;padding:32px 12px;font-family:Arial,sans-serif;color:#172033"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center"><table role="presentation" width="600" style="width:100%;max-width:600px;background:#fff;border:1px solid #e2e7ef;border-radius:8px"><tr><td style="padding:30px 32px"><img src="${safe.logoUrl}" width="190" alt="Lyceum of Alabang" style="display:block;max-width:100%;height:auto"><h1 style="margin:28px 0 12px;color:#1f3b68;font-size:22px">Permission Slip</h1><p>Dear ${safe.recipientName},</p><p>${safe.message}</p><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin:20px 0"><tr><td style="padding:8px;border-bottom:1px solid #e5e9f0;color:#687386">Name</td><td style="padding:8px;border-bottom:1px solid #e5e9f0;font-weight:700">${safe.employeeName}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #e5e9f0;color:#687386">Department</td><td style="padding:8px;border-bottom:1px solid #e5e9f0;font-weight:700">${safe.department}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #e5e9f0;color:#687386">Date</td><td style="padding:8px;border-bottom:1px solid #e5e9f0;font-weight:700">${safe.requestedDate}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #e5e9f0;color:#687386">Time Out</td><td style="padding:8px;border-bottom:1px solid #e5e9f0;font-weight:700">${safe.timeOut}</td><td style="padding:8px;border-bottom:1px solid #e5e9f0;color:#687386">Time In</td><td style="padding:8px;border-bottom:1px solid #e5e9f0;font-weight:700">${safe.timeIn}</td></tr><tr><td style="padding:8px;color:#687386;vertical-align:top">Reason</td><td style="padding:8px;font-weight:700">${safe.reason}</td></tr></table><p><a href="${safe.actionUrl}" style="display:inline-block;background:#1f3b68;color:#fff;padding:13px 22px;border-radius:5px;text-decoration:none;font-weight:700">${input.kind === "head_review" ? "Review Permission Slip" : "View Permission Slip"}</a></p><p style="margin-top:28px;color:#687386;font-size:12px">This is an automated notification from Lyceum of Alabang HRDO.</p></td></tr></table></td></tr></table></body></html>`;
     const mime = createMimeMessage(
       input.recipientEmail,
       subject,
       text,
       html,
-      logo,
       undefined,
       undefined,
       input.attachment ? [input.attachment] : [],

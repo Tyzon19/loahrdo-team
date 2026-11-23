@@ -4,6 +4,7 @@ import {
   sendCoeStatusEmail,
   sendPermissionSlipEmail,
   sendTemporaryPasswordEmail,
+  sendTripTicketEmail,
   sendWorkflowEmails,
 } from "@/server/gmail";
 
@@ -90,12 +91,58 @@ describe("Gmail workflow delivery", () => {
     const sentMime = sentMessages[0] ?? "";
     expect(sentMime).toContain("To: signatory@example.edu");
     expect(sentMime).not.toContain("[TEST]");
+    expect(sentMime).not.toContain('name="loa-loading.png"');
+    const htmlPart = sentMime.match(
+      /Content-Type: text\/html; charset="UTF-8"\r\nContent-Transfer-Encoding: base64\r\n\r\n([\s\S]*?)\r\n--loa_alt_[^\r\n]+/,
+    )?.[1];
+    expect(htmlPart).toBeDefined();
+    expect(Buffer.from(htmlPart?.replace(/\s/g, "") ?? "", "base64").toString("utf8")).toContain(
+      'src="https://vrtt.example.edu/loa-loading.png"',
+    );
     const textPart = sentMime.match(
       /Content-Type: text\/plain; charset="UTF-8"\r\nContent-Transfer-Encoding: base64\r\n\r\n([\s\S]*?)\r\n--loa_alt_[^\r\n]+/,
     )?.[1];
     expect(textPart).toBeDefined();
     expect(Buffer.from(textPart?.replace(/\s/g, "") ?? "", "base64").toString("utf8")).toContain(
       "https://vrtt.example.edu/requests/request-1",
+    );
+  });
+
+  it("keeps the approved trip-ticket image inline without embedding the logo", async () => {
+    let sentMime = "";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = String(input);
+        if (url === "https://oauth2.googleapis.com/token") {
+          return Response.json({ access_token: "mock-access-token" });
+        }
+        if (url === "https://gmail.googleapis.com/gmail/v1/users/me/messages/send") {
+          const body = JSON.parse(String(init?.body)) as { raw: string };
+          sentMime = Buffer.from(body.raw, "base64url").toString("utf8");
+          return Response.json({});
+        }
+        throw new Error(`Unexpected email request: ${url}`);
+      }),
+    );
+
+    const result = await sendTripTicketEmail(
+      { ...message, kind: "approved_requester" },
+      request,
+      Buffer.from("trip-ticket-image"),
+    );
+
+    expect(result).toMatchObject({ sent: true, delivered: 1, failed: 0 });
+    expect(sentMime).toContain("Content-ID: <approved-trip-ticket>");
+    expect(sentMime).toContain(
+      'Content-Disposition: inline; filename="VR-2026-0012-trip-ticket.png"',
+    );
+    expect(sentMime).not.toContain('name="loa-loading.png"');
+    const htmlPart = sentMime.match(
+      /Content-Type: text\/html; charset="UTF-8"\r\nContent-Transfer-Encoding: base64\r\n\r\n([\s\S]*?)\r\n--loa_alt_[^\r\n]+/,
+    )?.[1];
+    expect(Buffer.from(htmlPart?.replace(/\s/g, "") ?? "", "base64").toString("utf8")).toContain(
+      'src="https://vrtt.example.edu/loa-loading.png"',
     );
   });
 
@@ -313,7 +360,14 @@ describe("Gmail workflow delivery", () => {
 
     expect(result).toEqual({ sent: true, delivered: 1, failed: 0 });
     expect(sentMime).toContain("To: alex@example.edu");
-    expect(sentMime).toContain(`Content-ID: <loa-header-logo>`);
+    expect(sentMime).not.toContain('name="loa-loading.png"');
+    expect(sentMime).not.toContain("Content-ID: <loa-header-logo>");
+    const htmlPart = sentMime.match(
+      /Content-Type: text\/html; charset="UTF-8"\r\nContent-Transfer-Encoding: base64\r\n\r\n([\s\S]*?)\r\n--loa_alt_[^\r\n]+/,
+    )?.[1];
+    expect(Buffer.from(htmlPart?.replace(/\s/g, "") ?? "", "base64").toString("utf8")).toContain(
+      'src="https://vrtt.example.edu/loa-loading.png"',
+    );
     expect(sentMime).toContain(
       'Content-Disposition: attachment; filename="permission-slip-permission-1.png"',
     );

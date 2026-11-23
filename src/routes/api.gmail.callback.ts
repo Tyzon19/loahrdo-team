@@ -248,7 +248,7 @@ export const Route = createFileRoute("/api/gmail/callback")({
         if (identity.email.toLowerCase() !== senderEmail) {
           const response = htmlPage(
             "Wrong Gmail account",
-            `Connect ${senderEmail}, the approved personal sender account. No credentials were saved and no email was sent.`,
+            `Connect ${senderEmail}, the configured sender account. No credentials were saved and no email was sent.`,
             403,
           );
           headers.forEach((value, key) => response.headers.append(key, value));

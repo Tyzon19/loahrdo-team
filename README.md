@@ -89,21 +89,24 @@ Copy values from `.env.example` when setting up a new environment. Never commit 
 | `SITE_URL`                                                                                | Public origin used for canonical links, Open Graph, sitemap                                    |
 | `ALLOWED_EMAIL_DOMAINS`                                                                   | Institutional domains accepted for admin-created accounts                                      |
 | `GA_MEASUREMENT_ID`                                                                       | Optional GA4 ID, loaded only after analytics consent                                           |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `GOOGLE_SENDER_EMAIL` | Institutional sign-in and Gmail sender credentials; the approved personal sender is `markjosephturingan4@gmail.com` |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `GOOGLE_SENDER_EMAIL` | Institutional sign-in and Gmail sender credentials; the approved sender is `hrdo.desk@lyceumalabang.edu.ph` |
 | `GOOGLE_EXTERNAL_CLIENT_ID`, `GOOGLE_EXTERNAL_CLIENT_SECRET`                              | Optional separate Google OAuth client for former employees/verifiers; falls back to the shared client when unset |
 | `GOOGLE_SIGNIN_REDIRECT_URI`                                                              | Optional Google sign-in callback; defaults to the site origin plus `/api/auth/google/callback` |
 
 To connect the sender locally, configure the Google OAuth client ID and secret, add
 `http://localhost:8080/api/gmail/callback` as an authorized redirect URI, start the app, and visit
-`/api/gmail/connect`. Set `GOOGLE_SENDER_EMAIL=markjosephturingan4@gmail.com` and authorize that
-personal Gmail account. The callback rejects a different Google account and saves only the
+`/api/gmail/connect`. Set `GOOGLE_SENDER_EMAIL=hrdo.desk@lyceumalabang.edu.ph` and authorize that
+institutional Google Workspace account. The callback rejects a different Google account and saves only the
 refresh token; the configured sender address is not changed. It does not send a test email.
 If the sender was connected before email identity verification was added, reconnect it so Google
 grants the email identity scope as well as Gmail send permission. Restart the dev server after
 connecting. Run `npm run db:setup` to create the registration OTP table before enabling
 registration email.
 
-The personal Gmail account is the sender only; it is not used as a request or ticket recipient.
+The HRDO mailbox is the sender only; it is not used as a request or ticket recipient.
+The email header logo is loaded from the public `SITE_URL/loa-loading.png` address instead of
+being attached to every message. Recipients may need to allow remote images; trip-ticket and
+Permission Slip documents remain normal message attachments.
 Workflow messages go to the configured signatory/alternate account that owns the next action.
 Official trip tickets go to the requisitioner who owns the request. New signatory account details
 and password resets go to the email address configured for that account.

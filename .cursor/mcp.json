@@ -1,3 +1,8 @@
 {
-  "mcpServers": {}
+  "mcpServers": {
+    "repowise": {
+      "type": "http",
+      "url": "https://api.repowise.dev/mcp/tyzon19/loahrdo-team"
+    }
+  }
 }

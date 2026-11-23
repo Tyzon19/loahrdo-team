@@ -40,16 +40,11 @@ describe("professional email template", () => {
   });
 
   it("renders a responsive HTML email and a plain-text alternative", () => {
-    const rendered = renderEmailTemplate(
-      message,
-      "http://localhost:8080",
-      undefined,
-      "loa-header-logo",
-    );
+    const rendered = renderEmailTemplate(message, "http://localhost:8080");
 
     expect(rendered.subject).toBe(message.subject);
     expect(rendered.html).toContain('name="viewport"');
-    expect(rendered.html).toContain('src="cid:loa-header-logo"');
+    expect(rendered.html).toContain('src="http://localhost:8080/loa-loading.png"');
     expect(rendered.html).toContain("Kind regards,");
     expect(rendered.html).toContain("Lyceum of Alabang");
     expect(rendered.html).toContain("http://localhost:8080/print/");
@@ -66,11 +61,11 @@ describe("professional email template", () => {
           code: "482913",
           expiresInMinutes: 10,
         },
-        "loa-logo",
+        "https://vrtt.example.edu/loa-loading.png",
       );
 
       expect(rendered.subject).toContain("Verify your email address");
-      expect(rendered.html).toContain('src="cid:loa-logo"');
+      expect(rendered.html).toContain('src="https://vrtt.example.edu/loa-loading.png"');
       expect(rendered.html).toContain("482913");
       expect(rendered.html).toContain("expires in <strong>10 minutes</strong>");
       expect(rendered.text).toContain("482913");
@@ -78,11 +73,14 @@ describe("professional email template", () => {
     });
 
     it("uses standard verification copy and escapes user-controlled content", () => {
-      const rendered = renderRegistrationOtpEmail({
-        recipientName: "<script>Test</script>",
-        code: "482913",
-        expiresInMinutes: 10,
-      });
+      const rendered = renderRegistrationOtpEmail(
+        {
+          recipientName: "<script>Test</script>",
+          code: "482913",
+          expiresInMinutes: 10,
+        },
+        "https://vrtt.example.edu/loa-loading.png",
+      );
 
       expect(rendered.subject).toBe("[LOA Vehicle Request] Verify your email address");
       expect(rendered.html).toContain("&lt;script&gt;Test&lt;/script&gt;");
@@ -93,18 +91,24 @@ describe("professional email template", () => {
 
     it("rejects malformed codes and invalid expiry values", () => {
       expect(() =>
-        renderRegistrationOtpEmail({
-          recipientName: "Alex User",
-          code: "12345",
-          expiresInMinutes: 10,
-        }),
+        renderRegistrationOtpEmail(
+          {
+            recipientName: "Alex User",
+            code: "12345",
+            expiresInMinutes: 10,
+          },
+          "https://vrtt.example.edu/loa-loading.png",
+        ),
       ).toThrow("six digits");
       expect(() =>
-        renderRegistrationOtpEmail({
-          recipientName: "Alex User",
-          code: "123456",
-          expiresInMinutes: 0,
-        }),
+        renderRegistrationOtpEmail(
+          {
+            recipientName: "Alex User",
+            code: "123456",
+            expiresInMinutes: 0,
+          },
+          "https://vrtt.example.edu/loa-loading.png",
+        ),
       ).toThrow("positive number");
     });
   });
@@ -118,11 +122,11 @@ describe("professional email template", () => {
         signatoryTitle: "Head of Transport Services",
         loginUrl: "https://vrtt.example.edu/login",
       },
-      "loa-logo",
+      "https://vrtt.example.edu/loa-loading.png",
     );
 
     expect(rendered.subject).toBe("[LOA Vehicle Request] Your account is ready");
-    expect(rendered.html).toContain('src="cid:loa-logo"');
+    expect(rendered.html).toContain('src="https://vrtt.example.edu/loa-loading.png"');
     expect(rendered.html).toContain("&lt;script&gt;Test&lt;/script&gt;");
     expect(rendered.html).toContain("temporary&lt;&amp;&gt;password");
     expect(rendered.html).toContain("Change this password immediately");
@@ -132,14 +136,17 @@ describe("professional email template", () => {
   });
 
   it("uses password-reset copy for account recovery emails", () => {
-    const rendered = renderTemporaryPasswordEmail({
-      recipientName: "Alex User",
-      email: "alex@example.edu",
-      temporaryPassword: "temporary-password",
-      signatoryTitle: "Requisitioner",
-      loginUrl: "https://vrtt.example.edu/login",
-      accountAction: "password-reset",
-    });
+    const rendered = renderTemporaryPasswordEmail(
+      {
+        recipientName: "Alex User",
+        email: "alex@example.edu",
+        temporaryPassword: "temporary-password",
+        signatoryTitle: "Requisitioner",
+        loginUrl: "https://vrtt.example.edu/login",
+        accountAction: "password-reset",
+      },
+      "https://vrtt.example.edu/loa-loading.png",
+    );
 
     expect(rendered.subject).toBe("[LOA Vehicle Request] Temporary password reset");
     expect(rendered.html).toContain("Your Requisitioner account password was reset");
@@ -151,7 +158,6 @@ describe("professional email template", () => {
       message,
       "https://vrtt.example.edu",
       `/print/${message.requestId}`,
-      "loa-logo",
       "ticket-image",
       {
         department: "CCS",

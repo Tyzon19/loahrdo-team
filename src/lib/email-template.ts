@@ -90,7 +90,6 @@ export function renderEmailTemplate(
   message: EmailMessage,
   baseUrl: string,
   actionPath = requestPath(message),
-  logoContentId = "loa-header-logo",
   ticketImageContentId?: string,
   ticketPreview?: EmailTicketPreview,
 ): RenderedEmail {
@@ -113,7 +112,7 @@ export function renderEmailTemplate(
     name: escapeHtml(message.toName),
     number: escapeHtml(message.requestNumber),
     subject: escapeHtml(message.subject),
-    logoContentId: escapeHtml(logoContentId),
+    logoUrl: escapeHtml(absoluteActionUrl(baseUrl, "/loa-loading.png")),
     ticketContentId: ticketImageContentId ? escapeHtml(ticketImageContentId) : undefined,
   };
   const ticketRow = (label: string, value: string): [string, string] => [label, value];
@@ -182,7 +181,7 @@ export function renderEmailTemplate(
           <table role="presentation" class="email-shell" width="600" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:600px;background-color:#ffffff;border:1px solid #e2e7ef;border-radius:8px;overflow:hidden;">
             <tr>
               <td style="padding:30px 32px 8px;">
-                <img class="email-logo" src="cid:${safe.logoContentId}" width="190" alt="Lyceum of Alabang" style="display:block;width:190px;max-width:100%;height:auto;border:0;">
+                <img class="email-logo" src="${safe.logoUrl}" width="190" alt="Lyceum of Alabang" style="display:block;width:190px;max-width:100%;height:auto;border:0;">
               </td>
             </tr>
             <tr>
@@ -228,7 +227,7 @@ export function renderEmailTemplate(
 
 export function renderRegistrationOtpEmail(
   input: RegistrationOtpEmailInput,
-  logoContentId = "loa-header-logo",
+  logoUrl: string,
 ): RenderedEmail {
   if (!/^\d{6}$/.test(input.code)) {
     throw new Error("The registration verification code must contain six digits.");
@@ -239,7 +238,7 @@ export function renderRegistrationOtpEmail(
 
   const name = escapeHtml(input.recipientName);
   const code = escapeHtml(input.code);
-  const logo = escapeHtml(logoContentId);
+  const logo = escapeHtml(logoUrl);
   const ignoredNotice = "If you did not request this code, you can safely ignore this email.";
   const subject = "[LOA Vehicle Request] Verify your email address";
   const text = [
@@ -268,7 +267,7 @@ export function renderRegistrationOtpEmail(
       <tr><td align="center" style="padding:32px 12px;">
         <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:600px;background-color:#ffffff;border:1px solid #e2e7ef;border-radius:8px;overflow:hidden;">
           <tr><td style="padding:30px 32px 8px;">
-            <img src="cid:${logo}" width="190" alt="Lyceum of Alabang" style="display:block;width:190px;max-width:100%;height:auto;border:0;">
+            <img src="${logo}" width="190" alt="Lyceum of Alabang" style="display:block;width:190px;max-width:100%;height:auto;border:0;">
           </td></tr>
           <tr><td style="padding:24px 32px 32px;">
             <p style="margin:0 0 18px;color:#353b45;font-size:14px;line-height:1.6;">Dear ${name},</p>
@@ -296,7 +295,7 @@ export function renderRegistrationOtpEmail(
 
 export function renderTemporaryPasswordEmail(
   input: TemporaryPasswordEmailInput,
-  logoContentId = "loa-header-logo",
+  logoUrl: string,
 ): RenderedEmail {
   if (!input.temporaryPassword || input.temporaryPassword.length > 200) {
     throw new Error("The temporary password is invalid.");
@@ -315,7 +314,7 @@ export function renderTemporaryPasswordEmail(
   const email = escapeHtml(input.email);
   const password = escapeHtml(input.temporaryPassword);
   const title = escapeHtml(input.signatoryTitle);
-  const logo = escapeHtml(logoContentId);
+  const logo = escapeHtml(logoUrl);
   const actionUrl = escapeHtml(loginUrl.toString());
   const systemName = input.systemName ?? "LOA Vehicle Reservation & Trip Ticket";
   const hrdoSystem = input.systemName === "LOA HRDO Certificate of Employment";
@@ -359,7 +358,7 @@ export function renderTemporaryPasswordEmail(
       <tr><td align="center" style="padding:32px 12px;">
         <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:600px;background-color:#ffffff;border:1px solid #e2e7ef;border-radius:8px;overflow:hidden;">
           <tr><td style="padding:30px 32px 8px;">
-            <img src="cid:${logo}" width="190" alt="Lyceum of Alabang" style="display:block;width:190px;max-width:100%;height:auto;border:0;">
+            <img src="${logo}" width="190" alt="Lyceum of Alabang" style="display:block;width:190px;max-width:100%;height:auto;border:0;">
           </td></tr>
           <tr><td style="padding:24px 32px 32px;">
             <p style="margin:0 0 18px;color:#353b45;font-size:14px;line-height:1.6;">Dear ${name},</p>

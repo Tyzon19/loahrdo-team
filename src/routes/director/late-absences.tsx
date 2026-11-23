@@ -23,6 +23,7 @@ export const Route = createFileRoute("/director/late-absences")({
   component: DirectorLateAbsences,
 });
 
+
 const labels: Record<StaffGroup, string> = {
   NON_TEACHING: "Non-Teaching Staff",
   COLLEGE: "College",
