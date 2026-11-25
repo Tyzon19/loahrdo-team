@@ -107,6 +107,7 @@ function snapshot(names = ["CONCEPCION, CARL CHRISTIAN", "CONCEPCION, LARIZA G."
     row[372] = "A";
     row[373] = "1";
     row[374] = "1.5";
+    row[379] = "0";
     row[386] = "4.5";
     row[387] = "5";
     row[388] = "5";
@@ -198,6 +199,30 @@ describe.skipIf(!safe)("attendance acceptance against isolated MySQL", () => {
     vi.mocked(viewer).mockResolvedValue(other);
     expect((await getMyAttendance()).profile).toBeNull();
     expect((await getMyAttendance()).logs).toHaveLength(0);
+  });
+
+  it("updates every credit summary without changing unchanged attendance incidents", async () => {
+    await ingestSheetsSnapshot(snapshot());
+    await approveFirst();
+    const before = await getMyAttendance();
+    const edited = snapshot();
+    edited.values[7]![373] = "2.5";
+    edited.values[7]![374] = "8";
+    edited.values[7]![379] = "1";
+    edited.values[7]![386] = "9.5";
+    edited.values[7]![387] = "3.5";
+    edited.values[7]![388] = "4";
+    await ingestSheetsSnapshot(edited);
+    const after = await getMyAttendance();
+    expect(after.profile).toMatchObject({
+      leavesThisMonth: 2.5,
+      leavesThisYear: 8,
+      remainingEl: 9.5,
+      remainingSl: 3.5,
+      remainingVl: 4,
+      remainingBl: 0,
+    });
+    expect(after.logs).toEqual(before.logs);
   });
 
   it("requires explicit HRDO selection for identical duplicate rows", async () => {

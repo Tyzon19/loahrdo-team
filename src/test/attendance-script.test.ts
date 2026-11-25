@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { createContext, runInContext } from "node:vm";
 import { describe, expect, it, vi } from "vitest";
 
-function script(statuses: number[] = []) {
+function script(statuses: number[] = [], singleTracker = false) {
   const properties: Record<string, string> = {
     WEBHOOK_URL: "https://hrdo.example/api/webhooks/sheets-sync",
     WEBHOOK_SECRET: "a".repeat(40),
@@ -11,6 +11,10 @@ function script(statuses: number[] = []) {
     COLLEGE_SPREADSHEET_ID: "college_sheet",
     BASIC_ED_SPREADSHEET_ID: "basic_ed_sheet",
   };
+  if (singleTracker) {
+    delete properties["COLLEGE_SPREADSHEET_ID"];
+    delete properties["BASIC_ED_SPREADSHEET_ID"];
+  }
   const values = Array.from({ length: 8 }, () => Array(395).fill(""));
   values[0]![0] = 6;
   values[1]![0] = 2026;
@@ -21,7 +25,10 @@ function script(statuses: number[] = []) {
     getResponseCode: () => statuses.shift() ?? 200,
     getContentText: () => '{"ok":true}',
   }));
-  const everyMinutes = vi.fn(() => ({ create: vi.fn() }));
+  const created: Array<{ handler: string; spreadsheetId: string; event: string }> = [];
+  const deleted: string[] = [];
+  const flush = vi.fn();
+  const waitLock = vi.fn();
   const releaseLock = vi.fn();
   let id = 0;
   const context = createContext({
@@ -29,6 +36,7 @@ function script(statuses: number[] = []) {
       getScriptProperties: () => ({ getProperty: (name: string) => properties[name] }),
     },
     SpreadsheetApp: {
+      flush,
       openById: () => ({
         getSheetByName: () => ({ getLastRow: () => 8, getLastColumn: () => 395, getRange: range }),
       }),
@@ -39,14 +47,26 @@ function script(statuses: number[] = []) {
       newBlob: (text: string) => ({ getBytes: () => Buffer.from(text) }),
       sleep: vi.fn(),
     },
-    LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock }) },
+    LockService: { getScriptLock: () => ({ waitLock, releaseLock }) },
     ScriptApp: {
-      getProjectTriggers: () => [],
-      newTrigger: () => ({ timeBased: () => ({ everyMinutes }) }),
+      getProjectTriggers: () =>
+        ["syncAllStaffGroupsNow", "hrdoSyncAttendanceNow", "unrelatedJob"].map((handler) => ({
+          getHandlerFunction: () => handler,
+        })),
+      deleteTrigger: (trigger: { getHandlerFunction: () => string }) =>
+        deleted.push(trigger.getHandlerFunction()),
+      newTrigger: (handler: string) => ({
+        forSpreadsheet: (spreadsheetId: string) => ({
+          onEdit: () => ({ create: () => created.push({ handler, spreadsheetId, event: "edit" }) }),
+          onChange: () => ({
+            create: () => created.push({ handler, spreadsheetId, event: "change" }),
+          }),
+        }),
+      }),
     },
   });
   runInContext(readFileSync(resolve("scripts/Code.gs"), "utf8"), context);
-  return { context, range, fetch, everyMinutes, releaseLock };
+  return { context, properties, range, fetch, created, deleted, flush, waitLock, releaseLock };
 }
 
 describe("ready-to-paste Apps Script", () => {
@@ -76,9 +96,85 @@ describe("ready-to-paste Apps Script", () => {
     expect(s.fetch).toHaveBeenCalledTimes(4);
     expect(s.fetch.mock.calls[0]).toEqual(s.fetch.mock.calls[1]);
   });
-  it("installs a 15-minute trigger", () => {
+  it("replaces its scheduled sync with edit and structural-change triggers", () => {
     const s = script();
-    runInContext("install15MinuteTrigger()", s.context);
-    expect(s.everyMinutes).toHaveBeenCalledWith(15);
+    runInContext("installRealtimeTriggers()", s.context);
+    expect(s.created).toHaveLength(6);
+    expect(s.created.map((trigger) => trigger.event)).toEqual([
+      "edit",
+      "change",
+      "edit",
+      "change",
+      "edit",
+      "change",
+    ]);
+    expect(s.deleted).toEqual(["syncAllStaffGroupsNow", "hrdoSyncAttendanceNow"]);
+  });
+  it("supports just the configured tracker during the realtime test", () => {
+    const s = script([], true);
+    runInContext("installRealtimeTriggers()", s.context);
+    expect(s.created).toHaveLength(2);
+    runInContext("syncAllStaffGroupsNow()", s.context);
+    expect(s.fetch).toHaveBeenCalledOnce();
+  });
+  it("preserves the deployed HRDO webhook property names", () => {
+    const s = script([], true);
+    s.properties["HRDO_WEBHOOK_URL"] = s.properties["WEBHOOK_URL"]!;
+    s.properties["HRDO_WEBHOOK_SECRET"] = s.properties["WEBHOOK_SECRET"]!;
+    delete s.properties["WEBHOOK_URL"];
+    delete s.properties["WEBHOOK_SECRET"];
+    runInContext("syncAllStaffGroupsNow()", s.context);
+    expect(s.fetch).toHaveBeenCalledOnce();
+  });
+  it("rejects one tracker ID assigned to two departments", () => {
+    const s = script();
+    s.properties["COLLEGE_SPREADSHEET_ID"] = s.properties["NON_TEACHING_SPREADSHEET_ID"]!;
+    expect(() => runInContext("installRealtimeTriggers()", s.context)).toThrow("own tracker");
+    expect(s.created).toHaveLength(0);
+    expect(s.deleted).toHaveLength(0);
+  });
+  it("pushes the edited workbook immediately after flushing formulas", () => {
+    const s = script();
+    runInContext(
+      "syncStaffEdit({source: {getId: function() {return 'non_teaching_sheet'}}})",
+      s.context,
+    );
+    expect(s.fetch).toHaveBeenCalledOnce();
+    expect(s.flush).toHaveBeenCalledOnce();
+    expect(s.flush.mock.invocationCallOrder[0]).toBeLessThan(s.range.mock.invocationCallOrder[0]!);
+    expect(s.waitLock).toHaveBeenCalledWith(30_000);
+    expect(s.releaseLock).toHaveBeenCalledOnce();
+  });
+  it("syncs structural changes but avoids duplicate EDIT and FORMAT events", () => {
+    const s = script();
+    for (const changeType of ["EDIT", "FORMAT", "REMOVE_ROW"]) {
+      s.context["changeType"] = changeType;
+      runInContext(
+        "syncStaffChange({changeType: changeType, source: {getId: function() {return 'college_sheet'}}})",
+        s.context,
+      );
+    }
+    expect(s.fetch).toHaveBeenCalledOnce();
+  });
+  it("ignores events outside the configured source workbooks", () => {
+    const s = script();
+    runInContext("syncStaffEdit({source: {getId: function() {return 'other_sheet'}}})", s.context);
+    expect(s.fetch).not.toHaveBeenCalled();
+  });
+  it("pushes month-button changes, which do not fire spreadsheet edit triggers", () => {
+    const sync = vi.fn();
+    const setValue = vi.fn();
+    const context = createContext({
+      SpreadsheetApp: {
+        getActiveSpreadsheet: () => ({
+          getSheetByName: () => ({ getRange: () => ({ getValue: () => 5, setValue }) }),
+        }),
+      },
+      syncStaffEdit: sync,
+    });
+    runInContext(readFileSync(resolve("scripts/TrackerNavigation.gs"), "utf8"), context);
+    runInContext("PreviousMonth(); NextMonth();", context);
+    expect(setValue.mock.calls).toEqual([[4], [6]]);
+    expect(sync).toHaveBeenCalledTimes(2);
   });
 });

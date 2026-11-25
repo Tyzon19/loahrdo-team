@@ -7,16 +7,16 @@ export const BASE_ALLOCATION = 17;
 
 export const ATTENDANCE_CODES = {
   S: { leaveType: "Sick Leave", creditedDays: 1 },
-  V: { leaveType: "Vacation Leave", creditedDays: 1 },
-  E: { leaveType: "Emergency Leave", creditedDays: 1 },
+  V: { leaveType: "Vacation", creditedDays: 1 },
+  E: { leaveType: "Emergency", creditedDays: 1 },
   B: { leaveType: "Birthday Leave", creditedDays: 1 },
   M: { leaveType: "Maternity Leave", creditedDays: 1 },
   P: { leaveType: "Paternity Leave", creditedDays: 1 },
-  SP: { leaveType: "Solo Parent Leave", creditedDays: 1 },
-  SIL: { leaveType: "Service Incentive Leave", creditedDays: 1 },
-  HS: { leaveType: "Half-Day Sick Leave", creditedDays: 0.5 },
-  HV: { leaveType: "Half-Day Vacation Leave", creditedDays: 0.5 },
-  HE: { leaveType: "Half-Day Emergency Leave", creditedDays: 0.5 },
+  SP: { leaveType: "Solo Parent", creditedDays: 1 },
+  SIL: { leaveType: "SIL", creditedDays: 1 },
+  HS: { leaveType: "Half Day - SL", creditedDays: 0.5 },
+  HV: { leaveType: "Half Day - VL", creditedDays: 0.5 },
+  HE: { leaveType: "Half Day - EL", creditedDays: 0.5 },
   L: { leaveType: "Late Entry", creditedDays: 0 },
   LATE: { leaveType: "Late Entry", creditedDays: 0 },
   A: { leaveType: "Unexcused Absence", creditedDays: 0 },
@@ -24,6 +24,13 @@ export const ATTENDANCE_CODES = {
 } as const;
 
 export type AttendanceCode = keyof typeof ATTENDANCE_CODES;
+
+/** Uses the current sheet label even for incidents stored with an older label. */
+export function attendanceLeaveType(code: string) {
+  return Object.hasOwn(ATTENDANCE_CODES, code)
+    ? ATTENDANCE_CODES[code as AttendanceCode].leaveType
+    : code;
+}
 
 export interface ParsedAttendanceLog {
   sheetEmployeeName: string;
@@ -145,6 +152,7 @@ export function parseStaffMatrix(values: string[][]): ParsedStaffMatrix {
   const summaryColumns = {
     month: 373,
     year: 374,
+    birthday: 379,
     el: 386,
     sl: 387,
     vl: 388,
@@ -212,7 +220,7 @@ export function parseStaffMatrix(values: string[][]): ParsedStaffMatrix {
         remEl: balanceNumber(summaryColumns.el),
         remSl: balanceNumber(summaryColumns.sl),
         remVl: balanceNumber(summaryColumns.vl),
-        remBl: 1 + carryOverBl - logs.filter((log) => log.code === "B").length,
+        remBl: Math.max(0, 1 + carryOverBl - balanceNumber(summaryColumns.birthday)),
         carryOverBl,
         totalLates,
         employeeStatusNote: statusNote(values, row),

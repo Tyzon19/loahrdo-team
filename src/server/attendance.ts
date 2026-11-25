@@ -1,6 +1,7 @@
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import type { RowDataPacket } from "mysql2/promise";
 import { AppError, parseInput } from "@/lib/errors";
+import { fmtDate } from "@/lib/format";
 import {
   attendanceInstitutionalEmail,
   claimSchema,
@@ -10,7 +11,12 @@ import {
   sheetNameKey,
   sheetsSnapshotSchema,
 } from "@/lib/attendance";
-import { STAFF_GROUPS, parseStaffMatrix, type StaffGroup } from "@/lib/late-absences";
+import {
+  attendanceLeaveType,
+  STAFF_GROUPS,
+  parseStaffMatrix,
+  type StaffGroup,
+} from "@/lib/late-absences";
 import { requireAttendanceSession } from "./attendance-auth";
 import { attendanceAdminAllowed } from "@/lib/attendance-access";
 import { all, run, withTransaction, type Db } from "./db";
@@ -118,7 +124,7 @@ async function notify(userId: string, code: string, date: string, db: Db) {
       randomUUID(),
       userId,
       `${code === "LATE" ? "Late arrival" : "Unexcused absence"} requires acknowledgment`,
-      `${code} recorded for ${date}. Review it in My Leaves & Attendance.`,
+      `${code} recorded for ${fmtDate(date)}. Review it in My Leaves & Attendance.`,
     ],
     db,
   );
@@ -183,7 +189,7 @@ export async function getMyAttendance() {
       id: log.id,
       date: log.incident_date,
       code: log.code,
-      leaveType: log.leave_type,
+      leaveType: attendanceLeaveType(log.code),
       days: Number(log.credited_days),
       revision: log.revision,
       acknowledgedAt: log.acknowledged_at,

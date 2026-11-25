@@ -9,6 +9,7 @@ import { unwrap } from "@/lib/api";
 import { STAFF_GROUPS, type StaffGroup } from "@/lib/late-absences";
 import { listDirectorAttendanceFn } from "@/server-functions";
 import { AttendanceShell } from "@/components/attendance/AttendanceShell";
+import { ATTENDANCE_REFRESH_MS } from "@/lib/attendance";
 
 export const Route = createFileRoute("/director/late-absences")({
   beforeLoad: ({ context }) => {
@@ -48,7 +49,8 @@ function DirectorLateAbsences() {
   const data = useQuery({
     queryKey: ["director-attendance", staffGroup],
     queryFn: () => unwrap(listDirectorAttendanceFn({ data: { staffGroup } })),
-    refetchInterval: 10_000,
+    refetchInterval: ATTENDANCE_REFRESH_MS,
+    refetchIntervalInBackground: true,
   });
 
   if (data.isPending) return <LoadingScreen label="Loading executive attendance view" />;

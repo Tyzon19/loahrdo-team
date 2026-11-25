@@ -8,7 +8,7 @@ import { LoadingScreen } from "@/components/app/LoadingPanel";
 import { Button } from "@/components/ui/button";
 import { unwrap } from "@/lib/api";
 import { attendanceAdminAllowed } from "@/lib/attendance-access";
-import { DEPARTMENT_LABELS } from "@/lib/attendance";
+import { ATTENDANCE_REFRESH_MS, DEPARTMENT_LABELS } from "@/lib/attendance";
 import { listAttendanceAdminFn, approveAttendanceClaimFn } from "@/server-functions";
 
 export const Route = createFileRoute("/admin/late-absences")({
@@ -47,7 +47,8 @@ function AttendanceAdmin({ actorId }: { actorId: string }) {
   const result = useQuery({
     queryKey: ["attendance-admin", actorId],
     queryFn: () => unwrap(listAttendanceAdminFn({ data: {} })),
-    refetchInterval: 30_000,
+    refetchInterval: ATTENDANCE_REFRESH_MS,
+    refetchIntervalInBackground: true,
   });
   if (result.isPending) return <LoadingScreen label="Loading attendance administration" />;
   if (result.isError)
@@ -102,8 +103,8 @@ function AttendanceAdmin({ actorId }: { actorId: string }) {
         ))}
       </div>
       <p className="text-sm text-muted-foreground">
-        Apps Script pushes each tracker every 15 minutes. To push immediately, run
-        syncAllStaffGroupsNow in the script editor.
+        Realtime testing: tracker edits push automatically, and this page refreshes every second. To
+        push manually, run syncAllStaffGroupsNow in the script editor.
       </p>
       {error && (
         <p role="alert" className="text-sm text-destructive">

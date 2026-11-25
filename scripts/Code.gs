@@ -3,22 +3,39 @@
  * Set Script Properties (Project Settings):
  * WEBHOOK_URL = https://YOUR-EXISTING-HRDO-HOST/api/webhooks/sheets-sync
  * WEBHOOK_SECRET = same random 32+ character value as HRDO_SHEETS_WEBHOOK_SECRET
- * NON_TEACHING_SPREADSHEET_ID, COLLEGE_SPREADSHEET_ID, BASIC_ED_SPREADSHEET_ID
- * Then run install15MinuteTrigger once and approve Google's script permissions.
- * This standalone script reads all three spreadsheets using the installing HRDO account.
+ * Configure at least one of NON_TEACHING_SPREADSHEET_ID, COLLEGE_SPREADSHEET_ID,
+ * BASIC_ED_SPREADSHEET_ID. Existing HRDO_WEBHOOK_URL/SECRET properties also work.
+ * Run installRealtimeTriggers once. Each manual edit pushes its tracker immediately.
  */
-function install15MinuteTrigger() {
-  configuration_();
+function installRealtimeTriggers() {
+  var config = configuration_();
+  var owned = ['syncAllStaffGroupsNow', 'hrdoSyncAttendanceNow', 'syncStaffEdit', 'syncStaffChange'];
   ScriptApp.getProjectTriggers().forEach(function(trigger) {
-    if (trigger.getHandlerFunction() === 'syncAllStaffGroupsNow') ScriptApp.deleteTrigger(trigger);
+    if (owned.indexOf(trigger.getHandlerFunction()) !== -1) ScriptApp.deleteTrigger(trigger);
   });
-  ScriptApp.newTrigger('syncAllStaffGroupsNow').timeBased().everyMinutes(15).create();
+  config.sources.forEach(function(source) {
+    ScriptApp.newTrigger('syncStaffEdit').forSpreadsheet(source.id).onEdit().create();
+    ScriptApp.newTrigger('syncStaffChange').forSpreadsheet(source.id).onChange().create();
+  });
+}
+
+function syncStaffEdit(event) {
+  if (!event || !event.source) return;
+  var config = configuration_();
+  var id = event.source.getId();
+  var source = config.sources.filter(function(item) { return item.id === id; })[0];
+  if (source) syncSources_(config, [source]);
+}
+
+function syncStaffChange(event) {
+  if (!event || event.changeType === 'EDIT' || event.changeType === 'FORMAT') return;
+  syncStaffEdit(event);
 }
 
 function configuration_() {
   var properties = PropertiesService.getScriptProperties();
-  var url = properties.getProperty('WEBHOOK_URL');
-  var secret = properties.getProperty('WEBHOOK_SECRET');
+  var url = properties.getProperty('WEBHOOK_URL') || properties.getProperty('HRDO_WEBHOOK_URL');
+  var secret = properties.getProperty('WEBHOOK_SECRET') || properties.getProperty('HRDO_WEBHOOK_SECRET');
   if (!url || !/^https:\/\//i.test(url) || !secret || secret.length < 32) {
     throw new Error('Set an HTTPS WEBHOOK_URL and a 32+ character WEBHOOK_SECRET in Script Properties.');
   }
@@ -28,19 +45,28 @@ function configuration_() {
     ['BASIC_ED', 'BASIC_ED_SPREADSHEET_ID']
   ].map(function(source) {
     var id = properties.getProperty(source[1]);
-    if (!id) throw new Error('Missing Script Property: ' + source[1]);
-    return { group: source[0], id: id };
-  });
+    return id ? { group: source[0], id: id } : null;
+  }).filter(function(source) { return source !== null; });
+  if (!sources.length) throw new Error('Configure at least one tracker spreadsheet ID in Script Properties.');
+  var ids = sources.map(function(source) { return source.id; });
+  if (ids.some(function(id, index) { return ids.indexOf(id) !== index; })) {
+    throw new Error('Each department must use its own tracker spreadsheet ID.');
+  }
   return { url: url, secret: secret, sources: sources };
 }
 
 function syncAllStaffGroupsNow() {
+  var config = configuration_();
+  syncSources_(config, config.sources);
+}
+
+function syncSources_(config, sources) {
   var lock = LockService.getScriptLock();
-  if (!lock.tryLock(1000)) return; // Another trigger is already pushing all trackers.
+  // Queue edits so the last change is not silently dropped while another push is running.
+  lock.waitLock(30000);
   try {
-    var config = configuration_();
     var failures = [];
-    config.sources.forEach(function(source) {
+    sources.forEach(function(source) {
       try { pushTracker_(config, source); }
       catch (error) { failures.push(source.group + ': ' + error.message); }
     });
@@ -51,6 +77,7 @@ function syncAllStaffGroupsNow() {
 function pushTracker_(config, source) {
   var sheet = SpreadsheetApp.openById(source.id).getSheetByName('STAFF');
   if (!sheet) throw new Error('STAFF tab was not found.');
+  SpreadsheetApp.flush();
   var lastRow = Math.max(8, sheet.getLastRow());
   if (lastRow > 5000 || sheet.getLastColumn() > 410) throw new Error('STAFF exceeds the supported 5000-row / 410-column snapshot size.');
   // A:NY contains identity, all 372 daily cells and balances. NZ+ preserves remarks.

@@ -2,6 +2,9 @@ import { z } from "zod";
 import { STAFF_GROUPS } from "./late-absences";
 import { institutionalEmailAllowed } from "./validation";
 
+// shortcut: poll every second for the realtime test; increase after HR validates the sheet.
+export const ATTENDANCE_REFRESH_MS = 1_000;
+
 export const DEPARTMENT_LABELS = {
   NON_TEACHING: "Non-Teaching",
   COLLEGE: "College",

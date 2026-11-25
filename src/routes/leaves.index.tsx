@@ -10,13 +10,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { unwrap } from "@/lib/api";
-import { attendanceMonths, DEPARTMENT_LABELS } from "@/lib/attendance";
+import { attendanceMonths, ATTENDANCE_REFRESH_MS, DEPARTMENT_LABELS } from "@/lib/attendance";
+import { fmtDate, fmtDateTime, fmtRange } from "@/lib/format";
 import { ATTENDANCE_CODES } from "@/lib/late-absences";
 import {
   listMyAttendanceFn,
   respondToAttendanceIncidentFn,
   markAttendanceNotificationReadFn,
 } from "@/server-functions";
+
+const LEAVE_FILTER_CODES = ["S", "V", "M", "P", "B", "E", "SIL", "SP", "HE", "HV", "HS"] as const;
+const ATTENDANCE_FILTER_CODES = ["LATE", "ABSENT"] as const;
 
 export const Route = createFileRoute("/leaves/")({ component: AttendancePage });
 
@@ -36,7 +40,8 @@ function MyAttendance({ userId }: { userId: string }) {
   const attendance = useQuery({
     queryKey: ["my-attendance", userId],
     queryFn: () => unwrap(listMyAttendanceFn()),
-    refetchInterval: 30_000,
+    refetchInterval: ATTENDANCE_REFRESH_MS,
+    refetchIntervalInBackground: true,
   });
   if (attendance.isPending) return <LoadingScreen label="Loading your attendance" />;
   if (attendance.isError)
@@ -131,7 +136,7 @@ function MyAttendance({ userId }: { userId: string }) {
               </div>
               <p className="flex items-center gap-2 text-sm text-muted-foreground">
                 <CalendarRange className="h-4 w-4" aria-hidden />
-                {profile.cycleStart} – {profile.cycleEnd}
+                {fmtRange(profile.cycleStart, profile.cycleEnd)}
               </p>
             </div>
             <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -143,17 +148,16 @@ function MyAttendance({ userId }: { userId: string }) {
                   profile.remainingVl +
                   profile.remainingBl
                 }
-                max={17}
               />
-              <Summary title="TOTAL EL" amount={profile.remainingEl} max={6} />
-              <Summary title="TOTAL SL" amount={profile.remainingSl} max={5} />
-              <Summary title="TOTAL VL" amount={profile.remainingVl} max={5} />
+              <Summary title="TOTAL EL" amount={profile.remainingEl} />
+              <Summary title="TOTAL SL" amount={profile.remainingSl} />
+              <Summary title="TOTAL VL" amount={profile.remainingVl} />
             </div>
             <p className="mt-4 text-xs text-muted-foreground">
               Total includes {profile.remainingBl.toFixed(1)} birthday leave day(s), calculated from
-              birthday codes and BL carry over. Used this month:{" "}
-              {profile.leavesThisMonth.toFixed(1)} · This year: {profile.leavesThisYear.toFixed(1)}.
-              Last synced: {profile.syncedAt} (server time).
+              the sheet's birthday total and BL carry over. Used in the sheet-selected month:{" "}
+              {profile.leavesThisMonth.toFixed(1)} · Cycle used: {profile.leavesThisYear.toFixed(1)}
+              . Last synced: {fmtDateTime(profile.syncedAt)} (server time).
             </p>
             {profile.remarks && (
               <p className="mt-2 text-sm text-muted-foreground">{profile.remarks}</p>
@@ -172,7 +176,7 @@ function MyAttendance({ userId }: { userId: string }) {
                 {unacknowledged.map((log) => (
                   <li key={log.id} className="flex flex-wrap items-center gap-3 text-sm">
                     <span className="mr-auto">
-                      {log.date} · {log.leaveType}
+                      {fmtDate(log.date)} · {log.leaveType}
                     </span>
                     <Button
                       size="sm"
@@ -180,7 +184,7 @@ function MyAttendance({ userId }: { userId: string }) {
                       disabled={busy}
                       onClick={() => void respond(log)}
                     >
-                      Acknowledge {log.date}
+                      Acknowledge {fmtDate(log.date)}
                     </Button>
                     <Button
                       size="sm"
@@ -191,7 +195,7 @@ function MyAttendance({ userId }: { userId: string }) {
                         setExplanation(log.explanation ?? "");
                       }}
                     >
-                      Explain {log.date}
+                      Explain {fmtDate(log.date)}
                     </Button>
                   </li>
                 ))}
@@ -207,7 +211,7 @@ function MyAttendance({ userId }: { userId: string }) {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">
-                  Explain {selected.code} on {selected.date}
+                  Explain {selected.code} on {fmtDate(selected.date)}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -280,19 +284,28 @@ function MyAttendance({ userId }: { userId: string }) {
                 </select>
               </div>
               <div className="space-y-1">
-                <Label htmlFor="attendance-code">Code</Label>
+                <Label htmlFor="attendance-code">Type</Label>
                 <select
                   id="attendance-code"
                   className="block h-10 rounded-md border bg-background px-3 text-sm"
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
                 >
-                  <option value="">All codes</option>
-                  {Object.keys(ATTENDANCE_CODES)
-                    .filter((c) => c !== "L" && c !== "A")
-                    .map((c) => (
-                      <option key={c}>{c}</option>
+                  <option value="">All types</option>
+                  <optgroup label="Leaves">
+                    {LEAVE_FILTER_CODES.map((value) => (
+                      <option key={value} value={value}>
+                        {ATTENDANCE_CODES[value].leaveType}
+                      </option>
                     ))}
+                  </optgroup>
+                  <optgroup label="Attendance">
+                    {ATTENDANCE_FILTER_CODES.map((value) => (
+                      <option key={value} value={value}>
+                        {ATTENDANCE_CODES[value].leaveType}
+                      </option>
+                    ))}
+                  </optgroup>
                 </select>
               </div>
             </div>
@@ -305,8 +318,7 @@ function MyAttendance({ userId }: { userId: string }) {
                   <thead className="border-b text-xs uppercase text-muted-foreground">
                     <tr>
                       <th className="px-3 py-3">Date</th>
-                      <th className="px-3 py-3">Code</th>
-                      <th className="px-3 py-3">Leave / Attendance</th>
+                      <th className="px-3 py-3">Type</th>
                       <th className="px-3 py-3">Days</th>
                       <th className="px-3 py-3">Acknowledgment</th>
                       <th className="px-3 py-3">Action</th>
@@ -315,8 +327,7 @@ function MyAttendance({ userId }: { userId: string }) {
                   <tbody>
                     {visible.map((log) => (
                       <tr key={log.id} className="border-b last:border-0 hover:bg-muted/40">
-                        <td className="px-3 py-4 font-medium">{log.date}</td>
-                        <td className="px-3 py-4 font-semibold">{log.code}</td>
+                        <td className="px-3 py-4 font-medium">{fmtDate(log.date)}</td>
                         <td className="px-3 py-4">{log.leaveType}</td>
                         <td className="px-3 py-4 tabular-nums">{log.days.toFixed(1)}</td>
                         <td className="px-3 py-4">
@@ -359,7 +370,7 @@ function MyAttendance({ userId }: { userId: string }) {
   );
 }
 
-function Summary({ title, amount, max }: { title: string; amount: number; max: number }) {
+function Summary({ title, amount }: { title: string; amount: number }) {
   return (
     <Card className="min-w-0 rounded-xl">
       <CardHeader className="p-4 pb-2">
@@ -368,7 +379,7 @@ function Summary({ title, amount, max }: { title: string; amount: number; max: n
       <CardContent className="px-4 pb-4">
         <p className="text-2xl font-semibold tabular-nums">
           {amount.toFixed(1)}{" "}
-          <span className="text-xs font-normal text-muted-foreground">/ {max.toFixed(1)}</span>
+          <span className="text-xs font-normal text-muted-foreground">days</span>
         </p>
       </CardContent>
     </Card>

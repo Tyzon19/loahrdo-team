@@ -13,6 +13,7 @@ function grid() {
   values[7]![0] = "ADOLFO, STEPHANIE JOY A.";
   values[7]![373] = "0.5";
   values[7]![374] = "2";
+  values[7]![379] = "0";
   values[7]![386] = "4.5";
   values[7]![387] = "5";
   values[7]![388] = "0";
@@ -20,6 +21,17 @@ function grid() {
 }
 
 describe("STAFF's 12 blocks of 31 daily columns", () => {
+  it("uses NP's authoritative birthday total, including exclusions and HR adjustments", () => {
+    const values = grid();
+    values[7]![1] = "B";
+    expect(parseStaffMatrix(values).rows[0]!.balance.remBl).toBe(1);
+    values[7]![379] = "2";
+    values[7]![389] = "3 BL CARRY OVER";
+    expect(parseStaffMatrix(values).rows[0]!.balance.remBl).toBe(2);
+    values[7]![389] = "";
+    expect(parseStaffMatrix(values).rows[0]!.balance.remBl).toBe(0);
+  });
+
   it("maps month boundaries, skips impossible dates and includes May 31", () => {
     const values = grid();
     values[7]![1] = "S";
