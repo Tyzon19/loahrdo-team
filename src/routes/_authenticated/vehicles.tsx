@@ -152,16 +152,30 @@ function Vehicles() {
               </Button>
             </div>
           ) : (
-            <div className="-m-4">
-              <table className="w-full table-fixed text-sm">
+            <div className="overflow-x-auto rounded-lg border">
+              <table className="data-table min-w-[960px] table-fixed">
                 <thead className="border-b bg-muted text-left text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
-                    <th className="px-3 py-2 font-medium">Driver Name</th>
-                    <th className="px-3 py-2 font-medium">Vehicle Type</th>
-                    <th className="px-3 py-2 font-medium">Plate No.</th>
-                    <th className="px-3 py-2 font-medium">Status</th>
-                    <th className="px-3 py-2 font-medium">Upcoming reservations</th>
-                    {canEditVehicles && <th className="px-3 py-2 font-medium">Actions</th>}
+                    <th scope="col" className="px-3 py-2 font-medium">
+                      Driver Name
+                    </th>
+                    <th scope="col" className="px-3 py-2 font-medium">
+                      Vehicle Type
+                    </th>
+                    <th scope="col" className="px-3 py-2 font-medium">
+                      Plate No.
+                    </th>
+                    <th scope="col" className="px-3 py-2 font-medium">
+                      Status
+                    </th>
+                    <th scope="col" className="px-3 py-2 font-medium">
+                      Upcoming reservations
+                    </th>
+                    {canEditVehicles && (
+                      <th scope="col" className="px-3 py-2 font-medium">
+                        Actions
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -179,6 +193,20 @@ function Vehicles() {
                             "In service"
                           ) : (
                             <span className="text-warning">Under maintenance</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 font-medium">
+                          {reservations.length ? (
+                            <ul>
+                              {reservations.map((reservation) => (
+                                <li key={reservation.number}>
+                                  {reservation.number} ·{" "}
+                                  {fmtRange(reservation.dateStart, reservation.dateEnd)}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <span className="text-muted-foreground">None recorded</span>
                           )}
                         </td>
                         {canEditVehicles && (
@@ -228,20 +256,6 @@ function Vehicles() {
                             </div>
                           </td>
                         )}
-                        <td className="px-3 py-2 font-medium">
-                          {reservations.length ? (
-                            <ul>
-                              {reservations.map((reservation) => (
-                                <li key={reservation.number}>
-                                  {reservation.number} ·{" "}
-                                  {fmtRange(reservation.dateStart, reservation.dateEnd)}
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <span className="text-muted-foreground">None recorded</span>
-                          )}
-                        </td>
                       </tr>
                     );
                   })}

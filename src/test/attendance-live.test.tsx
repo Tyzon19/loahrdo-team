@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { listMyAttendanceFn } from "@/server-functions";
@@ -55,7 +55,10 @@ describe("live attendance credits", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1);
     });
-    expect(screen.getByText("13.5")).toBeInTheDocument();
+    expect(screen.getAllByRole("heading")[0]).toHaveAccessibleName(/HRDO . Leave summary/);
+    const summary = within(screen.getByRole("region", { name: /HRDO · Leave summary/ }));
+    expect(summary.getByText("13.5 days")).toBeInTheDocument();
+    expect(summary.getByText(/no leave recorded for the month/)).toBeInTheDocument();
     vi.mocked(listMyAttendanceFn).mockResolvedValue({
       ok: true,
       data: {
@@ -66,8 +69,8 @@ describe("live attendance credits", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1001);
     });
-    expect(screen.getByText("16.5")).toBeInTheDocument();
-    expect(screen.getByText("4.5")).toBeInTheDocument();
+    expect(summary.getByText("16.5 days")).toBeInTheDocument();
+    expect(summary.getByText("4.5 days")).toBeInTheDocument();
     expect(listMyAttendanceFn).toHaveBeenCalledTimes(2);
     client.clear();
   });

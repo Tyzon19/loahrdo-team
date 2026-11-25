@@ -203,12 +203,12 @@ function AttendanceAdmin({ actorId }: { actorId: string }) {
           <EmptyState title="No sync runs yet." />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left text-sm">
+            <table className="data-table w-full min-w-[720px] text-left text-sm">
               <caption className="sr-only">Latest 50 Sheets sync attempts</caption>
               <thead className="border-b text-xs uppercase text-muted-foreground">
                 <tr>
                   {["Started", "Tracker", "Status", "Rows", "Changes", "Message"].map((heading) => (
-                    <th key={heading} className="px-3 py-2">
+                    <th key={heading} scope="col" className="px-3 py-2">
                       {heading}
                     </th>
                   ))}

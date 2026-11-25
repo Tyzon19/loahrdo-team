@@ -140,15 +140,27 @@ function DirectorLateAbsences() {
           <EmptyState title="No attendance alerts yet." />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[700px] text-left text-sm">
+            <table className="data-table w-full min-w-[700px] text-left text-sm">
               <thead className="border-b text-xs uppercase text-muted-foreground">
                 <tr>
-                  <th className="px-3 py-2">Date</th>
-                  <th className="px-3 py-2">Employee</th>
-                  <th className="px-3 py-2">Group</th>
-                  <th className="px-3 py-2">Code</th>
-                  <th className="px-3 py-2">Type</th>
-                  <th className="px-3 py-2">Credited</th>
+                  <th scope="col" className="px-3 py-2">
+                    Date
+                  </th>
+                  <th scope="col" className="px-3 py-2">
+                    Employee
+                  </th>
+                  <th scope="col" className="px-3 py-2">
+                    Group
+                  </th>
+                  <th scope="col" className="px-3 py-2">
+                    Code
+                  </th>
+                  <th scope="col" className="px-3 py-2">
+                    Type
+                  </th>
+                  <th scope="col" className="px-3 py-2">
+                    Credited
+                  </th>
                 </tr>
               </thead>
               <tbody>

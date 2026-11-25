@@ -26,7 +26,7 @@ export function CoeRequestTable({
 
   return (
     <>
-      <ul className="grid gap-2 sm:grid-cols-2 2xl:hidden">
+      <ul className="grid gap-3 sm:grid-cols-2 lg:hidden">
         {requests.map((request) => (
           <li key={request.id} className="min-w-0 rounded-lg border bg-card p-4 shadow-xs">
             <div className="flex min-w-0 items-start justify-between gap-2">
@@ -90,9 +90,9 @@ export function CoeRequestTable({
           </li>
         ))}
       </ul>
-      <div className="hidden 2xl:block">
-        <Table01 label={staff ? "COE staff requests" : "My COE requests"}>
-          <TableHeader className="bg-muted/60">
+      <div className="hidden lg:block">
+        <Table01 label={staff ? "COE staff requests" : "My COE requests"} className="shadow-none">
+          <TableHeader className="bg-muted/70">
             <TableRow className="hover:bg-transparent">
               <TableHead className="w-[140px] text-xs font-semibold uppercase tracking-wide">
                 Request ID
@@ -138,7 +138,7 @@ export function CoeRequestTable({
           </TableHeader>
           <TableBody>
             {requests.map((request) => (
-              <TableRow key={request.id} className="align-top">
+              <TableRow key={request.id} className="align-middle hover:bg-muted/30 [&_td]:py-3">
                 <TableCell
                   className="font-mono text-xs font-medium text-foreground"
                   title={request.id}

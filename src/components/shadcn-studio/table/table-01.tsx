@@ -12,12 +12,10 @@ export function Table01({
   label: string;
 }) {
   return (
-    <div className={cn("overflow-hidden rounded-lg border bg-card shadow-xs", className)}>
-      <div className="overflow-x-auto">
-        <Table aria-label={label} className="min-w-[1080px] text-sm">
-          {children}
-        </Table>
-      </div>
+    <div className={cn("overflow-hidden rounded-lg border bg-card", className)}>
+      <Table aria-label={label} className="min-w-[1080px] text-sm">
+        {children}
+      </Table>
     </div>
   );
 }

@@ -268,7 +268,7 @@ function NotificationPreview({ email }: { email: EmailMessage }) {
           />
         )}
         {!photo && r && (
-          <table className="mt-4 w-full table-fixed text-sm">
+          <table className="data-table mt-4 w-full table-fixed text-sm">
             <tbody className="[&_td]:break-words [&_td]:border-b [&_td]:py-1.5 [&_td]:align-top [&_td]:[overflow-wrap:anywhere] [&_td:first-child]:w-28 [&_td:first-child]:pr-2 [&_td:first-child]:text-muted-foreground sm:[&_td:first-child]:w-40 sm:[&_td:first-child]:pr-3">
               <tr>
                 <td className="font-medium">Request Number</td>

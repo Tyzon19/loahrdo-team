@@ -1,7 +1,7 @@
 import { useDeferredValue, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Search, SlidersHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -97,100 +97,166 @@ function CoeRequestsPage() {
       />
 
       <Section title="All requests">
-        <div className="mb-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-          <Input
-            aria-label="Search COE requests"
-            placeholder="Search name, Employee ID, request ID…"
-            value={q}
-            onChange={(event) => {
-              setQ(event.target.value);
-              setPage(0);
-            }}
-            maxLength={100}
-          />
-          <Select
-            value={status}
-            onValueChange={(value) => {
-              setStatus(value as CoeStatus | "all");
-              setPage(0);
-            }}
+        <div className="mb-4 rounded-lg border bg-muted/20 p-4">
+          <div className="mb-4 flex items-center gap-2 text-sm font-semibold">
+            <SlidersHorizontal className="size-4 text-primary" aria-hidden />
+            Find a request
+          </div>
+          <label
+            htmlFor="coe-request-search"
+            className="mb-1.5 block text-xs font-medium text-muted-foreground"
           >
-            <SelectTrigger aria-label="Filter by status">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              {COE_STATUSES.map((key) => (
-                <SelectItem key={key} value={key}>
-                  {COE_STATUS_LABELS[key]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={department}
-            onValueChange={(value) => {
-              setDepartment(value);
-              setPage(0);
-            }}
-          >
-            <SelectTrigger aria-label="Filter by department">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All departments</SelectItem>
-              {departments.map((item) => (
-                <SelectItem key={item} value={item}>
-                  {item}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={deadline}
-            onValueChange={(value) => {
-              setDeadline(value as CoeDeadlineFilter);
-              setPage(0);
-            }}
-          >
-            <SelectTrigger aria-label="Filter by deadline">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Any deadline</SelectItem>
-              <SelectItem value="overdue">Overdue</SelectItem>
-              <SelectItem value="due_soon">Due soon</SelectItem>
-              <SelectItem value="on_track">On track</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select
-            value={copyType}
-            onValueChange={(value) => {
-              setCopyType(value as CoeCopyType | "all");
-              setPage(0);
-            }}
-          >
-            <SelectTrigger aria-label="Filter by type of copy">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Any copy type</SelectItem>
-              {COE_COPY_TYPES.map((key) => (
-                <SelectItem key={key} value={key}>
-                  {COE_COPY_TYPE_LABELS[key]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            Search
+          </label>
+          <div className="relative mb-4 max-w-xl">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
+            <Input
+              id="coe-request-search"
+              className="h-10 bg-background pl-9 shadow-none"
+              placeholder="Name, employee ID, or request ID"
+              value={q}
+              onChange={(event) => {
+                setQ(event.target.value);
+                setPage(0);
+              }}
+              maxLength={100}
+            />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div>
+              <label
+                htmlFor="coe-status-filter"
+                className="mb-1.5 block text-xs font-medium text-muted-foreground"
+              >
+                Status
+              </label>
+              <Select
+                value={status}
+                onValueChange={(value) => {
+                  setStatus(value as CoeStatus | "all");
+                  setPage(0);
+                }}
+              >
+                <SelectTrigger
+                  id="coe-status-filter"
+                  className="h-10 bg-background shadow-none hover:border-primary/40"
+                  aria-label="Filter by status"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  {COE_STATUSES.map((key) => (
+                    <SelectItem key={key} value={key}>
+                      {COE_STATUS_LABELS[key]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label
+                htmlFor="coe-department-filter"
+                className="mb-1.5 block text-xs font-medium text-muted-foreground"
+              >
+                Department
+              </label>
+              <Select
+                value={department}
+                onValueChange={(value) => {
+                  setDepartment(value);
+                  setPage(0);
+                }}
+              >
+                <SelectTrigger
+                  id="coe-department-filter"
+                  className="h-10 bg-background shadow-none hover:border-primary/40"
+                  aria-label="Filter by department"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All departments</SelectItem>
+                  {departments.map((item) => (
+                    <SelectItem key={item} value={item}>
+                      {item}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label
+                htmlFor="coe-deadline-filter"
+                className="mb-1.5 block text-xs font-medium text-muted-foreground"
+              >
+                Deadline
+              </label>
+              <Select
+                value={deadline}
+                onValueChange={(value) => {
+                  setDeadline(value as CoeDeadlineFilter);
+                  setPage(0);
+                }}
+              >
+                <SelectTrigger
+                  id="coe-deadline-filter"
+                  className="h-10 bg-background shadow-none hover:border-primary/40"
+                  aria-label="Filter by deadline"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Any deadline</SelectItem>
+                  <SelectItem value="overdue">Overdue</SelectItem>
+                  <SelectItem value="due_soon">Due soon</SelectItem>
+                  <SelectItem value="on_track">On track</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label
+                htmlFor="coe-copy-filter"
+                className="mb-1.5 block text-xs font-medium text-muted-foreground"
+              >
+                Copy type
+              </label>
+              <Select
+                value={copyType}
+                onValueChange={(value) => {
+                  setCopyType(value as CoeCopyType | "all");
+                  setPage(0);
+                }}
+              >
+                <SelectTrigger
+                  id="coe-copy-filter"
+                  className="h-10 bg-background shadow-none hover:border-primary/40"
+                  aria-label="Filter by type of copy"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Any copy type</SelectItem>
+                  {COE_COPY_TYPES.map((key) => (
+                    <SelectItem key={key} value={key}>
+                      {COE_COPY_TYPE_LABELS[key]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </div>
 
-        <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <span>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm">
+          <span className="font-medium">
             {filtered.length} matching request{filtered.length === 1 ? "" : "s"}
-            {deadline !== "all" ? " · three-day HR policy deadline" : ""}
           </span>
           {activeFilters && (
-            <Button size="sm" variant="ghost" className="h-7 px-2" onClick={resetFilters}>
+            <Button size="sm" variant="outline" onClick={resetFilters}>
               Clear filters
             </Button>
           )}

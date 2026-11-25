@@ -287,7 +287,7 @@ function Metabox({
   bodyClassName?: string;
 }) {
   return (
-    <section className="min-w-0 rounded-xl border bg-card text-card-foreground shadow-sm">
+    <section className="min-w-0 overflow-hidden rounded-xl border bg-card text-card-foreground">
       <h2 className="border-b px-4 py-3 text-sm font-semibold tracking-tight">{title}</h2>
       <div className={bodyClassName}>{children}</div>
       {footer && (
@@ -330,7 +330,7 @@ function MetaLine({ label, children }: { label: string; children: ReactNode }) {
 /* Progress tracker                                                            */
 /* -------------------------------------------------------------------------- */
 
-const TRACK_STEPS = ["Submitted", "Verified", "Preparing COE", "Ready", "Released"] as const;
+const TRACK_STEPS = ["Submitted", "Review", "Preparing COE", "Ready", "Released"] as const;
 
 /** Index of the step currently being worked on. Steps before it are done. */
 function trackIndex(status: CoeStatus) {
@@ -355,7 +355,7 @@ function ProgressTracker({ status }: { status: CoeStatus }) {
   const current = trackIndex(status);
   const needsAttention = status === "correction_requested";
   return (
-    <div className="rounded-xl border bg-card px-2 py-5 shadow-sm sm:px-4">
+    <div className="border-t px-2 py-5 sm:px-4">
       <ol className="flex items-start" aria-label="Request progress">
         {TRACK_STEPS.map((label, i) => {
           const done = i < current;
@@ -365,7 +365,7 @@ function ProgressTracker({ status }: { status: CoeStatus }) {
             : isCurrent
               ? needsAttention
                 ? "border-warning bg-card text-warning"
-                : "border-primary bg-card text-primary ring-4 ring-primary/15"
+                : "border-primary bg-primary/10 text-primary"
               : "border-border bg-card text-muted-foreground";
           return (
             <li
@@ -844,7 +844,7 @@ function CoeDetailPage() {
   const rejectedRemarksShownInBanner = request.status === "rejected";
 
   return (
-    <div className="space-y-4">
+    <div className="mx-auto max-w-7xl space-y-5">
       <PageHeader
         title={`COE Request ${coeReference(request.id)}`}
         description={`${request.employeeName} · Submitted ${fmtDateTime(request.requestedAt)}`}
@@ -857,58 +857,25 @@ function CoeDetailPage() {
         }
       />
 
-      {request.status !== "rejected" && <ProgressTracker status={request.status} />}
+      <section aria-label="Request status and progress" className="rounded-xl border bg-card">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-4">
+          <CoeStatusBadge status={request.status} audience={audience} />
+          <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
+            {isStaff ? staffHint(request.status) : COE_STATUS_HINTS[request.status]}
+          </p>
+          <div className="text-sm sm:ml-auto sm:text-right">
+            <p className="font-medium">HRDO deadline · {fmtDateTime(request.deadlineAt)}</p>
+            <CoeDeadlineNote deadlineAt={request.deadlineAt} status={request.status} />
+          </div>
+        </div>
+        {request.status !== "rejected" && <ProgressTracker status={request.status} />}
+      </section>
 
       <StatusBanner request={request} audience={audience} />
 
       <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
         {/* Sidebar comes first on phones so status and actions are not buried. */}
         <div className="order-first min-w-0 space-y-4 lg:order-last">
-          <Metabox title="Status" bodyClassName="space-y-3 p-4">
-            <CoeStatusBadge status={request.status} audience={audience} />
-            <p className="text-sm text-muted-foreground">
-              {isStaff ? staffHint(request.status) : COE_STATUS_HINTS[request.status]}
-            </p>
-            <dl className="divide-y border-t pt-1 text-sm">
-              <MetaLine label="Deadline">
-                {fmtDateTime(request.deadlineAt)}
-                <span className="mt-0.5 block font-normal">
-                  <CoeDeadlineNote deadlineAt={request.deadlineAt} status={request.status} />
-                </span>
-              </MetaLine>
-              <MetaLine label="Last updated">{fmtDateTime(request.updatedAt)}</MetaLine>
-              <MetaLine label="Handled by">
-                {request.processedByName || "Not yet assigned"}
-              </MetaLine>
-              {request.verifiedAt && (
-                <MetaLine label="Verified">
-                  {fmtDateTime(request.verifiedAt)}
-                  {request.verifiedByName ? ` · ${request.verifiedByName}` : ""}
-                </MetaLine>
-              )}
-              {request.correctionRequestedAt && (
-                <MetaLine label="Correction asked">
-                  {fmtDateTime(request.correctionRequestedAt)}
-                </MetaLine>
-              )}
-              {request.finalizedAt && (
-                <MetaLine label="COE finalized">{fmtDateTime(request.finalizedAt)}</MetaLine>
-              )}
-              {request.readyAt && (
-                <MetaLine label="Ready for pickup">{fmtDateTime(request.readyAt)}</MetaLine>
-              )}
-              {request.releasedAt && (
-                <MetaLine label="Released">
-                  {fmtDateTime(request.releasedAt)}
-                  {request.releasedByName ? ` · ${request.releasedByName}` : ""}
-                </MetaLine>
-              )}
-              {request.receivedByName && (
-                <MetaLine label="Received by">{request.receivedByName}</MetaLine>
-              )}
-            </dl>
-          </Metabox>
-
           {!isStaff && request.status === "correction_requested" && (
             <CorrectionForm request={request} />
           )}
@@ -985,6 +952,41 @@ function CoeDetailPage() {
             downloading={downloading}
             onDownload={() => void downloadDocument()}
           />
+
+          <Metabox title="Processing details" bodyClassName="px-4 py-2">
+            <dl className="divide-y text-sm">
+              <MetaLine label="Last updated">{fmtDateTime(request.updatedAt)}</MetaLine>
+              <MetaLine label="Handled by">
+                {request.processedByName || "Not yet assigned"}
+              </MetaLine>
+              {request.verifiedAt && (
+                <MetaLine label="Verified">
+                  {fmtDateTime(request.verifiedAt)}
+                  {request.verifiedByName ? ` · ${request.verifiedByName}` : ""}
+                </MetaLine>
+              )}
+              {request.correctionRequestedAt && (
+                <MetaLine label="Correction asked">
+                  {fmtDateTime(request.correctionRequestedAt)}
+                </MetaLine>
+              )}
+              {request.finalizedAt && (
+                <MetaLine label="COE finalized">{fmtDateTime(request.finalizedAt)}</MetaLine>
+              )}
+              {request.readyAt && (
+                <MetaLine label="Ready for pickup">{fmtDateTime(request.readyAt)}</MetaLine>
+              )}
+              {request.releasedAt && (
+                <MetaLine label="Released">
+                  {fmtDateTime(request.releasedAt)}
+                  {request.releasedByName ? ` · ${request.releasedByName}` : ""}
+                </MetaLine>
+              )}
+              {request.receivedByName && (
+                <MetaLine label="Received by">{request.receivedByName}</MetaLine>
+              )}
+            </dl>
+          </Metabox>
         </div>
 
         <div className="order-last min-w-0 space-y-4 lg:order-first">
@@ -1018,20 +1020,14 @@ function CoeDetailPage() {
               <Row label="Purpose">{request.purpose}</Row>
               <Row label="Type of copy">{COE_COPY_TYPE_LABELS[request.copyType]}</Row>
               <Row label="Date requested">{fmtDateTime(request.requestedAt)}</Row>
+              {requestNoteValue(request.note, "Date needed") && (
+                <Row label="Date needed by requestor">
+                  {formatMetadataDate("Date needed", requestNoteValue(request.note, "Date needed"))}
+                </Row>
+              )}
               <Row label="Request ID">
                 <span className="font-mono text-[13px]">{request.id}</span>
               </Row>
-
-              {formattedNote.fields.length > 0 && (
-                <>
-                  <RowGroup title="Employment details" />
-                  {formattedNote.fields.map(([label, value]) => (
-                    <Row key={label} label={label}>
-                      {formatMetadataDate(label, value)}
-                    </Row>
-                  ))}
-                </>
-              )}
 
               <RowGroup title="Notes" />
               <Row label="Additional note">
@@ -1045,6 +1041,20 @@ function CoeDetailPage() {
                 <Row label="HRDO remarks">{request.remarks}</Row>
               )}
             </dl>
+            {formattedNote.fields.length > 0 && (
+              <details className="border-t">
+                <summary className="cursor-pointer px-4 py-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  Submitted employment information
+                </summary>
+                <dl className="border-t">
+                  {formattedNote.fields.map(([label, value]) => (
+                    <Row key={label} label={label}>
+                      {formatMetadataDate(label, value)}
+                    </Row>
+                  ))}
+                </dl>
+              </details>
+            )}
           </Metabox>
 
           <Metabox title="History">

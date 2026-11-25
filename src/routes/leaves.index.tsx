@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarRange, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { PageHeader, Section, EmptyState } from "@/components/app/PageHeader";
 import { LoadingScreen } from "@/components/app/LoadingPanel";
 import { AttendanceClaimCard } from "@/components/attendance/ClaimCard";
@@ -62,6 +62,9 @@ function MyAttendance({ userId }: { userId: string }) {
     (log) => (!month || log.date.startsWith(month)) && (!code || log.code === code),
   );
   const selected = data.logs.find((log) => log.id === explainId);
+  const remaining = profile
+    ? profile.remainingEl + profile.remainingSl + profile.remainingVl + profile.remainingBl
+    : 0;
 
   async function respond(log: (typeof data.logs)[number], text?: string) {
     if (busy) return;
@@ -103,18 +106,15 @@ function MyAttendance({ userId }: { userId: string }) {
     }
   }
 
+  const refresh = (
+    <Button variant="outline" size="sm" onClick={() => void attendance.refetch()}>
+      <RefreshCw className="mr-2 size-4" aria-hidden />
+      Refresh
+    </Button>
+  );
   return (
     <div className="mx-auto w-full max-w-7xl space-y-5">
-      <PageHeader
-        title="My Leaves & Attendance"
-        description="Your leave credits and synced attendance records."
-        actions={
-          <Button variant="outline" onClick={() => void attendance.refetch()}>
-            <RefreshCw className="mr-2 h-4 w-4" aria-hidden />
-            Refresh
-          </Button>
-        }
-      />
+      {!profile?.active && <PageHeader title="My Leaves & Attendance" actions={refresh} />}
       {!profile ? (
         <AttendanceClaimCard pending={Boolean(data.claim)} claim={data.claim} />
       ) : !profile.active ? (
@@ -126,42 +126,77 @@ function MyAttendance({ userId }: { userId: string }) {
         </Section>
       ) : (
         <>
-          <section className="overflow-hidden rounded-2xl border bg-card p-5 shadow-sm lg:p-7">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+          <section
+            aria-labelledby="hrdo-summary"
+            className="overflow-hidden rounded-2xl border border-t-4 border-t-primary bg-card shadow-sm"
+          >
+            <div className="flex items-center gap-3 px-5 pt-5 sm:px-7 sm:pt-7">
+              <img
+                src="/HRDO%20LOGO.png"
+                alt=""
+                width="44"
+                height="44"
+                className="size-11 shrink-0 object-contain"
+              />
               <div>
-                <p className="text-sm font-medium text-muted-foreground">
+                <h1 id="hrdo-summary" className="text-sm font-semibold tracking-wide">
+                  HRDO · Leave summary
+                </h1>
+                <p className="text-xs text-muted-foreground">
                   {DEPARTMENT_LABELS[profile.departmentGroup]}
                 </p>
-                <h2 className="mt-1 text-2xl font-semibold tracking-tight">{profile.fullName}</h2>
               </div>
-              <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                <CalendarRange className="h-4 w-4" aria-hidden />
-                {fmtRange(profile.cycleStart, profile.cycleEnd)}
+              <div className="ml-auto">{refresh}</div>
+            </div>
+            <div className="grid gap-5 px-5 py-5 sm:px-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+              <div>
+                <Greeting key={profile.fullName} name={profile.fullName} />
+                <p className="mt-2 text-sm leading-relaxed">
+                  {profile.leavesThisMonth === 0
+                    ? "You have no leave recorded for the month selected in the HR tracker."
+                    : `You used ${days(profile.leavesThisMonth)} of leave in the month selected in the HR tracker.`}{" "}
+                  You have used {days(profile.leavesThisYear)} this cycle.
+                </p>
+              </div>
+              <div className="rounded-xl bg-primary/5 px-5 py-3 lg:min-w-48">
+                <p className="text-sm font-medium">Available leave</p>
+                <p className="mt-1 text-3xl font-semibold tracking-tight text-primary tabular-nums">
+                  {days(remaining)}
+                </p>
+              </div>
+            </div>
+            <div className="px-5 sm:px-7">
+              <dl className="grid grid-cols-2 gap-x-6 gap-y-3 border-y py-4 text-sm sm:grid-cols-4">
+                {(
+                  [
+                    ["Emergency", profile.remainingEl],
+                    ["Sick", profile.remainingSl],
+                    ["Vacation", profile.remainingVl],
+                    ["Birthday", profile.remainingBl],
+                  ] as const
+                ).map(([label, balance]) => (
+                  <div key={label}>
+                    <dt className="text-xs text-muted-foreground">{label}</dt>
+                    <dd className="mt-1 text-lg font-semibold tabular-nums">{days(balance)}</dd>
+                  </div>
+                ))}
+              </dl>
+              <details className="py-3 text-sm">
+                <summary className="cursor-pointer font-medium">
+                  Leave cycle and credit details
+                </summary>
+                <p className="mt-2 leading-relaxed text-muted-foreground">
+                  Your leave cycle runs from {fmtRange(profile.cycleStart, profile.cycleEnd)}. HRDO
+                  has not listed a separate credit expiry or a date for your next replenishment in
+                  this tracker. Birthday leave includes any carried credits and accounts for
+                  birthday leave used.
+                </p>
+              </details>
+              {profile.remarks && <p className="pb-3 text-sm">{profile.remarks}</p>}
+              <p className="border-t py-3 text-xs text-muted-foreground">
+                Last synced {fmtDateTime(profile.syncedAt)}
               </p>
             </div>
-            <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-              <Summary
-                title="Total Remaining"
-                amount={
-                  profile.remainingEl +
-                  profile.remainingSl +
-                  profile.remainingVl +
-                  profile.remainingBl
-                }
-              />
-              <Summary title="TOTAL EL" amount={profile.remainingEl} />
-              <Summary title="TOTAL SL" amount={profile.remainingSl} />
-              <Summary title="TOTAL VL" amount={profile.remainingVl} />
-            </div>
-            <p className="mt-4 text-xs text-muted-foreground">
-              Total includes {profile.remainingBl.toFixed(1)} birthday leave day(s), calculated from
-              the sheet's birthday total and BL carry over. Used in the sheet-selected month:{" "}
-              {profile.leavesThisMonth.toFixed(1)} · Cycle used: {profile.leavesThisYear.toFixed(1)}
-              . Last synced: {fmtDateTime(profile.syncedAt)} (server time).
-            </p>
-            {profile.remarks && (
-              <p className="mt-2 text-sm text-muted-foreground">{profile.remarks}</p>
-            )}
           </section>
           {unacknowledged.length > 0 && (
             <section
@@ -312,41 +347,60 @@ function MyAttendance({ userId }: { userId: string }) {
             {visible.length === 0 ? (
               <EmptyState title="No attendance entries for these filters." />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[680px] text-left text-sm">
+              <div className="overflow-x-auto rounded-lg border border-border">
+                <table className="data-table w-full min-w-[680px] border-collapse text-left text-sm">
                   <caption className="sr-only">Your synced leave and attendance history</caption>
-                  <thead className="border-b text-xs uppercase text-muted-foreground">
+                  <thead className="bg-muted/70 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     <tr>
-                      <th className="px-3 py-3">Date</th>
-                      <th className="px-3 py-3">Type</th>
-                      <th className="px-3 py-3">Days</th>
-                      <th className="px-3 py-3">Acknowledgment</th>
-                      <th className="px-3 py-3">Action</th>
+                      <th scope="col" className="border-b border-r px-4 py-3">
+                        Date
+                      </th>
+                      <th scope="col" className="border-b border-r px-4 py-3">
+                        Type
+                      </th>
+                      <th scope="col" className="border-b border-r px-4 py-3 text-right">
+                        Days
+                      </th>
+                      <th scope="col" className="border-b border-r px-4 py-3">
+                        Status
+                      </th>
+                      <th scope="col" className="border-b px-4 py-3">
+                        Action
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {visible.map((log) => (
-                      <tr key={log.id} className="border-b last:border-0 hover:bg-muted/40">
-                        <td className="px-3 py-4 font-medium">{fmtDate(log.date)}</td>
-                        <td className="px-3 py-4">{log.leaveType}</td>
-                        <td className="px-3 py-4 tabular-nums">{log.days.toFixed(1)}</td>
-                        <td className="px-3 py-4">
-                          {["LATE", "ABSENT"].includes(log.code)
-                            ? log.acknowledgedAt
-                              ? "Acknowledged"
-                              : "Awaiting acknowledgment"
-                            : "—"}
+                      <tr key={log.id} className="border-b last:border-b-0 hover:bg-muted/30">
+                        <td className="whitespace-nowrap border-r px-4 py-3 font-medium">
+                          {fmtDate(log.date)}
+                        </td>
+                        <td className="border-r px-4 py-3">{log.leaveType}</td>
+                        <td className="border-r px-4 py-3 text-right tabular-nums">
+                          {log.days.toFixed(1)}
+                        </td>
+                        <td className="border-r px-4 py-3">
+                          <span
+                            className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${["LATE", "ABSENT"].includes(log.code) && !log.acknowledgedAt ? "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200" : "bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200"}`}
+                          >
+                            {["LATE", "ABSENT"].includes(log.code)
+                              ? log.acknowledgedAt
+                                ? "Acknowledged"
+                                : "Needs acknowledgment"
+                              : "Recorded"}
+                          </span>
                           {log.explanation && (
-                            <p className="mt-1 max-w-xs whitespace-pre-wrap text-xs text-muted-foreground">
+                            <p className="mt-2 max-w-xs whitespace-pre-wrap text-xs text-muted-foreground">
                               {log.explanation}
                             </p>
                           )}
                         </td>
-                        <td className="px-3 py-4">
-                          {["LATE", "ABSENT"].includes(log.code) && (
+                        <td className="px-4 py-3">
+                          {["LATE", "ABSENT"].includes(log.code) ? (
                             <Button
-                              variant="ghost"
+                              variant="link"
                               size="sm"
+                              className="h-auto p-0"
                               disabled={busy}
                               onClick={() => {
                                 setExplainId(log.id);
@@ -355,6 +409,8 @@ function MyAttendance({ userId }: { userId: string }) {
                             >
                               Explain
                             </Button>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
                           )}
                         </td>
                       </tr>
@@ -370,18 +426,31 @@ function MyAttendance({ userId }: { userId: string }) {
   );
 }
 
-function Summary({ title, amount }: { title: string; amount: number }) {
+function days(value: number) {
+  return `${value} ${value === 1 ? "day" : "days"}`;
+}
+
+function Greeting({ name }: { name: string }) {
+  const greeting = `Hello, ${name}.`.replace(/\.{2}$/, ".");
+  const [length, setLength] = useState(greeting.length);
+  useEffect(() => {
+    if (!window.matchMedia || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let position = 0;
+    setLength(0);
+    const timer = window.setInterval(
+      () => {
+        position += 1;
+        setLength(position);
+        if (position >= greeting.length) window.clearInterval(timer);
+      },
+      Math.min(32, 1200 / greeting.length),
+    );
+    return () => window.clearInterval(timer);
+  }, [greeting]);
   return (
-    <Card className="min-w-0 rounded-xl">
-      <CardHeader className="p-4 pb-2">
-        <CardTitle className="text-xs font-medium text-muted-foreground">{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="px-4 pb-4">
-        <p className="text-2xl font-semibold tabular-nums">
-          {amount.toFixed(1)}{" "}
-          <span className="text-xs font-normal text-muted-foreground">days</span>
-        </p>
-      </CardContent>
-    </Card>
+    <p className="min-h-8 break-words text-2xl font-semibold tracking-tight sm:text-3xl">
+      <span className="sr-only">{greeting}</span>
+      <span aria-hidden="true">{greeting.slice(0, length)}</span>
+    </p>
   );
 }

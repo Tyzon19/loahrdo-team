@@ -65,19 +65,33 @@ export function RequestsTable({
       </ul>
       <div className="hidden lg:block">
         <div className="overflow-x-auto rounded-md border">
-          <table className="min-w-[1060px] w-full table-fixed border-separate border-spacing-0 text-sm">
+          <table className="data-table min-w-[1060px] w-full table-fixed border-collapse text-sm">
             <thead className="border-b bg-muted text-left text-[11px] uppercase tracking-wide text-foreground/75">
               <tr>
-                <th className="w-[140px] px-3 py-2 font-medium text-foreground/80">Request No.</th>
-                <th className="w-[115px] px-3 py-2 font-medium text-foreground/80">Submitted</th>
+                <th scope="col" className="w-[140px] px-3 py-2 font-medium text-foreground/80">
+                  Request No.
+                </th>
+                <th scope="col" className="w-[115px] px-3 py-2 font-medium text-foreground/80">
+                  Submitted
+                </th>
                 {showRequester && (
-                  <th className="w-[155px] px-3 py-2 font-medium text-foreground/80">Requestor</th>
+                  <th scope="col" className="w-[155px] px-3 py-2 font-medium text-foreground/80">
+                    Requestor
+                  </th>
                 )}
-                <th className="w-[180px] px-3 py-2 font-medium text-foreground/80">Destination</th>
-                <th className="w-[180px] px-3 py-2 font-medium text-foreground/80">Travel Dates</th>
-                <th className="w-[195px] px-3 py-2 font-medium text-foreground/80">Status</th>
-                <th className="w-[175px] px-3 py-2 font-medium text-foreground/80">Pending With</th>
-                <th className="w-[120px] px-3 py-2">
+                <th scope="col" className="w-[180px] px-3 py-2 font-medium text-foreground/80">
+                  Destination
+                </th>
+                <th scope="col" className="w-[180px] px-3 py-2 font-medium text-foreground/80">
+                  Travel Dates
+                </th>
+                <th scope="col" className="w-[195px] px-3 py-2 font-medium text-foreground/80">
+                  Status
+                </th>
+                <th scope="col" className="w-[175px] px-3 py-2 font-medium text-foreground/80">
+                  Pending With
+                </th>
+                <th scope="col" className="w-[120px] px-3 py-2">
                   <span className="sr-only">Action</span>
                 </th>
               </tr>
