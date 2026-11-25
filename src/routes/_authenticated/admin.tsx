@@ -4,9 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   ArrowUpRight,
   Building2,
-  Car,
   ClipboardCheck,
-  FileText,
   ShieldCheck,
   UserRound,
   Users,
@@ -41,33 +39,6 @@ export const Route = createFileRoute("/_authenticated/admin")({
   component: AdminDashboard,
 });
 
-const SYSTEMS = [
-  {
-    title: "Vehicle Trip Ticket",
-    description: "Manage vehicle requests, the fleet, and trip records.",
-    to: "/dashboard",
-    icon: Car,
-  },
-  {
-    title: "Certificate of Employment",
-    description: "Review COE requests and HRDO processing.",
-    to: "/hrdo/dashboard",
-    icon: FileText,
-  },
-  {
-    title: "Permission Slip",
-    description: "View the queue; approvals stay with the designated HRDO Head.",
-    to: "/permission-slips",
-    icon: ShieldCheck,
-  },
-  {
-    title: "Late & Absences",
-    description: "Manage attendance trackers, employee balances, and discrepancy records.",
-    to: "/admin/late-absences",
-    icon: ClipboardCheck,
-  },
-] as const;
-
 function AdminDashboard() {
   const { viewer } = Route.useRouteContext();
   const overview = useQuery({
@@ -91,7 +62,7 @@ function AdminDashboard() {
         description={
           viewer.isSuperAdmin
             ? "Organization-wide monitoring, system access, and module management."
-            : "Manage your assigned systems and records."
+            : "Monitor system activity and manage portal records."
         }
         actions={
           viewer.isSuperAdmin ? (
@@ -337,43 +308,25 @@ function AdminDashboard() {
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(260px,.6fr)]">
                 <div className="rounded-xl border bg-card p-5">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Request management
+                    Request overview
                   </p>
-                  <h2 className="mt-1 text-lg font-semibold">Daily HRDO operations</h2>
+                  <h2 className="mt-1 text-lg font-semibold">Daily system totals</h2>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     {[
-                      ["Vehicle Trip Ticket", "/requests", operations.data.totals.transportation],
-                      ["Certificate of Employment", "/hrdo/dashboard", operations.data.totals.coe],
-                      [
-                        "Permission Slip",
-                        "/permission-slips",
-                        operations.data.totals.permissionSlip,
-                      ],
-                      [
-                        "Late & Absences",
-                        "/admin/late-absences",
-                        operations.data.totals.lateAbsences,
-                      ],
-                    ].map(([label, to, counts]) => (
-                      <Link
-                        key={String(label)}
-                        to={String(to)}
-                        className="group rounded-lg border p-4 transition-colors hover:border-primary/40 hover:bg-muted/40"
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="font-medium">{String(label)}</p>
-                          <ArrowUpRight
-                            className="h-4 w-4 text-primary transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
-                            aria-hidden
-                          />
-                        </div>
+                      ["Vehicle Trip Ticket", operations.data.totals.transportation],
+                      ["Certificate of Employment", operations.data.totals.coe],
+                      ["Permission Slip", operations.data.totals.permissionSlip],
+                      ["Late & Absences", operations.data.totals.lateAbsences],
+                    ].map(([label, counts]) => (
+                      <div key={String(label)} className="rounded-lg border p-4">
+                        <p className="font-medium">{String(label)}</p>
                         <p className="mt-2 text-2xl font-semibold tabular-nums">
                           {(counts as { pending: number }).pending}
                           <span className="ml-1 text-xs font-normal text-muted-foreground">
                             pending
                           </span>
                         </p>
-                      </Link>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -391,28 +344,10 @@ function AdminDashboard() {
                       <ArrowUpRight className="h-4 w-4 text-primary" aria-hidden />
                     </Link>
                     <Link
-                      to="/trip-archive"
-                      className="flex min-h-12 items-center justify-between rounded-lg border px-3 text-sm font-medium hover:bg-muted/40"
-                    >
-                      Vehicle reports <ArrowUpRight className="h-4 w-4 text-primary" aria-hidden />
-                    </Link>
-                    <Link
-                      to="/hrdo/history"
-                      className="flex min-h-12 items-center justify-between rounded-lg border px-3 text-sm font-medium hover:bg-muted/40"
-                    >
-                      COE reports <ArrowUpRight className="h-4 w-4 text-primary" aria-hidden />
-                    </Link>
-                    <Link
                       to="/receipts"
                       className="flex min-h-12 items-center justify-between rounded-lg border px-3 text-sm font-medium hover:bg-muted/40"
                     >
                       Receipts archive <ArrowUpRight className="h-4 w-4 text-primary" aria-hidden />
-                    </Link>
-                    <Link
-                      to="/notifications"
-                      className="flex min-h-12 items-center justify-between rounded-lg border px-3 text-sm font-medium hover:bg-muted/40"
-                    >
-                      Notifications <ArrowUpRight className="h-4 w-4 text-primary" aria-hidden />
                     </Link>
                   </div>
                 </div>
@@ -421,37 +356,6 @@ function AdminDashboard() {
           )}
         </>
       )}
-
-      <section aria-labelledby="admin-systems-heading">
-        <h2 id="admin-systems-heading" className="text-base font-semibold">
-          {viewer.isSuperAdmin ? "Systems" : "HR Operations"}
-        </h2>
-        <ul className="mt-3 divide-y rounded-lg border bg-card">
-          {SYSTEMS.map(({ title, description, to, icon: Icon }) => (
-            <li key={to}>
-              <Link
-                to={to}
-                className="group grid min-h-[76px] grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-3 px-3 py-3 transition-colors hover:bg-muted/60 focus-visible:bg-muted/60 sm:gap-4 sm:px-5"
-              >
-                <span className="flex h-10 w-10 items-center justify-center rounded-md bg-muted text-primary">
-                  <Icon className="h-5 w-5" aria-hidden />
-                </span>
-                <span className="min-w-0">
-                  <span className="block font-medium text-foreground">{title}</span>
-                  <span className="mt-0.5 block text-sm text-muted-foreground">{description}</span>
-                </span>
-                <span className="flex items-center gap-1 text-sm font-medium text-primary">
-                  Open
-                  <ArrowUpRight
-                    className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-active:-translate-y-0.5"
-                    aria-hidden
-                  />
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </section>
 
       {viewer.isSuperAdmin && (
         <section

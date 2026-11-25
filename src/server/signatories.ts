@@ -12,6 +12,7 @@ import type { RowDataPacket } from "mysql2/promise";
 import { randomBytes, randomUUID } from "node:crypto";
 import { all, getPool, run, withTransaction } from "./db";
 import { requireViewer } from "./auth";
+import { revokeAccountSessions } from "./sessions";
 import {
   loadApproverNames,
   loadApproverUserIds,
@@ -391,14 +392,9 @@ export async function resetUserPassword(input: unknown) {
         [passwordHash, user.email],
         conn,
       );
-      await run(
-        "DELETE FROM hrdo_sessions WHERE user_id IN (SELECT id FROM hrdo_users WHERE email = ? AND role = 'employee')",
-        [user.email],
-        conn,
-      );
     }
+    await revokeAccountSessions(user.email, conn);
   });
-  await run("DELETE FROM sessions WHERE user_id = ?", [userId]);
 
   const emailDelivery = await sendTemporaryPasswordEmail({
     recipientName: user.name,

@@ -38,7 +38,7 @@ function Revise() {
     return (
       <div className="mx-auto w-full max-w-6xl">
         <PageHeader title="Revise request" description="Loading the latest record…" />
-        <LoadingPanel label="Loading request" rows={8} />
+        <LoadingPanel label="Loading request" />
       </div>
     );
   }

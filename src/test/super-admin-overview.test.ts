@@ -1,3 +1,4 @@
+import type { RowDataPacket } from "mysql2/promise";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { all } from "@/server/db";
 import { requireViewer } from "@/server/auth";
@@ -21,13 +22,13 @@ describe("Super Admin overview", () => {
       isSuperAdmin: true,
     });
     vi.mocked(all)
-      .mockResolvedValueOnce([{ total: 45, active: 40 }])
-      .mockResolvedValueOnce([{ total: 38 }])
-      .mockResolvedValueOnce([{ pending: 7, completed: 12, rejected: 2 }])
-      .mockResolvedValueOnce([{ pending: 3, completed: 5, rejected: 1 }])
-      .mockResolvedValueOnce([{ pending: 4, completed: 8, rejected: 1 }])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([]);
+      .mockResolvedValueOnce([{ total: 45, active: 40 }] as RowDataPacket[])
+      .mockResolvedValueOnce([{ total: 38 }] as RowDataPacket[])
+      .mockResolvedValueOnce([{ pending: 7, completed: 12, rejected: 2 }] as RowDataPacket[])
+      .mockResolvedValueOnce([{ pending: 3, completed: 5, rejected: 1 }] as RowDataPacket[])
+      .mockResolvedValueOnce([{ pending: 4, completed: 8, rejected: 1 }] as RowDataPacket[])
+      .mockResolvedValueOnce([] as RowDataPacket[])
+      .mockResolvedValueOnce([] as RowDataPacket[]);
 
     await expect(listSuperAdminOverview()).resolves.toMatchObject({
       totals: {
@@ -58,7 +59,7 @@ describe("Super Admin overview", () => {
       isSuperAdmin: false,
     });
     vi.mocked(all)
-      .mockResolvedValueOnce([{ total: 38 }])
+      .mockResolvedValueOnce([{ total: 38 }] as RowDataPacket[])
       .mockResolvedValueOnce([
         {
           total: 20,
@@ -68,7 +69,7 @@ describe("Super Admin overview", () => {
           rejected: 2,
           completed: 6,
         },
-      ])
+      ] as RowDataPacket[])
       .mockResolvedValueOnce([
         {
           total: 12,
@@ -78,7 +79,7 @@ describe("Super Admin overview", () => {
           rejected: 1,
           completed: 3,
         },
-      ])
+      ] as RowDataPacket[])
       .mockResolvedValueOnce([
         {
           total: 9,
@@ -88,8 +89,8 @@ describe("Super Admin overview", () => {
           rejected: 1,
           completed: 4,
         },
-      ])
-      .mockResolvedValueOnce([{ openFlags: 2 }]);
+      ] as RowDataPacket[])
+      .mockResolvedValueOnce([{ openFlags: 2 }] as RowDataPacket[]);
 
     await expect(listAdminOperationsOverview()).resolves.toMatchObject({
       employees: 38,

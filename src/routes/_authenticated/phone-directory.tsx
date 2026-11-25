@@ -33,7 +33,7 @@ function PhoneDirectory() {
         description="Contact the assigned signatories when a request needs attention."
       />
       {directory.isPending ? (
-        <LoadingPanel label="Loading the phone directory" rows={4} />
+        <LoadingPanel label="Loading the phone directory" />
       ) : directory.isError ? (
         <Section title="Signatory contacts">
           <div className="p-6 text-center" role="alert">

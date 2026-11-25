@@ -16,7 +16,6 @@ const ALL_REQUEST_ROLES: Role[] = [
   "assistant",
   "guard",
   "driver",
-  "admin",
 ];
 
 export function isApproverRole(role: Role) {
@@ -29,21 +28,22 @@ export function canSubmitRequests(role: Role) {
   return role === "requisitioner";
 }
 export function canViewAllRequests(role: Role, isSuperAdmin = false) {
-  return isSuperAdmin || ALL_REQUEST_ROLES.includes(role);
+  return !canAccessAdminPortal(role, isSuperAdmin) && ALL_REQUEST_ROLES.includes(role);
 }
 
 export function canViewRequest(
   user: Pick<User, "id" | "role"> & { isSuperAdmin?: boolean },
   requisitionerId: string,
 ) {
-  if (user.isSuperAdmin) return true;
+  if (canAccessAdminPortal(user.role, user.isSuperAdmin)) return false;
   if (user.role === "requisitioner") return user.id === requisitionerId;
   return canViewAllRequests(user.role);
 }
 
 export function canManageVehicles(role: Role, isSuperAdmin = false) {
   return (
-    isSuperAdmin || role === "transport_head" || role === "transport_staff" || role === "admin"
+    !canAccessAdminPortal(role, isSuperAdmin) &&
+    (role === "transport_head" || role === "transport_staff")
   );
 }
 export function canActOnStage(role: Role, stageRole: Role) {

@@ -81,17 +81,6 @@ export function ServiceDashboard({
     }
   }
 
-  async function handleSignOut() {
-    if (!onSignOut || signingOut) return;
-    setSigningOut(true);
-    try {
-      await onSignOut();
-    } catch {
-      toast.error("We couldn't sign you out. Please try again.");
-      setSigningOut(false);
-    }
-  }
-
   return (
     <div className="flex min-h-screen w-full min-w-0 max-w-full flex-col bg-muted/40">
       {signingOut && <LoadingScreen label="Signing out" mode="overlay" immediate />}

@@ -3,17 +3,24 @@ import { runSafely } from "@/lib/errors";
 
 export const bootstrapFn = createServerFn({ method: "GET" }).handler(async () => {
   try {
-    const [{ viewer }, { hrdoViewer }, { permissionViewer }, { serverEnvOptional }] =
-      await Promise.all([
-        import("./server/auth"),
-        import("./server/hrdo/auth"),
-        import("./server/permission/auth"),
-        import("./server/env"),
-      ]);
+    const [
+      { viewer },
+      { hrdoViewer },
+      { permissionViewer },
+      { serverEnvOptional },
+      { attendanceViewer },
+    ] = await Promise.all([
+      import("./server/auth"),
+      import("./server/hrdo/auth"),
+      import("./server/permission/auth"),
+      import("./server/env"),
+      import("./server/attendance-auth"),
+    ]);
     return {
       viewer: await viewer(),
       hrdoViewer: await hrdoViewer(),
       permissionViewer: await permissionViewer(),
+      attendanceViewer: await attendanceViewer(),
       analytics: { measurementId: serverEnvOptional("GA_MEASUREMENT_ID") ?? null },
     };
   } catch (error) {
@@ -22,6 +29,7 @@ export const bootstrapFn = createServerFn({ method: "GET" }).handler(async () =>
       viewer: null,
       hrdoViewer: null,
       permissionViewer: null,
+      attendanceViewer: null,
       analytics: { measurementId: null },
     };
   }
@@ -30,6 +38,29 @@ export const bootstrapFn = createServerFn({ method: "GET" }).handler(async () =>
 export const loginFn = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
   .handler(async ({ data }) => runSafely(async () => (await import("./server/auth")).login(data)));
+
+export const attendanceLoginFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/attendance-auth")).attendanceLogin(data)),
+  );
+export const attendanceLogoutFn = createServerFn({ method: "POST" }).handler(async () =>
+  runSafely(async () => (await import("./server/attendance-auth")).attendanceLogout()),
+);
+export const completeAttendanceProfileFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () =>
+      (await import("./server/attendance-auth")).completeAttendanceProfile(data),
+    ),
+  );
+export const changeAttendancePasswordFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () =>
+      (await import("./server/attendance-auth")).changeAttendancePassword(data),
+    ),
+  );
 
 export const hrdoLoginFn = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)
@@ -555,6 +586,24 @@ export const getTripArchiveFn = createServerFn({ method: "POST" })
 export const listMyAttendanceFn = createServerFn({ method: "GET" }).handler(async () =>
   runSafely(async () => (await import("./server/late-absences")).listMyAttendance()),
 );
+
+export const submitAttendanceClaimFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/attendance")).submitAttendanceClaim(data)),
+  );
+
+export const approveAttendanceClaimFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/attendance")).approveAttendanceClaim(data)),
+  );
+
+export const respondToAttendanceIncidentFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/attendance")).respondToAttendanceIncident(data)),
+  );
 
 export const listAttendanceAdminFn = createServerFn({ method: "POST" })
   .validator((input: unknown) => input)

@@ -8,6 +8,8 @@ import { all, run, withTransaction } from "@/server/db";
 import { hashPassword } from "@/server/password";
 import { sendTemporaryPasswordEmail } from "@/server/gmail";
 import { canManageHrdoAccounts, type HrdoRole } from "@/lib/hrdo";
+import { assertAccountReady } from "@/lib/account-readiness";
+import { revokeAccountSessions } from "../sessions";
 
 interface HrdoProcessorRow extends RowDataPacket {
   id: string;
@@ -20,9 +22,13 @@ interface HrdoProcessorRow extends RowDataPacket {
 
 async function requireAccountManager() {
   const mainViewer = await viewer();
-  if (mainViewer?.isSuperAdmin) return { canCreateHrdoAdmin: true };
+  if (mainViewer?.isSuperAdmin) {
+    assertAccountReady(mainViewer);
+    return { canCreateHrdoAdmin: true };
+  }
   const hrdoUser = await hrdoViewer();
-  if (canManageHrdoAccounts(hrdoUser)) {
+  if (hrdoUser && canManageHrdoAccounts(hrdoUser)) {
+    assertAccountReady(hrdoUser);
     return { canCreateHrdoAdmin: Boolean(hrdoUser?.isSuperAdmin) };
   }
   throw new AppError("Only administrators can manage HRDO processor accounts.");
@@ -33,6 +39,7 @@ async function requireSuperAdmin() {
   if (!mainViewer?.isSuperAdmin) {
     throw new AppError("Only Super Admins can reset COE processor passwords.");
   }
+  assertAccountReady(mainViewer);
 }
 
 function createTemporaryPassword() {
@@ -124,7 +131,7 @@ export async function resetHrdoProcessorPassword(input: unknown) {
       [passwordHash, userId],
       conn,
     );
-    await run("DELETE FROM hrdo_sessions WHERE user_id = ?", [userId], conn);
+    await revokeAccountSessions(account.email, conn);
     return account;
   });
 

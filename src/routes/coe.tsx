@@ -1,11 +1,17 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { ArrowRight, FileBadge, Mail } from "lucide-react";
 import { AuthLayout } from "@/components/AuthLayout";
 import { googleSignInErrorMessage } from "@/lib/google-signin";
 import { HRDO } from "@/lib/hrdo";
 import { canonical } from "@/lib/site";
+import { canAccessAdminPortal } from "@/lib/access";
 
 export const Route = createFileRoute("/coe")({
+  beforeLoad: ({ context }) => {
+    if (context.viewer && canAccessAdminPortal(context.viewer.role, context.viewer.isSuperAdmin)) {
+      throw redirect({ to: "/admin" });
+    }
+  },
   validateSearch: (search: Record<string, unknown>) => ({
     error:
       typeof search["error"] === "string" && /^google_[a-z_]+$/.test(search["error"])

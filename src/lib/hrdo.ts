@@ -4,9 +4,6 @@
  * The HRDO COE service has its own accounts, sessions and database tables.
  */
 
-import { canAccessAdminPortal } from "./access";
-import type { Viewer } from "./types";
-
 export const HRDO = {
   name: "LOA HRDO Certificate of Employment",
   shortName: "HRDO COE",
@@ -17,8 +14,19 @@ export const HRDO = {
   contactEmail: "itm@lyceumalabang.edu.ph",
 } as const;
 
-/** HR policy: a COE request must be processed within three days of submission. */
+/** Three working days, excluding weekends, in the institution's time zone. */
 export const COE_PROCESSING_DAYS = 3;
+
+export function coeProcessingDeadline(start: Date): Date {
+  const deadline = new Date(start);
+  const weekday = new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "Asia/Manila" });
+  let remaining = COE_PROCESSING_DAYS;
+  while (remaining > 0) {
+    deadline.setUTCDate(deadline.getUTCDate() + 1);
+    if (!["Sat", "Sun"].includes(weekday.format(deadline))) remaining -= 1;
+  }
+  return deadline;
+}
 /** A request counts as "due soon" inside this window before its deadline. */
 export const COE_DUE_SOON_HOURS = 24;
 /** Largest signed COE document HR can attach to a request. */
@@ -41,28 +49,6 @@ export function canExternalHrdoViewerAccessPath(pathname: string) {
   return (
     pathname === "/hrdo/profile" || pathname === "/hrdo/coe" || pathname.startsWith("/hrdo/coe/")
   );
-}
-
-export function hrdoViewerFromAdminPortal(
-  user:
-    | Pick<
-        Viewer,
-        "id" | "name" | "email" | "role" | "department" | "mustChangePassword" | "isSuperAdmin"
-      >
-    | null
-    | undefined,
-): HrdoViewer | null {
-  if (!user || !canAccessAdminPortal(user.role, user.isSuperAdmin)) return null;
-  return {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    role: "hrdo_admin",
-    department: user.department,
-    mustChangePassword: user.mustChangePassword,
-    isExternal: false,
-    isSuperAdmin: user.isSuperAdmin,
-  };
 }
 
 export function canManageHrdoAccounts(

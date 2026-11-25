@@ -1,5 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, XAxis, YAxis } from "recharts";
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState, Section } from "@/components/app/PageHeader";
@@ -63,11 +74,9 @@ export function CoeAnalytics() {
 
   return (
     <Section title="Overview">
-      <p className="mb-4 text-sm text-muted-foreground">
-        Key workload and service indicators.
-      </p>
+      <p className="mb-4 text-sm text-muted-foreground">Key workload and service indicators.</p>
       {analytics.isPending ? (
-        <LoadingPanel label="Loading COE analytics" rows={4} />
+        <LoadingPanel label="Loading COE analytics" />
       ) : analytics.isError ? (
         <div className="rounded-md border p-5 text-center" role="alert">
           <p className="font-medium">We couldn&apos;t load COE analytics.</p>
@@ -80,11 +89,31 @@ export function CoeAnalytics() {
         <div className="space-y-4">
           <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
             {[
-              { label: "All requests", value: displayNumber(analytics.data.summary.total), hint: "All time" },
-              { label: "Open requests", value: displayNumber(analytics.data.summary.open), hint: "Still in progress" },
-              { label: "Due soon", value: displayNumber(analytics.data.summary.dueSoon), hint: "Next 24 hours" },
-              { label: "Overdue", value: displayNumber(analytics.data.summary.overdue), hint: "Past deadline" },
-              { label: "Released", value: displayNumber(analytics.data.summary.released), hint: "All time" },
+              {
+                label: "All requests",
+                value: displayNumber(analytics.data.summary.total),
+                hint: "All time",
+              },
+              {
+                label: "Open requests",
+                value: displayNumber(analytics.data.summary.open),
+                hint: "Still in progress",
+              },
+              {
+                label: "Due soon",
+                value: displayNumber(analytics.data.summary.dueSoon),
+                hint: "Next 24 hours",
+              },
+              {
+                label: "Overdue",
+                value: displayNumber(analytics.data.summary.overdue),
+                hint: "Past deadline",
+              },
+              {
+                label: "Released",
+                value: displayNumber(analytics.data.summary.released),
+                hint: "All time",
+              },
               {
                 label: "Avg. release time",
                 value:
@@ -155,7 +184,10 @@ export function CoeAnalytics() {
               </CardHeader>
               <CardContent className="grid items-center gap-3 p-3 pt-0 sm:grid-cols-[minmax(0,1fr)_minmax(8rem,1fr)] sm:p-6 sm:pt-0">
                 {analytics.data.statuses.length ? (
-                  <ChartContainer config={statusChartConfig} className="mx-auto h-[210px] w-full max-w-[250px] aspect-square">
+                  <ChartContainer
+                    config={statusChartConfig}
+                    className="mx-auto h-[210px] w-full max-w-[250px] aspect-square"
+                  >
                     <PieChart>
                       <ChartTooltip
                         content={
@@ -218,7 +250,10 @@ export function CoeAnalytics() {
               </CardHeader>
               <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
                 {analytics.data.departments.length ? (
-                  <ChartContainer config={departmentChartConfig} className="h-[250px] w-full aspect-auto">
+                  <ChartContainer
+                    config={departmentChartConfig}
+                    className="h-[250px] w-full aspect-auto"
+                  >
                     <BarChart
                       data={analytics.data.departments}
                       layout="vertical"
@@ -235,7 +270,12 @@ export function CoeAnalytics() {
                         tick={{ fontSize: 11 }}
                       />
                       <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
-                      <Bar dataKey="total" fill="var(--color-total)" radius={[0, 5, 5, 0]} barSize={18} />
+                      <Bar
+                        dataKey="total"
+                        fill="var(--color-total)"
+                        radius={[0, 5, 5, 0]}
+                        barSize={18}
+                      />
                     </BarChart>
                   </ChartContainer>
                 ) : (
@@ -254,7 +294,10 @@ export function CoeAnalytics() {
               <CardContent className="space-y-4 p-4 pt-2 sm:p-6 sm:pt-2">
                 {analytics.data.copyTypes.length ? (
                   (() => {
-                    const max = Math.max(...analytics.data.copyTypes.map((entry) => entry.total), 1);
+                    const max = Math.max(
+                      ...analytics.data.copyTypes.map((entry) => entry.total),
+                      1,
+                    );
                     return analytics.data.copyTypes.map((entry, index) => (
                       <div key={entry.copyType} className="space-y-1.5">
                         <div className="flex items-center justify-between gap-3 text-sm">

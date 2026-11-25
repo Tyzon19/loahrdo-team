@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import {
   Bell,
   BarChart3,
-  Building2,
   Car,
   ChevronDown,
   ClipboardCheck,
@@ -138,7 +137,7 @@ const ITEMS = {
     icon: BarChart3,
   },
 } satisfies Record<string, NavItem>;
-export const NAV: Record<Role, NavItem[]> = {
+const NAV: Record<Role, NavItem[]> = {
   requisitioner: [ITEMS.newReq, ITEMS.myReq, ITEMS.notif, ITEMS.phoneDirectory, ITEMS.profile],
   department_head: [ITEMS.dash, ITEMS.notif, ITEMS.phoneDirectory, ITEMS.profile],
   transport_head: [
@@ -164,15 +163,8 @@ export const NAV: Record<Role, NavItem[]> = {
   driver: [ITEMS.dash, ITEMS.req, ITEMS.notif, ITEMS.phoneDirectory, ITEMS.profile],
   admin: [
     ITEMS.adminHome,
+    ITEMS.tripArchive,
     ITEMS.receipts,
-    ITEMS.vehicleDashboard,
-    { ...ITEMS.req, section: "Vehicle Trip Ticket" },
-    { ...ITEMS.vehicles, section: "Vehicle Trip Ticket" },
-    { ...ITEMS.tripArchive, section: "Vehicle Trip Ticket" },
-    ITEMS.attendanceAdmin,
-    { ...ITEMS.coe, section: "Other systems" },
-    { ...ITEMS.permission, section: "Other systems" },
-    { ...ITEMS.notif, section: "Account" },
     { ...ITEMS.phoneDirectory, section: "Account" },
     { ...ITEMS.profileSettings, section: "Account" },
   ],
@@ -190,7 +182,7 @@ function navItemsFor(user: Viewer, permissionPortal: boolean): NavItem[] {
     return [ITEMS.permission, ITEMS.profile];
   }
   if (user.isSuperAdmin) {
-    return user.role === "requisitioner" ? [ITEMS.newReq, ...NAV.admin] : NAV.admin;
+    return NAV.admin;
   }
   return NAV[user.role] ?? [ITEMS.dash, ITEMS.profile];
 }
@@ -299,13 +291,7 @@ function MobileNav({
   const items = navItemsFor(user, permissionPortal).filter(
     (item) => item.to !== "/profile" || item.label === "Profile",
   );
-  const centralAdmin = canAccessAdminPortal(user.role, user.isSuperAdmin);
-  const primaryItems =
-    items.length > 4
-      ? centralAdmin
-        ? [ITEMS.adminHome, ITEMS.vehicleDashboard, ITEMS.req]
-        : items.slice(0, 3)
-      : items;
+  const primaryItems = items.length > 4 ? items.slice(0, 3) : items;
   const overflowItems = items.filter(
     (item) =>
       !primaryItems.some((primary) => primary.to === item.to && primary.label === item.label),
@@ -422,7 +408,7 @@ export function AppShell({ user, children }: { user: Viewer; children: ReactNode
     queryKey: ["notifications"],
     queryFn: () => unwrap(listNotificationsFn()),
     staleTime: 15_000,
-    enabled: !permissionPortal,
+    enabled: !permissionPortal && !centralAdmin,
   });
   const unread = permissionPortal ? 0 : (notifications.data?.filter((n) => !n.read).length ?? 0);
 
@@ -466,7 +452,7 @@ export function AppShell({ user, children }: { user: Viewer; children: ReactNode
             {permissionPortal ? "Permission Slip" : centralAdmin ? "Admin Portal" : "LOA VRTT"}
           </span>
           <div className="ml-auto flex items-center gap-1.5">
-            {!permissionPortal && (
+            {!permissionPortal && !centralAdmin && (
               <Button
                 asChild
                 variant="ghost"

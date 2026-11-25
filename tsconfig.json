@@ -4,6 +4,7 @@
     "src/**/*.tsx",
     "vite.config.ts",
     "vitest.config.ts",
+    "vitest.attendance.config.ts",
     "eslint.config.js"
   ],
   "compilerOptions": {
@@ -20,7 +21,7 @@
 
     "skipLibCheck": true,
     "strict": true,
-    "noUnusedLocals": false,
+    "noUnusedLocals": true,
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
     "noImplicitOverride": true,

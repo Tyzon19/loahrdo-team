@@ -106,7 +106,7 @@ function CoeHistoryPage() {
         </div>
 
         {history.isPending ? (
-          <LoadingPanel label="Loading request history" rows={8} />
+          <LoadingPanel label="Loading request history" />
         ) : history.isError ? (
           <div className="p-6 text-center" role="alert">
             <p className="font-medium">We couldn&apos;t load the request history.</p>

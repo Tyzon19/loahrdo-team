@@ -7,6 +7,7 @@ function ensureLoaded() {
   try {
     (process as unknown as { loadEnvFile?: (path?: string) => void }).loadEnvFile?.(".env");
   } catch {
+    // Hosts may supply environment variables without a local .env file.
   }
 }
 

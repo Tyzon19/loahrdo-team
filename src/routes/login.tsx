@@ -33,23 +33,28 @@ export const Route = createFileRoute("/login")({
     const issue = search["error"];
     const reset = search["reset"] === "success" ? "success" : undefined;
     return {
-      ...(typeof target === "string" && target.startsWith("/") && !target.startsWith("//")
+      ...(typeof target === "string" &&
+      target.startsWith("/") &&
+      !target.startsWith("//") &&
+      !/[\\\r\n\0]/.test(target)
         ? { redirect: target }
         : {}),
       ...(typeof issue === "string" && /^google_[a-z_]+$/.test(issue) ? { error: issue } : {}),
       ...(reset ? { reset } : {}),
     };
   },
-  beforeLoad: ({ context }) => {
+  beforeLoad: ({ context, search }) => {
     if (context.viewer) {
       throw routerRedirect({
         to: context.viewer.needsProfileCompletion
           ? "/complete-profile"
           : context.viewer.mustChangePassword
             ? "/change-password"
-            : canAccessAdminPortal(context.viewer.role, context.viewer.isSuperAdmin)
-              ? "/admin"
-              : "/dashboard",
+            : search.redirect && search.redirect !== "/login"
+              ? search.redirect
+              : canAccessAdminPortal(context.viewer.role, context.viewer.isSuperAdmin)
+                ? "/admin"
+                : "/dashboard",
       });
     }
   },
@@ -93,14 +98,6 @@ function LoginPage() {
       }
       await router.invalidate();
       toast.success("Signed in.");
-      const target = result.data.mustChangePassword
-        ? "/change-password"
-        : search.redirect && search.redirect !== "/login"
-          ? search.redirect
-          : result.data.isAdminPortal
-            ? "/admin"
-            : "/dashboard";
-      await router.navigate({ href: target });
     } catch {
       setError("We couldn't sign you in. Check your connection and try again.");
     } finally {

@@ -533,7 +533,7 @@ export function SignatoryAccountsSettings() {
           at their next sign-in.
         </p>
         {query.isPending ? (
-          <LoadingPanel label="Loading user accounts" rows={2} />
+          <LoadingPanel label="Loading user accounts" />
         ) : query.isError ? (
           <div className="p-4 text-sm" role="alert">
             <p className="font-medium">We couldn&apos;t load user accounts.</p>
@@ -703,7 +703,7 @@ export function SignatoryAssignmentSettings() {
           Administration → President.
         </p>
         {query.isPending ? (
-          <LoadingPanel label="Loading main signatories" rows={3} />
+          <LoadingPanel label="Loading main signatories" />
         ) : query.isError ? (
           <div className="p-4 text-sm" role="alert">
             <p className="font-medium">We couldn&apos;t load main signatories.</p>
@@ -755,7 +755,7 @@ export function SignatoryAssignmentSettings() {
           signs in with their own account; their name, signature, and signing time are recorded.
         </p>
         {query.isPending ? (
-          <LoadingPanel label="Loading alternate signatories" rows={3} />
+          <LoadingPanel label="Loading alternate signatories" />
         ) : query.isError ? (
           <div className="p-4 text-sm" role="alert">
             <p className="font-medium">We couldn&apos;t load alternate signatories.</p>
@@ -851,7 +851,7 @@ export function PhoneDirectorySettings() {
         visible to signed-in users in the LOA Phone Directory.
       </p>
       {phoneDirectory.isPending ? (
-        <LoadingPanel label="Loading signatory phone numbers" rows={3} />
+        <LoadingPanel label="Loading signatory phone numbers" />
       ) : phoneDirectory.isError ? (
         <div className="p-4 text-sm" role="alert">
           <p className="font-medium">We couldn&apos;t load phone directory contacts.</p>

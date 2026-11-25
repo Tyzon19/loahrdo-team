@@ -3,7 +3,6 @@ import {
   isPermissionHead,
   canViewPermissionQueue,
   permissionRoleFor,
-  permissionViewerForAdminPortal,
   PERMISSION_HEAD_EMAIL,
   canManagePermissionSignatories,
   type PermissionViewer,
@@ -85,43 +84,5 @@ describe("Permission Slip access", () => {
     expect(isPermissionHead(moduleAdmin)).toBe(false);
     expect(isPermissionHead(superAdmin)).toBe(false);
     expect(canViewPermissionQueue(viewer({ role: "employee" }))).toBe(false);
-  });
-
-  it("maps central admins to read-only Permission Slip access", () => {
-    const adminViewer = permissionViewerForAdminPortal({
-      id: "admin",
-      name: "System Admin",
-      email: "admin@lyceumalabang.edu.ph",
-      role: "admin",
-      department: "Administration",
-      isSuperAdmin: false,
-    });
-
-    expect(adminViewer?.isAdmin).toBe(true);
-    expect(canViewPermissionQueue(adminViewer)).toBe(true);
-    expect(isPermissionHead(adminViewer)).toBe(false);
-    expect(
-      permissionViewerForAdminPortal({
-        id: "employee",
-        name: "Employee",
-        email: "employee@lyceumalabang.edu.ph",
-        role: "requisitioner",
-        department: "Administration",
-        isSuperAdmin: false,
-      }),
-    ).toBe(null);
-
-    const rootViewer = permissionViewerForAdminPortal({
-      id: "root",
-      name: "Super Admin",
-      email: "root@lyceumalabang.edu.ph",
-      role: "requisitioner",
-      department: "Administration",
-      isSuperAdmin: true,
-    });
-
-    expect(rootViewer?.isSuperAdmin).toBe(true);
-    expect(canViewPermissionQueue(rootViewer)).toBe(true);
-    expect(isPermissionHead(rootViewer)).toBe(false);
   });
 });

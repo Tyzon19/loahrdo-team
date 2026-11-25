@@ -23,6 +23,12 @@ The project uses **Vitest** as the test runner with the following stack:
 # Run the full suite once
 npm test
 
+# Run lint, formatting, tests, and production build
+npm run check
+
+# Run database-backed attendance checks
+npm run test:attendance-db
+
 # Run in watch mode during development
 npm run test:watch
 
@@ -30,6 +36,8 @@ npm run test:watch
 npm run lint
 npm run format
 ```
+
+The database runner creates a disposable database with isolated tracker settings and verifies session revocation, one-time recovery codes, expiry, and transactional writes; `npm test` alone skips these database cases.
 
 ### Configuration
 

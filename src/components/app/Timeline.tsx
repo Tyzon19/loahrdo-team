@@ -8,7 +8,6 @@ import {
   Pencil,
   RotateCcw,
   Truck,
-  Workflow,
 } from "lucide-react";
 import type { HistoryEvent, VehicleRequest } from "@/lib/types";
 import { currentSignatures, ROLE_TITLES, stageForStatus, STAGES } from "@/lib/workflow";

@@ -1,11 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import {
-  readAnalyticsConsent,
-  writeAnalyticsConsent,
-  type ConsentValue,
-} from "@/lib/consent";
+import { readAnalyticsConsent, writeAnalyticsConsent, type ConsentValue } from "@/lib/consent";
 import { recordPageViewFn } from "@/server-functions";
 
 declare global {
@@ -26,6 +22,7 @@ export function Analytics({ measurementId }: { measurementId: string | null }) {
   const [consent, setConsent] = useState<ConsentValue | null>(null);
   const [ready, setReady] = useState(false);
   const [gaLoaded, setGaLoaded] = useState(false);
+  const promptVisible = ready && consent === null;
 
   useEffect(() => {
     const stored = readAnalyticsConsent();
@@ -71,19 +68,19 @@ export function Analytics({ measurementId }: { measurementId: string | null }) {
     setConsent(value);
   }
 
-  if (!ready || consent !== null) return null;
+  if (!promptVisible) return null;
 
   return (
     <div
       role="dialog"
       aria-label="Analytics cookie preference"
       aria-live="polite"
-      className="no-print fixed inset-x-3 bottom-3 z-50 mx-auto max-w-3xl rounded-sm border bg-card p-4 shadow-lg sm:inset-x-6"
+      className="no-print border-b bg-card px-4 py-3 shadow-sm sm:px-6"
     >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div className="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center">
         <p className="flex-1 text-sm">
-          We use optional analytics cookies to count visits and improve this service. No
-          analytics runs unless you accept.{" "}
+          We use optional analytics cookies to count visits and improve this service. No analytics
+          runs unless you accept.{" "}
           <Link to="/privacy" className="text-primary underline">
             Read the Privacy Policy
           </Link>

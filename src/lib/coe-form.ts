@@ -152,14 +152,19 @@ export function parseStoredDescription(raw: string) {
     return { options, details, custom };
   }
 
-  const parts = raw.split(", ").map((part) => part.trim()).filter(Boolean);
+  const parts = raw
+    .split(", ")
+    .map((part) => part.trim())
+    .filter(Boolean);
   for (const [index, part] of parts.entries()) {
     const option = [...COE_DESCRIPTION_OPTIONS]
       .sort((a, b) => b.length - a.length)
-      .find((item) => part === item || part.startsWith(`${item} `) || part.startsWith(`${item} - `));
+      .find(
+        (item) => part === item || part.startsWith(`${item} `) || part.startsWith(`${item} - `),
+      );
     if (!option) continue;
     if (!options.includes(option)) options.push(option);
-    let remainder = part.slice(option.length).trim().replace(/^-\s*/, "");
+    const remainder = part.slice(option.length).trim().replace(/^-\s*/, "");
     if (option === COE_DESCRIPTION_OTHER) {
       if (index === parts.length - 1 && remainder.includes(" - ")) {
         const split = remainder.split(" - ");

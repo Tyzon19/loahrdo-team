@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { unwrap } from "@/lib/api";
 import { permissionLogoutFn } from "@/server-functions";
-import { AppShell } from "@/components/app/AppShell";
 import { canAccessAdminPortal } from "@/lib/access";
 
 export const Route = createFileRoute("/permission-slips")({
@@ -22,18 +21,7 @@ export const Route = createFileRoute("/permission-slips")({
   ssr: false,
   beforeLoad: ({ context, location }) => {
     if (context.viewer && canAccessAdminPortal(context.viewer.role, context.viewer.isSuperAdmin)) {
-      if (context.viewer.needsProfileCompletion) {
-        throw redirect({ to: "/complete-profile", search: { redirect: "/admin" } });
-      }
-      if (context.viewer.mustChangePassword) {
-        throw redirect({ to: "/change-password" });
-      }
-      if (location.pathname === "/permission-slips/login") {
-        throw redirect({ to: "/admin" });
-      }
-      if (location.pathname === "/permission-slips/profile") {
-        throw redirect({ to: "/profile", search: { portal: undefined } });
-      }
+      throw redirect({ to: "/admin" });
     }
     if (location.pathname === "/permission-slips/login") return;
     if (
@@ -53,14 +41,7 @@ export const Route = createFileRoute("/permission-slips")({
 });
 
 function PermissionSlipsLayout() {
-  const { permissionViewer, viewer } = Route.useRouteContext();
-  if (viewer && canAccessAdminPortal(viewer.role, viewer.isSuperAdmin)) {
-    return (
-      <AppShell user={viewer}>
-        <Outlet />
-      </AppShell>
-    );
-  }
+  const { permissionViewer } = Route.useRouteContext();
   if (!permissionViewer) return <Outlet />;
 
   return (

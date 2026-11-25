@@ -54,13 +54,20 @@ export async function getCoeAnalytics() {
   }
 
   const periodStart = "DATE_FORMAT(DATE_SUB(NOW(), INTERVAL 11 MONTH), '%Y-%m-01')";
-  const [currentRows, summaryRows, requestMonthRows, releaseMonthRows, statusRows, departmentRows, copyRows] =
-    await Promise.all([
-      all<Array<RowDataPacket & { current_month: string }>>(
-        "SELECT DATE_FORMAT(NOW(), '%Y-%m') AS current_month",
-      ),
-      all<SummaryRow[]>(
-        `SELECT COUNT(*) AS total,
+  const [
+    currentRows,
+    summaryRows,
+    requestMonthRows,
+    releaseMonthRows,
+    statusRows,
+    departmentRows,
+    copyRows,
+  ] = await Promise.all([
+    all<Array<RowDataPacket & { current_month: string }>>(
+      "SELECT DATE_FORMAT(NOW(), '%Y-%m') AS current_month",
+    ),
+    all<SummaryRow[]>(
+      `SELECT COUNT(*) AS total,
                 SUM(status IN ('pending','under_review','correction_requested','processing','awaiting_review','ready_for_pickup')) AS open_count,
                 SUM(status IN ('pending','under_review','correction_requested','processing','awaiting_review') AND deadline_at > NOW() AND deadline_at <= DATE_ADD(NOW(), INTERVAL 24 HOUR)) AS due_soon,
                 SUM(status IN ('pending','under_review','correction_requested','processing','awaiting_review') AND deadline_at <= NOW()) AS overdue,
@@ -69,44 +76,44 @@ export async function getCoeAnalytics() {
                 AVG(CASE WHEN status = 'released' AND released_at IS NOT NULL
                     THEN TIMESTAMPDIFF(HOUR, requested_at, released_at) / 24 END) AS average_release_days
          FROM hrdo_coe_requests`,
-      ),
-      all<MonthRow[]>(
-        `SELECT DATE_FORMAT(requested_at, '%Y-%m') AS month, COUNT(*) AS total
+    ),
+    all<MonthRow[]>(
+      `SELECT DATE_FORMAT(requested_at, '%Y-%m') AS month, COUNT(*) AS total
          FROM hrdo_coe_requests
          WHERE requested_at >= ${periodStart}
          GROUP BY DATE_FORMAT(requested_at, '%Y-%m')
          ORDER BY month`,
-      ),
-      all<MonthRow[]>(
-        `SELECT DATE_FORMAT(released_at, '%Y-%m') AS month, COUNT(*) AS total
+    ),
+    all<MonthRow[]>(
+      `SELECT DATE_FORMAT(released_at, '%Y-%m') AS month, COUNT(*) AS total
          FROM hrdo_coe_requests
          WHERE released_at IS NOT NULL AND released_at >= ${periodStart}
          GROUP BY DATE_FORMAT(released_at, '%Y-%m')
          ORDER BY month`,
-      ),
-      all<StatusRow[]>(
-        `SELECT status, COUNT(*) AS total
+    ),
+    all<StatusRow[]>(
+      `SELECT status, COUNT(*) AS total
          FROM hrdo_coe_requests
          GROUP BY status
          ORDER BY total DESC`,
-      ),
-      all<DepartmentRow[]>(
-        `SELECT COALESCE(NULLIF(TRIM(department), ''), 'Not specified') AS department,
+    ),
+    all<DepartmentRow[]>(
+      `SELECT COALESCE(NULLIF(TRIM(department), ''), 'Not specified') AS department,
                 COUNT(*) AS total
          FROM hrdo_coe_requests
          WHERE requested_at >= ${periodStart}
          GROUP BY COALESCE(NULLIF(TRIM(department), ''), 'Not specified')
          ORDER BY total DESC, department ASC
          LIMIT 8`,
-      ),
-      all<CopyRow[]>(
-        `SELECT copy_type, COUNT(*) AS total
+    ),
+    all<CopyRow[]>(
+      `SELECT copy_type, COUNT(*) AS total
          FROM hrdo_coe_requests
          WHERE requested_at >= ${periodStart}
          GROUP BY copy_type
          ORDER BY total DESC`,
-      ),
-    ]);
+    ),
+  ]);
 
   const currentMonth = currentRows[0]?.current_month;
   const summary = summaryRows[0];

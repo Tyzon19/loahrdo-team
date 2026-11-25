@@ -3,26 +3,39 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { CalendarDays, Clock3, RefreshCw, Umbrella } from "lucide-react";
 import { PageHeader, Section, EmptyState } from "@/components/app/PageHeader";
-import { LoadingPanel } from "@/components/app/LoadingPanel";
+import { LoadingScreen } from "@/components/app/LoadingPanel";
 import { Button } from "@/components/ui/button";
 import { unwrap } from "@/lib/api";
 import { STAFF_GROUPS, type StaffGroup } from "@/lib/late-absences";
 import { listDirectorAttendanceFn } from "@/server-functions";
+import { AttendanceShell } from "@/components/attendance/AttendanceShell";
 
 export const Route = createFileRoute("/director/late-absences")({
   beforeLoad: ({ context }) => {
+    if (!context.attendanceViewer)
+      throw redirect({
+        to: "/leaves/login",
+        search: { redirect: "/director/late-absences", error: undefined },
+      });
+    if (context.attendanceViewer.accountRole !== "director") throw redirect({ to: "/leaves" });
     if (
-      context.viewer?.role !== "director" &&
-      context.viewer?.role !== "admin" &&
-      !context.viewer?.isSuperAdmin
-    ) {
-      throw redirect({ to: "/login", search: { redirect: "/director/late-absences" } });
-    }
+      context.attendanceViewer.needsProfileCompletion ||
+      context.attendanceViewer.mustChangePassword
+    )
+      throw redirect({ to: "/leaves/account" });
   },
   head: () => ({ meta: [{ title: "Executive Attendance View | LOA HRDO Desk" }] }),
-  component: DirectorLateAbsences,
+  component: DirectorAttendancePage,
 });
 
+function DirectorAttendancePage() {
+  const { attendanceViewer } = Route.useRouteContext();
+  return attendanceViewer ? (
+    <AttendanceShell user={attendanceViewer}>
+      <DirectorLateAbsences />
+    </AttendanceShell>
+  ) : null;
+}
 
 const labels: Record<StaffGroup, string> = {
   NON_TEACHING: "Non-Teaching Staff",
@@ -38,7 +51,7 @@ function DirectorLateAbsences() {
     refetchInterval: 10_000,
   });
 
-  if (data.isPending) return <LoadingPanel label="Loading executive attendance view" rows={8} />;
+  if (data.isPending) return <LoadingScreen label="Loading executive attendance view" />;
   if (data.isError)
     return (
       <Section title="Executive Attendance View">

@@ -4,7 +4,6 @@ import {
   BadgeCheck,
   BookOpenText,
   BriefcaseBusiness,
-  ClipboardList,
   Mail,
   ShieldCheck,
 } from "lucide-react";

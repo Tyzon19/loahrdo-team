@@ -54,6 +54,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       viewer: bootstrap.viewer,
       hrdoViewer: bootstrap.hrdoViewer,
       permissionViewer: bootstrap.permissionViewer,
+      attendanceViewer: bootstrap.attendanceViewer,
       analytics: bootstrap.analytics,
     };
   },
@@ -147,8 +148,8 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <Outlet />
       <Analytics measurementId={analytics.measurementId} />
+      <Outlet />
       <Toaster position="top-center" />
     </QueryClientProvider>
   );

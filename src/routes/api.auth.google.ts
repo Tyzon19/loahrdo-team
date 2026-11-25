@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { createFileRoute } from "@tanstack/react-router";
 import { safeSignInNext } from "@/lib/google-signin";
+import { safeAttendanceTarget } from "@/lib/attendance-access";
 import {
   GOOGLE_MODE_COOKIE,
   GOOGLE_NEXT_COOKIE,
@@ -34,7 +35,9 @@ export const Route = createFileRoute("/api/auth/google")({
           return redirect(
             mode === "external"
               ? "/coe?error=google_unavailable"
-              : "/login?error=google_unavailable",
+              : mode === "attendance"
+                ? "/leaves/login?error=google_unavailable"
+                : "/login?error=google_unavailable",
           );
         }
 
@@ -46,14 +49,18 @@ export const Route = createFileRoute("/api/auth/google")({
           return redirect(
             mode === "external"
               ? "/coe?error=google_unavailable"
-              : "/login?error=google_unavailable",
+              : mode === "attendance"
+                ? "/leaves/login?error=google_unavailable"
+                : "/login?error=google_unavailable",
           );
         }
         if (callbackUrl.protocol !== "http:" && callbackUrl.protocol !== "https:") {
           return redirect(
             mode === "external"
               ? "/coe?error=google_unavailable"
-              : "/login?error=google_unavailable",
+              : mode === "attendance"
+                ? "/leaves/login?error=google_unavailable"
+                : "/login?error=google_unavailable",
           );
         }
 
@@ -64,7 +71,10 @@ export const Route = createFileRoute("/api/auth/google")({
         const state = randomBytes(32).toString("base64url");
         const verifier = randomBytes(32).toString("base64url");
         const challenge = createHash("sha256").update(verifier).digest("base64url");
-        const next = safeSignInNext(requestUrl.searchParams.get("redirect"));
+        const next =
+          mode === "attendance"
+            ? safeAttendanceTarget(requestUrl.searchParams.get("redirect"))
+            : safeSignInNext(requestUrl.searchParams.get("redirect"));
 
         const googleUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
         googleUrl.search = new URLSearchParams({

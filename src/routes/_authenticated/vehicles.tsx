@@ -8,12 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader, Section, EmptyState } from "@/components/app/PageHeader";
 import { ButtonLoading, LoadingPanel } from "@/components/app/LoadingPanel";
-import {
-  addVehicleFn,
-  deleteVehicleFn,
-  listVehiclesFn,
-  updateVehicleFn,
-} from "@/server-functions";
+import { addVehicleFn, deleteVehicleFn, listVehiclesFn, updateVehicleFn } from "@/server-functions";
 import { unwrap } from "@/lib/api";
 import { canManageVehicles } from "@/lib/access";
 import { fmtRange } from "@/lib/format";
@@ -148,7 +143,7 @@ function Vehicles() {
       <div className="space-y-4">
         <Section title="Drivers and vehicles">
           {query.isPending ? (
-            <LoadingPanel label="Loading vehicles" rows={4} />
+            <LoadingPanel label="Loading vehicles" />
           ) : query.isError ? (
             <div className="p-6 text-center" role="alert">
               <p className="font-medium">We couldn&apos;t load vehicles.</p>
@@ -213,7 +208,11 @@ function Vehicles() {
                                 size="sm"
                                 disabled={deletingId !== null || editingVehicle !== null}
                                 onClick={() =>
-                                  void deleteVehicle(vehicle.id, vehicle.driverName, vehicle.plateNo)
+                                  void deleteVehicle(
+                                    vehicle.id,
+                                    vehicle.driverName,
+                                    vehicle.plateNo,
+                                  )
                                 }
                                 aria-label={`Delete ${vehicle.driverName} vehicle record`}
                               >
@@ -248,7 +247,10 @@ function Vehicles() {
                   })}
                   {(data?.vehicles.length ?? 0) === 0 && (
                     <tr>
-                      <td colSpan={canEditVehicles ? 6 : 5} className="font-medium text-center py-6">
+                      <td
+                        colSpan={canEditVehicles ? 6 : 5}
+                        className="font-medium text-center py-6"
+                      >
                         No vehicles recorded yet. Add the first vehicle below.
                       </td>
                     </tr>

@@ -15,6 +15,7 @@ export function writeAnalyticsConsent(value: ConsentValue) {
   try {
     window.localStorage.setItem(ANALYTICS_CONSENT_KEY, value);
   } catch {
+    // Browser storage may be unavailable; consent remains unset.
   }
 }
 

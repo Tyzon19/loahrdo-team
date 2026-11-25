@@ -16,6 +16,7 @@ import {
 import type { RowDataPacket } from "mysql2/promise";
 import type { Role, Viewer } from "@/lib/types";
 import { canAccessAdminPortal } from "@/lib/access";
+import { assertOtherSystemUser } from "./account-scope";
 import { joinFullName } from "@/lib/name";
 import { hasUserSetPassword, requiresProfileCompletion } from "@/lib/google-signin";
 import {
@@ -35,6 +36,9 @@ import { encryptedCookieRequired, serverEnv, serverEnvOptional } from "./env";
 import { all, run, withTransaction } from "./db";
 import { AppError, isDuplicateKey, parseInput } from "@/lib/errors";
 import { DUMMY_HASH, hashPassword, verifyPassword } from "./password";
+import { assertAccountReady } from "@/lib/account-readiness";
+import { consumeRecoveryCode } from "./password-recovery";
+import { revokeAccountSessions, type RetainedSession } from "./sessions";
 import { sendRegistrationOtpEmail } from "./gmail";
 import {
   clearLinkedLock,
@@ -150,6 +154,7 @@ function cookieOptions(maxAge: number) {
 }
 
 export async function createSession(userId: string): Promise<{ token: string; maxAge: number }> {
+  await assertOtherSystemUser(userId);
   const cookieName = sessionCookieName();
   const previous = getCookie(cookieName);
   if (previous) {
@@ -246,6 +251,7 @@ export async function viewer(): Promise<Viewer | null> {
      FROM sessions s
      JOIN users u ON u.id = s.user_id
      WHERE s.token_hash = ? AND s.expires_at > NOW()
+       AND NOT EXISTS (SELECT 1 FROM attendance_only_accounts a WHERE a.user_id = u.id)
      LIMIT 1`,
     [hash],
   );
@@ -267,14 +273,29 @@ export async function viewer(): Promise<Viewer | null> {
   return mapViewer(row);
 }
 
-export async function requireViewer(): Promise<Viewer> {
+async function requireSession(): Promise<Viewer> {
   const current = await viewer();
   if (!current) throw new AppError("Please sign in to continue.");
   return current;
 }
 
+export async function requireViewer(): Promise<Viewer> {
+  const current = await requireSession();
+  assertAccountReady(current);
+  return current;
+}
+
+export async function requireTransportViewer(): Promise<Viewer> {
+  const current = await requireViewer();
+  if (canAccessAdminPortal(current.role, current.isSuperAdmin)) {
+    throw new AppError("Admin accounts cannot access the Vehicle Trip Ticket system.");
+  }
+  return current;
+}
+
 export async function login(
   input: unknown,
+  issueSession: (userId: string) => Promise<void> = startSession,
 ): Promise<{ mustChangePassword: boolean; isAdminPortal: boolean }> {
   const data = parseInput(loginSchema, input);
   const email = normaliseEmail(data.email);
@@ -311,7 +332,7 @@ export async function login(
 
     const userId = await linkUserProfile(linked);
     await clearLinkedLock(linked);
-    await startSession(userId);
+    await issueSession(userId);
     return { mustChangePassword: Boolean(linked.must_change_password), isAdminPortal: false };
   }
 
@@ -336,7 +357,7 @@ export async function login(
     ) {
       const userId = await linkUserProfile(linked);
       await clearLinkedLock(linked);
-      await startSession(userId);
+      await issueSession(userId);
       return { mustChangePassword: Boolean(linked.must_change_password), isAdminPortal: false };
     }
 
@@ -350,7 +371,7 @@ export async function login(
   }
 
   await run("UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?", [user.id]);
-  await startSession(user.id);
+  await issueSession(user.id);
   return {
     mustChangePassword: Boolean(user.must_change_password),
     isAdminPortal: canAccessAdminPortal(user.role, Boolean(user.is_super_admin)),
@@ -399,25 +420,10 @@ export async function resetPasswordWithRecoveryCode(input: unknown): Promise<{ r
   ]);
   const user = userRows[0];
   if (!user) throw new AppError("The recovery code is invalid or expired.");
-  const otpRows = await all<
-    Array<RowDataPacket & { code_hash: string; expires_at: string; attempts: number }>
-  >("SELECT code_hash, expires_at, attempts FROM registration_otps WHERE email = ? LIMIT 1", [
-    email,
-  ]);
-  const otp = otpRows[0];
-  if (
-    !otp ||
-    otp.expires_at <= new Date().toISOString().slice(0, 19).replace("T", " ") ||
-    otp.attempts >= REGISTRATION_OTP_MAX_ATTEMPTS
-  ) {
-    throw new AppError("The recovery code is invalid or expired.");
-  }
-  if (otp.code_hash !== sha256(data.code)) {
-    await run("UPDATE registration_otps SET attempts = attempts + 1 WHERE email = ?", [email]);
-    throw new AppError("The recovery code is invalid or expired.");
-  }
   const passwordHash = await hashPassword(data.newPassword);
-  await withTransaction(async (conn) => {
+  const error = await withTransaction(async (conn) => {
+    const invalid = await consumeRecoveryCode("registration_otps", email, data.code, conn);
+    if (invalid) return invalid;
     await run(
       "UPDATE users SET password_hash = ?, failed_attempts = 0, locked_until = NULL, must_change_password = 0 WHERE id = ?",
       [passwordHash, user.id],
@@ -429,17 +435,11 @@ export async function resetPasswordWithRecoveryCode(input: unknown): Promise<{ r
         [passwordHash, email],
         conn,
       );
-      await run("DELETE FROM sessions WHERE user_id = ?", [user.id], conn);
-      await run(
-        "DELETE FROM hrdo_sessions WHERE user_id IN (SELECT id FROM hrdo_users WHERE email = ? AND role = 'employee')",
-        [email],
-        conn,
-      );
-    } else {
-      await run("DELETE FROM sessions WHERE user_id = ?", [user.id], conn);
     }
-    await run("DELETE FROM registration_otps WHERE email = ?", [email], conn);
+    await revokeAccountSessions(email, conn);
+    return null;
   });
+  if (error) throw error;
   return { reset: true };
 }
 
@@ -664,8 +664,13 @@ export async function logout(): Promise<{ ok: true }> {
   return { ok: true };
 }
 
-export async function changePassword(input: unknown): Promise<{ ok: true }> {
-  const current = await requireViewer();
+export async function changePassword(
+  input: unknown,
+  currentViewer = requireSession,
+  linkedHrdoAccountId: string | null = null,
+  keep: RetainedSession = { table: "sessions", token: getCookie(sessionCookieName()) },
+): Promise<{ ok: true }> {
+  const current = await currentViewer();
   if (current.needsProfileCompletion) {
     throw new AppError("Complete your name before setting a password.");
   }
@@ -690,7 +695,6 @@ export async function changePassword(input: unknown): Promise<{ ok: true }> {
     });
   }
 
-  const token = getCookie(sessionCookieName());
   const passwordHash = await hashPassword(data.newPassword);
   await withTransaction(async (conn) => {
     await run(
@@ -704,24 +708,22 @@ export async function changePassword(input: unknown): Promise<{ ok: true }> {
         [passwordHash, current.email],
         conn,
       );
+    }
+    if (linkedHrdoAccountId) {
       await run(
-        "DELETE FROM hrdo_sessions WHERE user_id IN (SELECT id FROM hrdo_users WHERE email = ? AND role = 'employee')",
-        [current.email],
+        `UPDATE hrdo_users SET password_hash = ?, must_change_password = 0,
+        failed_attempts = 0, locked_until = NULL WHERE id = ? AND email = ?`,
+        [passwordHash, linkedHrdoAccountId, current.email],
         conn,
       );
     }
+    await revokeAccountSessions(current.email, conn, keep);
   });
-  if (token) {
-    await run("DELETE FROM sessions WHERE user_id = ? AND token_hash <> ?", [
-      current.id,
-      sha256(token),
-    ]);
-  }
   return { ok: true };
 }
 
 export async function updateProfile(input: unknown): Promise<Viewer> {
-  const current = await requireViewer();
+  const current = await requireSession();
   const data = parseInput(profileSchema, input);
   await withTransaction(async (conn) => {
     await run(
@@ -740,8 +742,11 @@ export async function updateProfile(input: unknown): Promise<Viewer> {
   return { ...current, name: data.name, department: data.department };
 }
 
-export async function completeProfileName(input: unknown): Promise<Viewer> {
-  const current = await requireViewer();
+export async function completeProfileName(
+  input: unknown,
+  currentViewer = requireSession,
+): Promise<Viewer> {
+  const current = await currentViewer();
   if (!current.needsProfileCompletion) {
     throw new AppError("Your profile does not need completion. Continue to your account.");
   }

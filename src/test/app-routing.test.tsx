@@ -3,6 +3,7 @@ import { createRouter, rootRouteId } from "@tanstack/react-router";
 import { describe, expect, it } from "vitest";
 
 import { routeTree } from "@/routeTree.gen";
+import { Route as AuthenticatedRoute } from "@/routes/_authenticated";
 
 function match(path: string) {
   const router = createRouter({
@@ -13,6 +14,19 @@ function match(path: string) {
 }
 
 describe("App routing", () => {
+  it.each([
+    ["admin", false],
+    ["requisitioner", true],
+  ] as const)("lets %s (Super Admin: %s) open read-only Trip Analytics", (role, isSuperAdmin) => {
+    expect(() =>
+      AuthenticatedRoute.options.beforeLoad?.({
+        context: {
+          viewer: { role, isSuperAdmin, mustChangePassword: false, needsProfileCompletion: false },
+        },
+        location: { pathname: "/trip-archive" },
+      } as never),
+    ).not.toThrow();
+  });
   it("matches the public landing page for /", () => {
     const matches = match("/");
     expect(matches.at(-1)?.routeId).not.toBe(rootRouteId);

@@ -14,9 +14,13 @@ import {
   setCookie,
 } from "@tanstack/react-start/server";
 import type { RowDataPacket } from "mysql2/promise";
+import { assertAccountReady } from "@/lib/account-readiness";
+import { consumeRecoveryCode } from "../password-recovery";
+import { revokeAccountSessions } from "../sessions";
 import type { HrdoRole, HrdoViewer } from "@/lib/hrdo";
-import { hrdoViewerFromAdminPortal } from "@/lib/hrdo";
 import { viewer } from "@/server/auth";
+import { canAccessAdminPortal } from "@/lib/access";
+import { assertOtherSystemEmail } from "../account-scope";
 import { joinFullName } from "@/lib/name";
 import {
   changePasswordSchema,
@@ -69,12 +73,6 @@ interface HrdoUserRow extends RowDataPacket {
   lock_minutes?: number | null;
 }
 
-interface RecoveryOtpRow extends RowDataPacket {
-  code_hash: string;
-  expires_at: string;
-  attempts: number;
-}
-
 const loginAttempts = new Map<string, { count: number; resetAt: number }>();
 
 function isLocalEnvironmentIp(ip: string | null | undefined) {
@@ -109,6 +107,21 @@ function sha256(value: string) {
   return createHash("sha256").update(value).digest("hex");
 }
 
+async function isCentralAdmin(email: string): Promise<boolean> {
+  const rows = await all<Array<RowDataPacket & { role: string; is_super_admin: number }>>(
+    "SELECT role, is_super_admin FROM users WHERE email = ? LIMIT 1",
+    [normaliseEmail(email)],
+  );
+  return Boolean(rows[0] && (rows[0].role === "admin" || rows[0].is_super_admin));
+}
+
+async function rejectCentralAdmin(email: string) {
+  await assertOtherSystemEmail(email);
+  if (await isCentralAdmin(email)) {
+    throw new AppError("Admin accounts must sign in through the main header login.");
+  }
+}
+
 function mapViewer(row: HrdoUserRow): HrdoViewer {
   return {
     id: row.id,
@@ -133,6 +146,12 @@ function cookieOptions(maxAge: number) {
 }
 
 export async function hrdoCreateSession(userId: string) {
+  const account = await all<Array<RowDataPacket & { email: string }>>(
+    "SELECT email FROM hrdo_users WHERE id = ? LIMIT 1",
+    [userId],
+  );
+  if (!account[0]) throw new AppError("Account was not found.");
+  await assertOtherSystemEmail(account[0].email);
   const cookieName = sessionCookieName();
   const previous = getCookie(cookieName);
   if (previous) {
@@ -164,6 +183,7 @@ export interface HrdoGoogleSignInResult extends HrdoGoogleSignInAccount {
 export async function hrdoGoogleSignInAccount(
   email: string,
 ): Promise<HrdoGoogleSignInAccount | null> {
+  await rejectCentralAdmin(email);
   const rows = await all<HrdoUserRow[]>(
     `SELECT h.id, h.name, h.email, h.password_hash,
             CASE WHEN h.is_external = 0 AND COALESCE(m.is_super_admin, 0) = 1
@@ -186,6 +206,7 @@ export async function ensureHrdoGoogleAccount(
   allowExternal = false,
 ): Promise<HrdoGoogleSignInResult> {
   const normalised = normaliseEmail(email);
+  await rejectCentralAdmin(normalised);
   if (allowExternal && institutionalEmailAllowed(normalised)) {
     throw new AppError(
       "Use a personal Google account. Institutional accounts are for current employees.",
@@ -218,7 +239,7 @@ export async function ensureHrdoGoogleAccount(
   const localName = (normalised.split("@")[0] ?? "").replace(/[._-]+/g, " ").trim();
   const name = linkedUser?.name?.trim() || localName || "Institutional User";
   const department = linkedUser?.department?.trim() || "General";
-  const role: HrdoRole = !allowExternal && linkedUser?.is_super_admin ? "hrdo_admin" : "employee";
+  const role: HrdoRole = "employee";
   const id = randomUUID();
   await run(
     `INSERT INTO hrdo_users
@@ -253,8 +274,8 @@ function clearSessionCookie() {
 }
 
 export async function hrdoViewer(): Promise<HrdoViewer | null> {
-  const adminPortalViewer = hrdoViewerFromAdminPortal(await viewer());
-  if (adminPortalViewer) return adminPortalViewer;
+  const mainViewer = await viewer();
+  if (mainViewer && canAccessAdminPortal(mainViewer.role, mainViewer.isSuperAdmin)) return null;
 
   const cookieName = sessionCookieName();
   const token = getCookie(cookieName);
@@ -270,6 +291,7 @@ export async function hrdoViewer(): Promise<HrdoViewer | null> {
      JOIN hrdo_users u ON u.id = s.user_id
      LEFT JOIN users m ON m.email = u.email
      WHERE s.token_hash = ? AND s.expires_at > NOW()
+       AND NOT EXISTS (SELECT 1 FROM attendance_only_accounts a JOIN users x ON x.id = a.user_id WHERE x.email = u.email)
      LIMIT 1`,
     [hash],
   );
@@ -278,6 +300,7 @@ export async function hrdoViewer(): Promise<HrdoViewer | null> {
     clearSessionCookie();
     return null;
   }
+  if (await isCentralAdmin(row.email)) return null;
 
   await run(
     `UPDATE hrdo_sessions
@@ -291,15 +314,22 @@ export async function hrdoViewer(): Promise<HrdoViewer | null> {
   return mapViewer(row);
 }
 
-export async function requireHrdoViewer(): Promise<HrdoViewer> {
+async function requireHrdoSession(): Promise<HrdoViewer> {
   const current = await hrdoViewer();
   if (!current) throw new AppError("Please sign in to continue.");
+  return current;
+}
+
+export async function requireHrdoViewer(): Promise<HrdoViewer> {
+  const current = await requireHrdoSession();
+  assertAccountReady(current);
   return current;
 }
 
 export async function hrdoLogin(input: unknown): Promise<{ mustChangePassword: boolean }> {
   const data = parseInput(loginSchema, input);
   const email = normaliseEmail(data.email);
+  await rejectCentralAdmin(email);
 
   checkIpRateLimit(getRequestIP() ?? "unknown");
 
@@ -479,26 +509,11 @@ export async function resetHrdoPasswordWithRecoveryCode(input: unknown): Promise
     [email],
   );
   const user = users[0];
-  const otps = await all<RecoveryOtpRow[]>(
-    "SELECT code_hash, expires_at, attempts FROM hrdo_registration_otps WHERE email = ? LIMIT 1",
-    [email],
-  );
-  const otp = otps[0];
-  if (
-    !user ||
-    !otp ||
-    otp.expires_at <= new Date().toISOString().slice(0, 19).replace("T", " ") ||
-    otp.attempts >= REGISTRATION_OTP_MAX_ATTEMPTS
-  ) {
-    throw new AppError("The recovery code is invalid or expired.");
-  }
-  const codeHash = createHash("sha256").update(data.code).digest("hex");
-  if (otp.code_hash !== codeHash) {
-    await run("UPDATE hrdo_registration_otps SET attempts = attempts + 1 WHERE email = ?", [email]);
-    throw new AppError("The recovery code is invalid or expired.");
-  }
+  if (!user) throw new AppError("The recovery code is invalid or expired.");
   const passwordHash = await hashPassword(data.newPassword);
-  await withTransaction(async (conn) => {
+  const error = await withTransaction(async (conn) => {
+    const invalid = await consumeRecoveryCode("hrdo_registration_otps", email, data.code, conn);
+    if (invalid) return invalid;
     await run(
       "UPDATE hrdo_users SET password_hash = ?, failed_attempts = 0, locked_until = NULL, must_change_password = 0 WHERE id = ?",
       [passwordHash, user.id],
@@ -510,17 +525,11 @@ export async function resetHrdoPasswordWithRecoveryCode(input: unknown): Promise
         [passwordHash, email],
         conn,
       );
-      await run("DELETE FROM hrdo_sessions WHERE user_id = ?", [user.id], conn);
-      await run(
-        "DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE email = ? AND role = 'requisitioner')",
-        [email],
-        conn,
-      );
-    } else {
-      await run("DELETE FROM hrdo_sessions WHERE user_id = ?", [user.id], conn);
     }
-    await run("DELETE FROM hrdo_registration_otps WHERE email = ?", [email], conn);
+    await revokeAccountSessions(email, conn);
+    return null;
   });
+  if (error) throw error;
   return { reset: true };
 }
 
@@ -593,15 +602,7 @@ export async function hrdoRequestRegistrationOtp(input: unknown): Promise<{ sent
          attempts = IF(last_sent_at <= DATE_SUB(NOW(), INTERVAL 60 SECOND), 0, attempts),
          expires_at = IF(last_sent_at <= DATE_SUB(NOW(), INTERVAL 60 SECOND), VALUES(expires_at), expires_at),
          last_sent_at = IF(last_sent_at <= DATE_SUB(NOW(), INTERVAL 60 SECOND), NOW(), last_sent_at)`,
-      [
-        email,
-        data.name,
-        "General",
-        passwordHash,
-        codeHash,
-        sendNonce,
-        REGISTRATION_OTP_MINUTES,
-      ],
+      [email, data.name, "General", passwordHash, codeHash, sendNonce, REGISTRATION_OTP_MINUTES],
       conn,
     );
     const pending = await all<HrdoRegistrationOtpRow[]>(
@@ -727,7 +728,7 @@ export async function hrdoLogout(): Promise<{ ok: true }> {
 }
 
 export async function hrdoChangePassword(input: unknown): Promise<{ ok: true }> {
-  const current = await requireHrdoViewer();
+  const current = await requireHrdoSession();
   const data = parseInput(changePasswordSchema, input);
 
   const rows = await all<HrdoUserRow[]>(
@@ -760,24 +761,14 @@ export async function hrdoChangePassword(input: unknown): Promise<{ ok: true }> 
         [passwordHash, current.email],
         conn,
       );
-      await run(
-        "DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE email = ? AND role = 'requisitioner')",
-        [current.email],
-        conn,
-      );
     }
+    await revokeAccountSessions(current.email, conn, { table: "hrdo_sessions", token });
   });
-  if (token) {
-    await run("DELETE FROM hrdo_sessions WHERE user_id = ? AND token_hash <> ?", [
-      current.id,
-      sha256(token),
-    ]);
-  }
   return { ok: true };
 }
 
 export async function hrdoUpdateProfile(input: unknown): Promise<HrdoViewer> {
-  const current = await requireHrdoViewer();
+  const current = await requireHrdoSession();
   const data = parseInput(profileSchema, input);
   await withTransaction(async (conn) => {
     await run(
@@ -798,7 +789,7 @@ export async function hrdoUpdateProfile(input: unknown): Promise<HrdoViewer> {
 
 /** Saves the split name collected from first-time HRDO Google sign-ins. */
 export async function hrdoCompleteProfileName(input: unknown): Promise<HrdoViewer> {
-  const current = await requireHrdoViewer();
+  const current = await requireHrdoSession();
   const data = parseInput(namePartsSchema, input);
   const name = joinFullName(data);
   if (name.length < 2) throw new AppError("Enter your full name.");

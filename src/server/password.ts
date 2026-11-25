@@ -34,9 +34,15 @@ export async function verifyPassword(value: string, stored: string): Promise<boo
   const r = Number(parts[2]);
   const p = Number(parts[3]);
   if (
-    !Number.isInteger(N) || N < 16384 || N > 131072 ||
-    !Number.isInteger(r) || r < 8 || r > 16 ||
-    !Number.isInteger(p) || p < 1 || p > 4
+    !Number.isInteger(N) ||
+    N < 16384 ||
+    N > 131072 ||
+    !Number.isInteger(r) ||
+    r < 8 ||
+    r > 16 ||
+    !Number.isInteger(p) ||
+    p < 1 ||
+    p > 4
   ) {
     return false;
   }
@@ -45,12 +51,8 @@ export async function verifyPassword(value: string, stored: string): Promise<boo
     const expected = Buffer.from(parts[5]!, "base64url");
     if (expected.length < 32 || expected.length > 128) return false;
     const actual = await new Promise<Buffer>((resolve, reject) => {
-      scrypt(
-        value,
-        salt,
-        expected.length,
-        { N, r, p, maxmem: 128 * 1024 * 1024 },
-        (error, key) => (error ? reject(error) : resolve(key)),
+      scrypt(value, salt, expected.length, { N, r, p, maxmem: 128 * 1024 * 1024 }, (error, key) =>
+        error ? reject(error) : resolve(key),
       );
     });
     return actual.length === expected.length && timingSafeEqual(actual, expected);

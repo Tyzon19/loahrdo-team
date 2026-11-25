@@ -6,7 +6,6 @@ import {
 } from "@/lib/ticket-verification";
 import { all, getPool } from "./db";
 import { serverEnv } from "./env";
-import { request } from "https";
 interface VerificationRequestRow extends RowDataPacket {
   id: string;
   number: string;

@@ -17,10 +17,9 @@ import {
   isPermissionHead,
   type PermissionViewer,
 } from "@/lib/permission-access";
-import { canAccessAdminPortal } from "@/lib/access";
 import { all, run, withTransaction } from "../db";
 import { requirePermissionViewer } from "./auth";
-import { requireViewer, viewer } from "../auth";
+import { requireViewer } from "../auth";
 import { hashPassword } from "../password";
 import { sendPermissionSlipEmail, sendTemporaryPasswordEmail } from "../gmail";
 
@@ -212,12 +211,9 @@ function requireDepartmentHead(viewer: PermissionViewer) {
 }
 
 async function requireReceiptArchiver() {
-  const mainViewer = await viewer();
-  if (mainViewer && canAccessAdminPortal(mainViewer.role, mainViewer.isSuperAdmin)) {
-    return;
-  }
   const permissionViewer = await requirePermissionViewer();
   requireDepartmentHead(permissionViewer);
+  return permissionViewer;
 }
 
 export async function listPermissionSignatories() {
@@ -389,30 +385,34 @@ export async function submitPermissionSlip(input: unknown) {
   }
 
   const id = randomUUID();
-  await run(
-    `INSERT INTO permission_slips
+  await withTransaction(async (conn) => {
+    await run(
+      `INSERT INTO permission_slips
       (id, employee_id, employee_name, employee_email, department, requested_date,
        time_out, time_in, reason, employee_signature, status)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_approval')`,
-    [
-      id,
-      viewer.id,
-      viewer.name,
-      viewer.email,
-      data.department,
-      data.requestedDate,
-      data.timeOut,
-      data.timeIn,
-      data.reason,
-      data.employeeSignature,
-    ],
-  );
-  await run(
-    `INSERT INTO permission_history
+      [
+        id,
+        viewer.id,
+        viewer.name,
+        viewer.email,
+        data.department,
+        data.requestedDate,
+        data.timeOut,
+        data.timeIn,
+        data.reason,
+        data.employeeSignature,
+      ],
+      conn,
+    );
+    await run(
+      `INSERT INTO permission_history
       (id, permission_slip_id, actor_id, actor_name, actor_role, type, message)
      VALUES (?, ?, ?, ?, 'requisitioner', 'submitted', ?)`,
-    [randomUUID(), id, viewer.id, viewer.name, "Permission slip submitted for HRDO approval."],
-  );
+      [randomUUID(), id, viewer.id, viewer.name, "Permission slip submitted for HRDO approval."],
+      conn,
+    );
+  });
 
   const deliveries = await Promise.all(
     signatories.map((signatory) =>
@@ -598,7 +598,7 @@ export async function persistPermissionSlipReceipt(input: unknown) {
 }
 
 export async function sendPermissionSlipReceipt(input: unknown) {
-  await requireReceiptArchiver();
+  const viewer = await requireReceiptArchiver();
   const data = parseInput(sendPermissionReceiptSchema, input);
   const slip = await loadPermission(data.id);
   if (!slip) throw new AppError("Permission slip not found.");

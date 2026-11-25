@@ -27,7 +27,6 @@ describe("access rules", () => {
       "assistant",
       "guard",
       "driver",
-      "admin",
     ] as Role[]) {
       expect(canViewAllRequests(role)).toBe(true);
       expect(canViewRequest(user(role), "someone-else")).toBe(true);
@@ -53,14 +52,16 @@ describe("access rules", () => {
     expect(canManageVehicles("director")).toBe(false);
   });
 
-  it("grants Super Admin system access without granting workflow signatory roles", () => {
+  it("keeps Admin and Super Admin in the portal, not the vehicle workflow", () => {
     const rootViewer = { id: "root", role: "requisitioner" as const, isSuperAdmin: true };
 
     expect(canAccessAdminPortal(rootViewer.role, rootViewer.isSuperAdmin)).toBe(true);
-    expect(canViewAllRequests(rootViewer.role, rootViewer.isSuperAdmin)).toBe(true);
-    expect(canViewRequest(rootViewer, "someone-else")).toBe(true);
-    expect(canManageVehicles(rootViewer.role, rootViewer.isSuperAdmin)).toBe(true);
-    expect(canSubmitRequests(rootViewer.role)).toBe(true);
+    expect(canViewAllRequests(rootViewer.role, rootViewer.isSuperAdmin)).toBe(false);
+    expect(canViewRequest(rootViewer, "someone-else")).toBe(false);
+    expect(canManageVehicles(rootViewer.role, rootViewer.isSuperAdmin)).toBe(false);
+    expect(canViewAllRequests("admin")).toBe(false);
+    expect(canViewRequest(user("admin"), "someone-else")).toBe(false);
+    expect(canManageVehicles("admin")).toBe(false);
     expect(canActOnStage(rootViewer.role, "transport_head")).toBe(false);
     expect(canViewSiteAnalytics(rootViewer.role, rootViewer.isSuperAdmin)).toBe(true);
   });

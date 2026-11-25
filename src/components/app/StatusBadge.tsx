@@ -14,7 +14,13 @@ const MAP: Record<Status, { icon: typeof Clock; cls: string }> = {
 export function StatusBadge({ status, className }: { status: Status; className?: string }) {
   const { icon: Icon, cls } = MAP[status];
   return (
-    <span className={cn("inline-flex max-w-full items-center gap-1 whitespace-normal break-words rounded-sm border px-2 py-0.5 text-xs font-medium sm:whitespace-nowrap", cls, className)}>
+    <span
+      className={cn(
+        "inline-flex max-w-full items-center gap-1 whitespace-normal break-words rounded-sm border px-2 py-0.5 text-xs font-medium sm:whitespace-nowrap",
+        cls,
+        className,
+      )}
+    >
       <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
       {STATUS_LABELS[status]}
     </span>

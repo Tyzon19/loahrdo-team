@@ -19,6 +19,8 @@ export const ATTENDANCE_CODES = {
   HE: { leaveType: "Half-Day Emergency Leave", creditedDays: 0.5 },
   L: { leaveType: "Late Entry", creditedDays: 0 },
   LATE: { leaveType: "Late Entry", creditedDays: 0 },
+  A: { leaveType: "Unexcused Absence", creditedDays: 0 },
+  ABSENT: { leaveType: "Unexcused Absence", creditedDays: 0 },
 } as const;
 
 export type AttendanceCode = keyof typeof ATTENDANCE_CODES;
@@ -46,6 +48,7 @@ export interface ParsedBalance {
 }
 
 export interface ParsedStaffRow {
+  sheetRowNumber: number;
   sheetEmployeeName: string;
   logs: ParsedAttendanceLog[];
   balance: ParsedBalance;
@@ -116,36 +119,35 @@ function dateAtOffset(year: number, month: number, offset: number) {
   };
 }
 
-function findColumn(values: string[][], labels: string[]) {
-  const wanted = new Set(labels.map((label) => label.toLowerCase()));
-  for (let column = 1; column < (values[0]?.length ?? 0); column += 1) {
-    for (let row = 0; row < Math.min(values.length, 7); row += 1) {
-      if (wanted.has(text(values[row]?.[column]).toLowerCase())) return column;
-    }
-  }
-  return -1;
-}
-
-function statusNote(values: string[][], row: string[]) {
-  const parts = [...row, ...(values[0] ?? []), ...(values[1] ?? [])]
+function statusNote(_values: string[][], row: string[]) {
+  const parts = row
+    .slice(389)
     .map(text)
     .filter((value) => /(?:CARRY OVER|RESIGNED|RETIRED)/i.test(value));
   return parts.length ? [...new Set(parts)].join(" | ") : null;
 }
 
 export function parseStaffMatrix(values: string[][]): ParsedStaffMatrix {
-  const startMonth = Math.min(12, Math.max(1, Math.trunc(number(values[0]?.[0], 6))));
-  const startYear = Math.max(2000, Math.trunc(number(values[1]?.[0], 2026)));
+  const startMonth = Number(values[0]?.[0]);
+  const startYear = Number(values[1]?.[0]);
+  if (
+    !Number.isInteger(startMonth) ||
+    startMonth < 1 ||
+    startMonth > 12 ||
+    !Number.isInteger(startYear) ||
+    startYear < 2000 ||
+    startYear > 2100
+  ) {
+    throw new Error("STAFF!A1 and A2 must contain a valid starting month and year.");
+  }
   const start = dateAtOffset(startYear, startMonth, 0).iso;
-  const end = dateAtOffset(startYear, startMonth, 364).iso;
+  const end = new Date(Date.UTC(startYear, startMonth - 1 + 12, 0)).toISOString().slice(0, 10);
   const summaryColumns = {
-    month: findColumn(values, ["Leaves This Month"]),
-    year: findColumn(values, ["Leaves This Year"]),
-    el: findColumn(values, ["TOTAL EL", "REMAINING EL"]),
-    sl: findColumn(values, ["TOTAL SL", "REMAINING SL"]),
-    vl: findColumn(values, ["TOTAL VL", "REMAINING VL"]),
-    bl: findColumn(values, ["B/L", "REMAINING B/L"]),
-    lates: findColumn(values, ["Total Lates Recorded"]),
+    month: 373,
+    year: 374,
+    el: 386,
+    sl: 387,
+    vl: 388,
   };
   const rows: ParsedStaffRow[] = [];
 
@@ -153,13 +155,39 @@ export function parseStaffMatrix(values: string[][]): ParsedStaffMatrix {
     const row = values[rowIndex] ?? [];
     const sheetEmployeeName = text(row[0]);
     if (!sheetEmployeeName || !sheetEmployeeName.includes(",")) continue;
+    if (sheetEmployeeName.length > 190)
+      throw new Error(`STAFF row ${rowIndex + 1} has a name longer than 190 characters.`);
+    if (row.length < 389) throw new Error(`STAFF row ${rowIndex + 1} is truncated before NY.`);
+    const balanceNumber = (column: number) => {
+      const raw = text(row[column]);
+      const parsed = Number(raw.replace(/,/g, ""));
+      if (!raw || !Number.isFinite(parsed) || Math.abs(parsed) > 9999) {
+        throw new Error(`STAFF row ${rowIndex + 1}, column ${column + 1} has an invalid balance.`);
+      }
+      return parsed;
+    };
 
     const logs: ParsedAttendanceLog[] = [];
-    for (let offset = 0; offset < 365; offset += 1) {
-      const code = text(row[offset + 1]).toUpperCase() as AttendanceCode;
+    for (let offset = 0; offset < 372; offset += 1) {
+      const monthOffset = Math.floor(offset / 31);
+      const day = (offset % 31) + 1;
+      const dateObject = new Date(Date.UTC(startYear, startMonth - 1 + monthOffset, day));
+      if (dateObject.getUTCDate() !== day) continue;
+      const rawCode = text(row[offset + 1]).toUpperCase();
+      if (!rawCode) continue;
+      const code = (
+        rawCode === "L" ? "LATE" : rawCode === "A" ? "ABSENT" : rawCode
+      ) as AttendanceCode;
       const definition = ATTENDANCE_CODES[code];
-      if (!definition) continue;
-      const date = dateAtOffset(startYear, startMonth, offset);
+      if (!Object.hasOwn(ATTENDANCE_CODES, code) || !definition) {
+        throw new Error(`Unsupported code in STAFF row ${rowIndex + 1}, column ${offset + 2}.`);
+      }
+      const date = {
+        iso: dateObject.toISOString().slice(0, 10),
+        dayOfWeek: new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" }).format(
+          dateObject,
+        ),
+      };
       logs.push({
         sheetEmployeeName,
         incidentDate: date.iso,
@@ -174,19 +202,19 @@ export function parseStaffMatrix(values: string[][]): ParsedStaffMatrix {
     const carryOverBl = carryOverMatch ? number(carryOverMatch[1]) : 0;
     const totalLates = logs.filter((log) => log.code === "L" || log.code === "LATE").length;
     rows.push({
+      sheetRowNumber: rowIndex + 1,
       sheetEmployeeName,
       logs,
       balance: {
         sheetEmployeeName,
-        leavesThisMonth: number(row[summaryColumns.month]),
-        leavesThisYear: number(row[summaryColumns.year]),
-        remEl: number(row[summaryColumns.el], 6),
-        remSl: number(row[summaryColumns.sl], 5),
-        remVl: number(row[summaryColumns.vl], 5),
-        remBl: number(row[summaryColumns.bl], 1 + carryOverBl),
+        leavesThisMonth: balanceNumber(summaryColumns.month),
+        leavesThisYear: balanceNumber(summaryColumns.year),
+        remEl: balanceNumber(summaryColumns.el),
+        remSl: balanceNumber(summaryColumns.sl),
+        remVl: balanceNumber(summaryColumns.vl),
+        remBl: 1 + carryOverBl - logs.filter((log) => log.code === "B").length,
         carryOverBl,
-        totalLates:
-          summaryColumns.lates >= 0 ? number(row[summaryColumns.lates], totalLates) : totalLates,
+        totalLates,
         employeeStatusNote: statusNote(values, row),
       },
     });

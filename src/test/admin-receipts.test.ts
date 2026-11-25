@@ -49,7 +49,7 @@ describe("Admin receipts", () => {
 
   it("allows Super Admins to list receipts", async () => {
     vi.mocked(requireViewer).mockResolvedValue(viewer("requisitioner", true));
-    vi.mocked(all).mockResolvedValue([]);
+    vi.mocked(all).mockResolvedValue([] as RowDataPacket[]);
 
     await expect(listAdminReceipts({ system: "all", page: 0 })).resolves.toMatchObject({
       items: [],
@@ -66,7 +66,7 @@ describe("Admin receipts", () => {
 
   it("searches receipt archives by person name or department", async () => {
     vi.mocked(requireViewer).mockResolvedValue(viewer("admin"));
-    vi.mocked(all).mockResolvedValue([]);
+    vi.mocked(all).mockResolvedValue([] as RowDataPacket[]);
 
     await expect(
       listAdminReceipts({ system: "all", q: "Juan Dela Cruz", page: 0 }),
@@ -103,8 +103,8 @@ describe("Admin receipts", () => {
       file_name: "certificate.pdf",
     };
     vi.mocked(all)
-      .mockResolvedValueOnce([{ system: "coe", total: 1 }])
-      .mockResolvedValueOnce([row]);
+      .mockResolvedValueOnce([{ system: "coe", total: 1 }] as RowDataPacket[])
+      .mockResolvedValueOnce([row] as RowDataPacket[]);
 
     const result = await listAdminReceipts({
       system: "coe",
@@ -147,7 +147,7 @@ describe("Admin receipts", () => {
       mime: "application/pdf",
       content,
     };
-    vi.mocked(all).mockResolvedValue([row]);
+    vi.mocked(all).mockResolvedValue([row] as RowDataPacket[]);
 
     await expect(
       getAdminReceiptPreview({
@@ -171,7 +171,7 @@ describe("Admin receipts", () => {
       mime: "image/png",
       image,
     };
-    vi.mocked(all).mockResolvedValue([row]);
+    vi.mocked(all).mockResolvedValue([row] as RowDataPacket[]);
 
     await expect(
       getAdminReceiptPreview({
@@ -195,7 +195,7 @@ describe("Admin receipts", () => {
         mime: "application/pdf",
         content: Buffer.from("%PDF-1.7 receipt"),
       },
-    ]);
+    ] as RowDataPacket[]);
 
     const result = await bulkDownloadAdminReceipts({
       receipts: [
@@ -212,7 +212,7 @@ describe("Admin receipts", () => {
 
   it("does not return a COE document before it is ready for release", async () => {
     vi.mocked(requireViewer).mockResolvedValue(viewer("admin"));
-    vi.mocked(all).mockResolvedValue([]);
+    vi.mocked(all).mockResolvedValue([] as RowDataPacket[]);
 
     await expect(
       getAdminReceiptPreview({
@@ -224,7 +224,7 @@ describe("Admin receipts", () => {
 
   it("returns an approved Permission Slip for its receipt preview", async () => {
     vi.mocked(requireViewer).mockResolvedValue(viewer("admin"));
-    vi.mocked(all).mockResolvedValue([]);
+    vi.mocked(all).mockResolvedValue([] as RowDataPacket[]);
     const slip: PermissionSlip = {
       id: "33333333-3333-4333-8333-333333333333",
       employeeId: "44444444-4444-4444-8444-444444444444",
@@ -254,7 +254,7 @@ describe("Admin receipts", () => {
     vi.mocked(requireViewer).mockResolvedValue(viewer("admin"));
     vi.mocked(all).mockResolvedValue([
       { status: "approved", receipt_image: Buffer.from("permission receipt png") },
-    ]);
+    ] as RowDataPacket[]);
     const slip: PermissionSlip = {
       id: "33333333-3333-4333-8333-333333333333",
       employeeId: "44444444-4444-4444-8444-444444444444",

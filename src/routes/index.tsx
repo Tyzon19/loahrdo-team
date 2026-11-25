@@ -1,11 +1,17 @@
-import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
+import { createFileRoute, redirect, useNavigate, useRouter } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { ServiceDashboard } from "@/components/ServiceDashboard";
 import { unwrap } from "@/lib/api";
 import { canonical } from "@/lib/site";
+import { canAccessAdminPortal } from "@/lib/access";
 import { hrdoLogoutFn, logoutFn, permissionLogoutFn } from "@/server-functions";
 
 export const Route = createFileRoute("/")({
+  beforeLoad: ({ context }) => {
+    if (context.viewer && canAccessAdminPortal(context.viewer.role, context.viewer.isSuperAdmin)) {
+      throw redirect({ to: "/admin" });
+    }
+  },
   head: () => ({
     meta: [
       { title: "LOA HRDO Desk | Lyceum of Alabang" },

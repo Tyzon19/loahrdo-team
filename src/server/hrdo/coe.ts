@@ -29,7 +29,7 @@ import { normalizePhilippineMobileNumber } from "@/lib/validation";
 import { all, likePattern, run, withTransaction, type Db } from "../db";
 import { sendCoeReleaseEmail, sendCoeStatusEmail } from "../gmail";
 import { requireHrdoViewer } from "./auth";
-import { join } from "node:path";
+import { coeProcessingDeadline } from "@/lib/hrdo";
 
 const submitSchema = z.object({
   requestorType: z.enum(["internal", "third_party"]),
@@ -486,7 +486,7 @@ export async function submitCoeRequest(input: unknown): Promise<CoeRequest> {
       `INSERT INTO hrdo_coe_requests
          (id, employee_id, employee_name, employee_email, employee_number, department,
           purpose, note, copy_type, deadline_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 3 DAY))`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, FROM_UNIXTIME(?))`,
       [
         id,
         viewer.id,
@@ -497,6 +497,7 @@ export async function submitCoeRequest(input: unknown): Promise<CoeRequest> {
         data.purpose,
         data.note,
         data.copyType,
+        coeProcessingDeadline(new Date()).getTime() / 1000,
       ],
       conn,
     );
@@ -1018,7 +1019,7 @@ function addSignatureImage(
     ),
     contentTypesXml: contentTypesXml.replace("</Types>", `${contentType}</Types>`),
     imagePath,
-    image: Buffer.from(match[2], "base64"),
+    image: Buffer.from(match[2]!, "base64"),
   };
 }
 

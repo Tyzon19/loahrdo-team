@@ -143,7 +143,7 @@ function HrDashboard() {
               Overdue and requests due within 24 hours.
             </p>
             {requests.isPending || priorityRequests.isPending ? (
-              <LoadingPanel label="Loading requests needing attention" rows={3} />
+              <LoadingPanel label="Loading requests needing attention" />
             ) : priorityRequests.isError ? (
               <LoadError
                 message="Check your connection and try again."

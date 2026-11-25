@@ -100,7 +100,7 @@ function PrintTicket() {
     if (officialTicket.isPending) {
       return (
         <div className="mx-auto max-w-[210mm] p-4">
-          <LoadingPanel label="Loading official trip ticket" rows={10} />
+          <LoadingPanel label="Loading official trip ticket" />
         </div>
       );
     }
@@ -164,7 +164,7 @@ function PrintTicket() {
   if (query.isPending) {
     return (
       <div className="mx-auto max-w-[210mm] p-4">
-        <LoadingPanel label="Loading trip ticket" rows={10} />
+        <LoadingPanel label="Loading trip ticket" />
       </div>
     );
   }

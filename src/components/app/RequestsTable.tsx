@@ -71,9 +71,7 @@ export function RequestsTable({
                 <th className="w-[140px] px-3 py-2 font-medium text-foreground/80">Request No.</th>
                 <th className="w-[115px] px-3 py-2 font-medium text-foreground/80">Submitted</th>
                 {showRequester && (
-                  <th className="w-[155px] px-3 py-2 font-medium text-foreground/80">
-                    Requestor
-                  </th>
+                  <th className="w-[155px] px-3 py-2 font-medium text-foreground/80">Requestor</th>
                 )}
                 <th className="w-[180px] px-3 py-2 font-medium text-foreground/80">Destination</th>
                 <th className="w-[180px] px-3 py-2 font-medium text-foreground/80">Travel Dates</th>

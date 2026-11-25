@@ -88,7 +88,10 @@ function HrdoChangePassword() {
         <Section title="Account password">
           <form className="max-w-md space-y-4" onSubmit={onSubmit} noValidate>
             {error && (
-              <div role="alert" className="flex gap-2 rounded-sm border border-destructive/40 bg-danger-soft p-3 text-sm">
+              <div
+                role="alert"
+                className="flex gap-2 rounded-sm border border-destructive/40 bg-danger-soft p-3 text-sm"
+              >
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden />
                 <span>{error}</span>
               </div>

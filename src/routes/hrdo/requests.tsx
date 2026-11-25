@@ -197,7 +197,7 @@ function CoeRequestsPage() {
         </div>
 
         {requests.isPending ? (
-          <LoadingPanel label="Loading COE requests" rows={8} />
+          <LoadingPanel label="Loading COE requests" />
         ) : requests.isError ? (
           <div className="p-6 text-center" role="alert">
             <p className="font-medium">We couldn&apos;t load COE requests.</p>

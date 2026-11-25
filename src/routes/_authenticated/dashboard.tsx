@@ -33,7 +33,6 @@ import {
 } from "@/server-functions";
 import { unwrap } from "@/lib/api";
 import { ROLE_TITLES, STAGES } from "@/lib/workflow";
-import { SITE } from "@/lib/site";
 import type { EmailMessage } from "@/lib/types";
 import { FACEBOOK_URL, LOGO_URL } from "@/components/AuthLayout";
 

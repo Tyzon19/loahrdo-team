@@ -118,7 +118,7 @@ function RequestDetailPage() {
     return (
       <>
         <PageHeader title="Request details" description="Loading the latest record…" />
-        <LoadingPanel label="Loading request" rows={8} />
+        <LoadingPanel label="Loading request" />
       </>
     );
   }

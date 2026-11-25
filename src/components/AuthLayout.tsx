@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { ArrowLeft, Eye, EyeOff, Facebook, type LucideIcon } from "lucide-react";
 
 export const FACEBOOK_URL = "https://www.facebook.com/lyceumhrdo";
-export const LOGO_URL = "https://lyceumalabang.edu.ph/wp-content/uploads/2025/08/logo-blk.png";
+export const LOGO_URL = "/loa-logo.png";
 
 export function AuthLayout({
   title,
@@ -56,7 +56,8 @@ export function AuthLayout({
         {children}
         <div className="mt-10 space-y-3 text-sm text-muted-foreground sm:mt-14">
           <p className="break-words">
-            For inquiries and comments please send us a message at https://www.facebook.com/lyceumhrdo
+            For inquiries and comments please send us a message at
+            https://www.facebook.com/lyceumhrdo
           </p>
           <p>
             Copyright © 2026 Lyceum of Alabang.
@@ -185,8 +186,6 @@ export function FakeCaptcha() {
   );
 }
 
-
-
 export function OrDivider() {
   return (
     <div className="my-3 flex items-center gap-3 text-xs uppercase tracking-wide text-muted-foreground">
@@ -196,7 +195,6 @@ export function OrDivider() {
     </div>
   );
 }
-
 
 export function GoogleButton({ href, label }: { href: string; label: string }) {
   return (

@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
-import { AlertCircle, KeyRound, ShieldCheck } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,7 +15,10 @@ export const Route = createFileRoute("/_authenticated/change-password")({
   head: () => ({
     meta: [
       { title: `Change password — ${SITE.name}` },
-      { name: "description", content: "Choose a new password for your LOA vehicle reservation account." },
+      {
+        name: "description",
+        content: "Choose a new password for your LOA vehicle reservation account.",
+      },
       { name: "robots", content: "noindex, nofollow" },
     ],
   }),
@@ -79,7 +82,10 @@ function ChangePassword() {
         <Section title="Account password">
           <form className="max-w-md space-y-4" onSubmit={onSubmit} noValidate>
             {error && (
-              <div role="alert" className="flex gap-2 rounded-sm border border-destructive/40 bg-danger-soft p-3 text-sm">
+              <div
+                role="alert"
+                className="flex gap-2 rounded-sm border border-destructive/40 bg-danger-soft p-3 text-sm"
+              >
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden />
                 <span>{error}</span>
               </div>

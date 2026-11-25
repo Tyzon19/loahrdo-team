@@ -39,7 +39,7 @@ function Profile() {
 
   useEffect(() => {
     if (hrdoViewer) setForm({ name: hrdoViewer.name, department: hrdoViewer.department });
-  }, [hrdoViewer?.id, hrdoViewer?.name, hrdoViewer?.department]);
+  }, [hrdoViewer]);
 
   if (!hrdoViewer) return null;
 
@@ -61,7 +61,10 @@ function Profile() {
 
   return (
     <>
-      <PageHeader title="Profile" description="Your HRDO account details are used on COE requests." />
+      <PageHeader
+        title="Profile"
+        description="Your HRDO account details are used on COE requests."
+      />
       <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
         <Section title="Account">
           <form className="grid gap-4 sm:grid-cols-2" onSubmit={save} noValidate>
@@ -79,7 +82,13 @@ function Profile() {
             </div>
             <div>
               <Label htmlFor="profile-email">Email</Label>
-              <Input id="profile-email" type="email" className="mt-1" value={hrdoViewer.email} readOnly />
+              <Input
+                id="profile-email"
+                type="email"
+                className="mt-1"
+                value={hrdoViewer.email}
+                readOnly
+              />
             </div>
             <div>
               <Label htmlFor="profile-department">Department / Office</Label>

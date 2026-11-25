@@ -62,14 +62,14 @@ function Profile() {
       lastName: split.lastName,
       department: viewer.department,
     });
-  }, [viewer?.id, viewer?.name, viewer?.department]);
+  }, [viewer]);
 
   if (!viewer) return null;
   const canManageVehicleAdmin = viewer.role === "admin" || viewer.isSuperAdmin;
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
-    if (busy) return;
+    if (busy || !viewer) return;
     setBusy(true);
     setErrors({});
 

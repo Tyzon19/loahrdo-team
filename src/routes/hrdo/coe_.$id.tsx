@@ -503,7 +503,7 @@ function CoeDetailPage() {
     return (
       <>
         <PageHeader title="COE request details" description="Loading the latest record…" />
-        <LoadingPanel label="Loading COE request" rows={6} />
+        <LoadingPanel label="Loading COE request" />
       </>
     );
   }

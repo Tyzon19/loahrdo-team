@@ -96,8 +96,16 @@ function SideNav({
       <div className="border-b border-sidebar-border px-4 py-4">
         <div className="flex items-center gap-2.5">
           <div className="flex items-center gap-2">
-            <img src="/loa-logo.png" alt="Lyceum of Alabang logo" className="h-10 w-10 shrink-0 rounded-md bg-white object-contain p-1" />
-            <img src="/HRDO%20LOGO.png" alt="HRDO logo" className="h-10 w-10 shrink-0 rounded-md bg-white object-contain p-1" />
+            <img
+              src="/loa-logo.png"
+              alt="Lyceum of Alabang logo"
+              className="h-10 w-10 shrink-0 rounded-md bg-white object-contain p-1"
+            />
+            <img
+              src="/HRDO%20LOGO.png"
+              alt="HRDO logo"
+              className="h-10 w-10 shrink-0 rounded-md bg-white object-contain p-1"
+            />
           </div>
           <div>
             <p className="text-sm font-semibold leading-tight text-sidebar-accent-foreground">
@@ -196,7 +204,9 @@ export function HrdoShell({ user, children }: { user: HrdoViewer; children: Reac
 
   return (
     <div className="flex min-h-screen">
-      {signingOut && <LoadingScreen label="Signing out of LOA HRDO Desk" mode="overlay" immediate />}
+      {signingOut && (
+        <LoadingScreen label="Signing out of LOA HRDO Desk" mode="overlay" immediate />
+      )}
       <aside className="no-print sticky top-0 hidden h-screen w-56 shrink-0 md:block">
         <SideNav user={user} items={items} />
       </aside>
@@ -215,7 +225,11 @@ export function HrdoShell({ user, children }: { user: HrdoViewer; children: Reac
             />
           </div>
           <span className="truncate text-sm font-semibold">
-            {canManageHrdoAccounts(user) ? "HRDO COE PORTAL" : isHrdoStaffRole(user.role) ? "HRDO Staff Portal" : "Employee Portal"}
+            {canManageHrdoAccounts(user)
+              ? "HRDO COE PORTAL"
+              : isHrdoStaffRole(user.role)
+                ? "HRDO Staff Portal"
+                : "Employee Portal"}
           </span>
           <div className="ml-auto flex items-center gap-1">
             <DropdownMenu>
@@ -260,13 +274,9 @@ export function HrdoShell({ user, children }: { user: HrdoViewer; children: Reac
             </DropdownMenu>
           </div>
         </header>
-        <main
-          id="main-content"
-          className="w-full flex-1 px-3 pb-24 pt-5 sm:px-6 md:pb-5"
-        >
+        <main id="main-content" className="w-full flex-1 px-3 pb-24 pt-5 sm:px-6 md:pb-5">
           {children}
         </main>
-
       </div>
       <MobileNav items={items} />
     </div>

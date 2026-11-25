@@ -252,7 +252,7 @@ export function PermissionSignatorySettings() {
           system access and password stay unchanged.
         </p>
         {candidates.isPending ? (
-          <LoadingPanel label="Loading eligible accounts" rows={2} />
+          <LoadingPanel label="Loading eligible accounts" />
         ) : candidates.isError ? (
           <div role="alert" className="rounded-md border border-destructive/40 p-4">
             <p className="font-medium">We couldn't load eligible accounts.</p>
@@ -303,7 +303,7 @@ export function PermissionSignatorySettings() {
 
       <Section title="Active signatories">
         {accounts.isPending ? (
-          <LoadingPanel label="Loading Permission Slip signatories" rows={3} />
+          <LoadingPanel label="Loading Permission Slip signatories" />
         ) : accounts.isError ? (
           <div role="alert" className="rounded-md border border-destructive/40 p-4">
             <p className="font-medium">We couldn't load Permission Slip signatories.</p>

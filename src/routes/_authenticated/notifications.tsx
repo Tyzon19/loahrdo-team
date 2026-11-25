@@ -74,7 +74,7 @@ function Notifications() {
         />
       </div>
       {notifications.isPending ? (
-        <LoadingPanel label="Loading notifications" rows={6} />
+        <LoadingPanel label="Loading notifications" />
       ) : notifications.isError ? (
         <Section title="Inbox">
           <div className="p-6 text-center" role="alert">

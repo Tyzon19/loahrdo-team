@@ -15,7 +15,7 @@ The HRDO Certificate of Employment system lets Lyceum of Alabang employees reque
 3. HRDO prepares the certificate using the approved template or uploads the signed document.
 4. Staff mark the request ready and record the recipient when the document is released. The employee can check the request status and history along the way.
 
-Requests are expected to be processed within three days of submission. The dashboard highlights requests approaching their deadline.
+New requests are expected to be processed within three working days of submission, excluding weekends in Philippine time. Existing saved deadlines remain unchanged; the dashboard highlights requests approaching their deadline.
 
 ## Certificate and delivery options
 

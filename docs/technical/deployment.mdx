@@ -5,7 +5,7 @@ description: "Setup procedures, production build, database operations, backup, m
 
 ## Prerequisites
 
-- Node.js 20 or newer
+- Node.js 22.12 or newer
 - npm
 - MySQL or MariaDB (Laragon locally)
 - A configured `.env` file (see [Environment Variables](/technical/environment))
@@ -15,7 +15,7 @@ description: "Setup procedures, production build, database operations, backup, m
 <Steps>
   <Step title="Install dependencies">
     ```bash
-    npm install
+    npm ci
     ```
   </Step>
   <Step title="Create the database and app user">
@@ -119,17 +119,13 @@ The system uses up to two OAuth clients.
 ## Production build and deploy
 
 <Steps>
-  <Step title="Run tests">
+  <Step title="Run checks">
     ```bash
-    npm test
-    ```
-  </Step>
-  <Step title="Build the application">
-    ```bash
-    npm run build
+    npm run check
+    npm run test:attendance-db
     ```
 
-    This produces a Nitro output in `.output` that can be served directly by the Nitro server.
+    The checks include linting, formatting, the test suite, and a production build. The build produces a Nitro output in `.output` that can be served directly by the Nitro server.
   </Step>
   <Step title="Set production environment">
     Ensure `SITE_URL` uses HTTPS. The session cookie is marked `Secure` automatically when the protocol is HTTPS.

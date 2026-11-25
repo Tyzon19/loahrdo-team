@@ -2,6 +2,8 @@ import { timingSafeEqual } from "node:crypto";
 import { createFileRoute } from "@tanstack/react-router";
 import { googleAccountProblem, googleSignInDestination, safeSignInNext } from "@/lib/google-signin";
 import { normaliseEmail } from "@/lib/validation";
+import { attendanceInstitutionalEmail } from "@/lib/attendance";
+import { attendanceDestination } from "@/lib/attendance-access";
 import {
   GOOGLE_MODE_COOKIE,
   GOOGLE_NEXT_COOKIE,
@@ -17,6 +19,7 @@ interface GoogleTokenResponse {
 }
 
 interface GoogleUserInfo {
+  name?: string;
   email?: string;
   email_verified?: boolean;
   verified_email?: boolean;
@@ -77,8 +80,19 @@ async function googleJson<T>(
   }
 }
 
-function failure(code: string, cookies: string[], mode: "requisitioner" | "hrdo" | "external") {
-  const destination = mode === "hrdo" ? "/hrdo/login" : mode === "external" ? "/coe" : "/login";
+function failure(
+  code: string,
+  cookies: string[],
+  mode: "requisitioner" | "hrdo" | "external" | "attendance",
+) {
+  const destination =
+    mode === "attendance"
+      ? "/leaves/login"
+      : mode === "hrdo"
+        ? "/hrdo/login"
+        : mode === "external"
+          ? "/coe"
+          : "/login";
   return redirect(`${destination}?error=${encodeURIComponent(code)}`, cookies);
 }
 
@@ -96,7 +110,7 @@ export const Route = createFileRoute("/api/auth/google/callback")({
         }
 
         const mode = (cookieValue(request, GOOGLE_MODE_COOKIE) ?? "requisitioner") as
-          "requisitioner" | "hrdo" | "external";
+          "requisitioner" | "hrdo" | "external" | "attendance";
         const cleared = [
           clearedSignInCookie(GOOGLE_STATE_COOKIE, secure),
           clearedSignInCookie(GOOGLE_VERIFIER_COOKIE, secure),
@@ -161,6 +175,28 @@ export const Route = createFileRoute("/api/auth/google/callback")({
           }
 
           const email = normaliseEmail(identity.email);
+
+          if (mode === "attendance") {
+            if (!attendanceInstitutionalEmail(email))
+              return failure("google_domain", cleared, mode);
+            const {
+              ensureAttendanceGoogleAccount,
+              createAttendanceSession,
+              ATTENDANCE_SESSION_COOKIE,
+            } = await import("@/server/attendance-auth");
+            const id = await ensureAttendanceGoogleAccount(email, identity.name);
+            const { token, maxAge, user } = await createAttendanceSession(id);
+            const cookie = `${ATTENDANCE_SESSION_COOKIE}=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAge}${secure ? "; Secure" : ""}`;
+            let requested = "/leaves";
+            try {
+              requested = decodeURIComponent(cookieValue(request, GOOGLE_NEXT_COOKIE) ?? "/leaves");
+            } catch {
+              /* Use scoped home. */
+            }
+            return redirect(attendanceDestination(user, requested), [...cleared, cookie]);
+          }
+          const { attendanceOnlyEmail } = await import("@/server/account-scope");
+          if (await attendanceOnlyEmail(email)) return failure("google_role", cleared, mode);
 
           if (mode === "hrdo" || mode === "external") {
             if (mode === "external") {

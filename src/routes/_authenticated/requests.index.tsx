@@ -42,8 +42,7 @@ function RequestsList() {
 
   const requests = useQuery({
     queryKey: ["requests", "list", deferredQ, status],
-    queryFn: () =>
-      unwrap(listRequestsFn({ data: { q: deferredQ, status } })),
+    queryFn: () => unwrap(listRequestsFn({ data: { q: deferredQ, status } })),
     staleTime: 10_000,
   });
 
@@ -94,7 +93,7 @@ function RequestsList() {
         </div>
 
         {requests.isPending ? (
-          <LoadingPanel label="Loading requests" rows={6} />
+          <LoadingPanel label="Loading requests" />
         ) : requests.isError ? (
           <div className="panel p-6 text-center" role="alert">
             <p className="font-medium">We couldn&apos;t load requests.</p>
@@ -120,7 +119,12 @@ function RequestsList() {
             </div>
             {pages > 1 && (
               <div className="mt-3 flex items-center justify-end gap-2 text-sm">
-                <Button size="sm" variant="outline" disabled={current === 0} onClick={() => setPage(current - 1)}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={current === 0}
+                  onClick={() => setPage(current - 1)}
+                >
                   Previous
                 </Button>
                 <span>

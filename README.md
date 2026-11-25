@@ -20,7 +20,7 @@ maintain the LOA phone directory; signed-in users can view assigned contacts the
 
 ## Requirements
 
-- Node.js 20+ and npm
+- Node.js 22.12+ and npm (the project uses `package-lock.json`)
 - Laragon with MySQL or MariaDB running
 
 ## Local setup (Laragon)
@@ -148,5 +148,8 @@ OAuth policies, sender restrictions, and recipient mail systems can still reject
 - `npm run dev` — development server
 - `npm run build` / `npm run preview` — production build and preview
 - `npm test` — unit and routing tests
+- `npm run typecheck` — TypeScript checks
+- `npm run check` — lint, formatting, tests, type checks, and production build
+- `npm run test:attendance-db` — acceptance tests against a disposable MySQL database
 - `npm run lint` — ESLint
 - `npm run db:setup` / `npm run db:seed` — database schema and initial accounts

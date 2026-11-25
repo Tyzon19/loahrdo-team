@@ -267,7 +267,7 @@ export function HrdoProcessorSettings({
 
       <Section title="HRDO accounts">
         {accounts.isPending ? (
-          <LoadingPanel label="Loading HRDO processor accounts" rows={3} />
+          <LoadingPanel label="Loading HRDO processor accounts" />
         ) : accounts.isError ? (
           <p className="text-sm text-destructive" role="alert">
             We couldn't load HRDO processor accounts. Refresh the page and try again.

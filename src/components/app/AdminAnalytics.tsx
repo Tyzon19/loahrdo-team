@@ -35,7 +35,7 @@ export function AdminAnalytics() {
       }
     >
       {analytics.isPending ? (
-        <LoadingPanel label="Loading trip analytics" rows={3} />
+        <LoadingPanel label="Loading trip analytics" />
       ) : analytics.isError ? (
         <div className="p-4 text-center" role="alert">
           <p className="font-medium">We couldn&apos;t load trip analytics.</p>

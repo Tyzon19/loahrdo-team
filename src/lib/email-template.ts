@@ -313,7 +313,6 @@ export function renderTemporaryPasswordEmail(
   const name = escapeHtml(input.recipientName);
   const email = escapeHtml(input.email);
   const password = escapeHtml(input.temporaryPassword);
-  const title = escapeHtml(input.signatoryTitle);
   const logo = escapeHtml(logoUrl);
   const actionUrl = escapeHtml(loginUrl.toString());
   const systemName = input.systemName ?? "LOA Vehicle Reservation & Trip Ticket";

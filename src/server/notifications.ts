@@ -1,13 +1,13 @@
 import type { EmailMessage } from "@/lib/types";
 import { notificationIdSchema, requestIdSchema } from "@/lib/validation";
-import { requireViewer } from "./auth";
+import { requireTransportViewer } from "./auth";
 import type { RowDataPacket } from "mysql2/promise";
 import { all, run } from "./db";
 import { AppError } from "@/lib/errors";
 import { mapNotification, type NotificationDbRow } from "./mappers";
 
 export async function listNotifications(): Promise<EmailMessage[]> {
-  const viewer = await requireViewer();
+  const viewer = await requireTransportViewer();
   const rows = await all<NotificationDbRow[]>(
     `SELECT n.id, n.request_id, r.number AS request_number, n.to_user_id, n.to_name, n.to_email,
             n.subject, n.kind, n.stage, n.heading, n.body, n.cta_label, n.read_at,
@@ -23,7 +23,7 @@ export async function listNotifications(): Promise<EmailMessage[]> {
 }
 
 export async function notificationImage(input: unknown): Promise<string | null> {
-  const viewer = await requireViewer();
+  const viewer = await requireTransportViewer();
   const parsed = notificationIdSchema.safeParse(input);
   if (!parsed.success) return null;
   const rows = await all<RowDataPacket[]>(
@@ -38,7 +38,7 @@ export async function notificationImage(input: unknown): Promise<string | null> 
 }
 
 export async function officialTripTicketImage(input: unknown): Promise<string | null> {
-  const viewer = await requireViewer();
+  const viewer = await requireTransportViewer();
   if (viewer.role !== "requisitioner") {
     throw new AppError("Only requisitioners can view their official trip ticket.");
   }
@@ -63,7 +63,7 @@ export async function officialTripTicketImage(input: unknown): Promise<string | 
 }
 
 export async function markNotificationRead(input: unknown): Promise<{ ok: true }> {
-  const viewer = await requireViewer();
+  const viewer = await requireTransportViewer();
   const parsed = notificationIdSchema.safeParse(input);
   if (!parsed.success) throw new AppError("We couldn't find that notification.");
 
@@ -76,7 +76,7 @@ export async function markNotificationRead(input: unknown): Promise<{ ok: true }
 }
 
 export async function markApprovalNoticeRead(input: unknown): Promise<{ ok: true }> {
-  const viewer = await requireViewer();
+  const viewer = await requireTransportViewer();
   if (viewer.role !== "requisitioner") {
     throw new AppError("Only requisitioners can mark trip approval notices as read.");
   }

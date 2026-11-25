@@ -3,7 +3,6 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowUpRight,
-  BarChart3,
   CalendarDays,
   CheckCircle2,
   Clock3,
@@ -217,7 +216,7 @@ function TripArchive() {
       </Card>
 
       {archive.isPending ? (
-        <LoadingPanel label="Loading trip archive" rows={5} />
+        <LoadingPanel label="Loading trip archive" />
       ) : archive.isError ? (
         <Section title="Trip archive">
           <div className="p-6 text-center" role="alert">

@@ -22,7 +22,6 @@ import {
   canViewAllRequests,
   canViewRequest,
   isApproverRole,
-
 } from "@/lib/access";
 import {
   approveSchema,
@@ -51,7 +50,7 @@ import {
   WorkflowError,
   type Ctx,
 } from "@/lib/workflow";
-import { requireViewer } from "./auth";
+import { requireTransportViewer } from "./auth";
 import { all, getPool, likePattern, run, withTransaction } from "./db";
 import { AppError, isDuplicateKey, isMissingTableError, parseInput } from "@/lib/errors";
 import { serverEnv } from "./env";
@@ -70,7 +69,6 @@ import {
   type RequestDbRow,
   type VehicleDbRow,
 } from "./mappers";
-import { constants } from "node:buffer";
 
 function canSee(viewer: Viewer, requisitionerId: string) {
   return canViewRequest(viewer, requisitionerId);
@@ -83,7 +81,6 @@ function assertFutureDate(input: RequestInput) {
     });
   }
 }
-
 
 async function insertHistory(conn: PoolConnection, requestId: string, events: HistoryEvent[]) {
   if (!events.length) return;
@@ -293,7 +290,7 @@ function signatureBytes(dataUrl: string) {
 /* ------------------------------- Reads ------------------------------- */
 
 export async function listRequests(input: unknown): Promise<RequestRow[]> {
-  const viewer = await requireViewer();
+  const viewer = await requireTransportViewer();
   const filter = parseInput(requestFilterSchema, input ?? {});
 
   const where: string[] = [];
@@ -354,7 +351,7 @@ export async function listRequests(input: unknown): Promise<RequestRow[]> {
 }
 
 export async function getDestinationSuggestions(input: unknown): Promise<string[]> {
-  const viewer = await requireViewer();
+  const viewer = await requireTransportViewer();
   if (viewer.role !== "requisitioner") {
     throw new AppError("Only requisitioners can search their previous destinations.");
   }
@@ -390,7 +387,7 @@ async function requestDetail(
   id: unknown,
   includeSignatureImages: boolean,
 ): Promise<RequestDetail | null> {
-  const viewer = await requireViewer();
+  const viewer = await requireTransportViewer();
   if (includeSignatureImages && viewer.role === "requisitioner" && !viewer.isSuperAdmin) {
     throw new AppError("The official trip ticket image is required.");
   }
@@ -490,7 +487,7 @@ export async function submitRequest(input: unknown): Promise<{
   number: string;
   workflowEmail?: Awaited<ReturnType<typeof sendWorkflowEmails>>;
 }> {
-  const viewer = await requireViewer();
+  const viewer = await requireTransportViewer();
   if (viewer.role !== "requisitioner") {
     throw new AppError("Only requisitioners can submit vehicle requests.");
   }
@@ -580,7 +577,7 @@ async function lockAndLoad(conn: PoolConnection, id: string) {
 export async function approveRequest(
   input: unknown,
 ): Promise<{ status: Status; workflowEmail?: Awaited<ReturnType<typeof sendWorkflowEmails>> }> {
-  const viewer = await requireViewer();
+  const viewer = await requireTransportViewer();
   const data = parseInput(approveSchema, input);
   signatureBytes(data.signature.image);
 
@@ -724,7 +721,7 @@ export async function approveRequest(
 export async function rejectRequest(
   input: unknown,
 ): Promise<{ status: Status; workflowEmail?: Awaited<ReturnType<typeof sendWorkflowEmails>> }> {
-  const viewer = await requireViewer();
+  const viewer = await requireTransportViewer();
   const data = parseInput(rejectSchema, input);
 
   const result = await withTransaction(async (conn) => {
@@ -810,7 +807,7 @@ export async function rejectRequest(
 export async function resubmitRequest(
   input: unknown,
 ): Promise<{ id: string; workflowEmail?: Awaited<ReturnType<typeof sendWorkflowEmails>> }> {
-  const viewer = await requireViewer();
+  const viewer = await requireTransportViewer();
   const data = parseInput(resubmitSchema, input);
   assertFutureDate(data.input);
 
@@ -881,7 +878,7 @@ export async function resubmitRequest(
 }
 
 export async function updatePendingRequest(input: unknown): Promise<{ id: string }> {
-  const viewer = await requireViewer();
+  const viewer = await requireTransportViewer();
   if (viewer.role !== "requisitioner") {
     throw new AppError("Only requisitioners can edit vehicle requests.");
   }
@@ -941,7 +938,7 @@ export async function sendTripTicket(input: unknown): Promise<{
   alreadySent: boolean;
   emailDelivery: Awaited<ReturnType<typeof sendTripTicketEmail>>;
 }> {
-  const viewer = await requireViewer();
+  const viewer = await requireTransportViewer();
   if (!canViewAllRequests(viewer.role, viewer.isSuperAdmin)) {
     throw new AppError("Only staff in the approval workflow can send the trip ticket.");
   }
@@ -1040,7 +1037,7 @@ export async function listVehicles(): Promise<{
   vehicles: Vehicle[];
   reservations: VehicleReservation[];
 }> {
-  const viewer = await requireViewer();
+  const viewer = await requireTransportViewer();
   if (!canManageVehicles(viewer.role, viewer.isSuperAdmin)) {
     throw new AppError("Vehicle records are managed by Transport Services.");
   }
@@ -1066,7 +1063,7 @@ export async function listVehicles(): Promise<{
 }
 
 export async function addVehicle(input: unknown): Promise<Vehicle> {
-  const viewer = await requireViewer();
+  const viewer = await requireTransportViewer();
   if (!canManageVehicles(viewer.role, viewer.isSuperAdmin)) {
     throw new AppError("Only Transport Services can add vehicles.");
   }
@@ -1096,7 +1093,7 @@ export async function addVehicle(input: unknown): Promise<Vehicle> {
 }
 
 export async function deleteVehicle(input: unknown) {
-  const viewer = await requireViewer();
+  const viewer = await requireTransportViewer();
   if (viewer.role !== "admin" && !viewer.isSuperAdmin) {
     throw new AppError("Only administrators can delete vehicles.");
   }
@@ -1114,7 +1111,7 @@ export async function deleteVehicle(input: unknown) {
 }
 
 export async function updateVehicle(input: unknown) {
-  const viewer = await requireViewer();
+  const viewer = await requireTransportViewer();
   if (viewer.role !== "admin" && !viewer.isSuperAdmin) {
     throw new AppError("Only administrators can edit vehicles.");
   }
@@ -1143,7 +1140,7 @@ export async function updateVehicle(input: unknown) {
 }
 
 export async function dashboardStats(): Promise<DashboardStats> {
-  const viewer = await requireViewer();
+  const viewer = await requireTransportViewer();
   const scoped = !canViewAllRequests(viewer.role, viewer.isSuperAdmin);
   const where = scoped ? "WHERE requisitioner_id = ?" : "";
   const params = scoped ? [viewer.id] : [];

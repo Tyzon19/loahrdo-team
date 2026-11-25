@@ -8,13 +8,16 @@ import {
 } from "@tanstack/react-start/server";
 import type { RowDataPacket } from "mysql2/promise";
 import type { Role } from "@/lib/types";
+import { assertAccountReady } from "@/lib/account-readiness";
+import { revokeAccountSessions } from "../sessions";
 import {
-  permissionViewerForAdminPortal,
   permissionRoleFor,
   type PermissionRole,
   type PermissionViewer,
 } from "@/lib/permission-access";
 import { viewer } from "@/server/auth";
+import { canAccessAdminPortal } from "@/lib/access";
+import { assertOtherSystemUser } from "../account-scope";
 import { changePasswordSchema, loginSchema, normaliseEmail, profileSchema } from "@/lib/validation";
 import { AppError, parseInput } from "@/lib/errors";
 import { encryptedCookieRequired } from "../env";
@@ -91,6 +94,14 @@ function sha256(value: string) {
   return createHash("sha256").update(value).digest("hex");
 }
 
+async function isCentralAdmin(email: string): Promise<boolean> {
+  const rows = await all<Array<RowDataPacket & { role: Role; is_super_admin: number }>>(
+    "SELECT role, is_super_admin FROM users WHERE email = ? LIMIT 1",
+    [normaliseEmail(email)],
+  );
+  return Boolean(rows[0] && canAccessAdminPortal(rows[0].role, Boolean(rows[0].is_super_admin)));
+}
+
 function cookieOptions(maxAge: number) {
   return {
     httpOnly: true,
@@ -109,6 +120,7 @@ function lockError(row: { lock_minutes?: number | null }) {
 }
 
 async function startSession(userId: string) {
+  await assertOtherSystemUser(userId);
   const cookieName = sessionCookieName();
   const previous = getCookie(cookieName);
   if (previous) {
@@ -131,8 +143,8 @@ function clearSessionCookie() {
 }
 
 export async function permissionViewer(): Promise<PermissionViewer | null> {
-  const adminPortalViewer = permissionViewerForAdminPortal(await viewer());
-  if (adminPortalViewer) return adminPortalViewer;
+  const mainViewer = await viewer();
+  if (mainViewer && canAccessAdminPortal(mainViewer.role, mainViewer.isSuperAdmin)) return null;
 
   const cookieName = sessionCookieName();
   const token = getCookie(cookieName);
@@ -152,6 +164,7 @@ export async function permissionViewer(): Promise<PermissionViewer | null> {
      FROM permission_sessions s
      JOIN users u ON u.id = s.user_id
      WHERE s.token_hash = ? AND s.expires_at > NOW()
+       AND NOT EXISTS (SELECT 1 FROM attendance_only_accounts a WHERE a.user_id = u.id)
      LIMIT 1`,
     [hash],
   );
@@ -160,6 +173,7 @@ export async function permissionViewer(): Promise<PermissionViewer | null> {
     clearSessionCookie();
     return null;
   }
+  if (canAccessAdminPortal(row.role, Boolean(row.is_super_admin))) return null;
 
   await run(
     `UPDATE permission_sessions
@@ -186,14 +200,20 @@ export async function permissionViewer(): Promise<PermissionViewer | null> {
   };
 }
 
-export async function requirePermissionViewer(): Promise<PermissionViewer> {
+async function requirePermissionSession(): Promise<PermissionViewer> {
   const current = await permissionViewer();
   if (!current) throw new AppError("Please sign in to continue.");
   return current;
 }
 
+export async function requirePermissionViewer(): Promise<PermissionViewer> {
+  const current = await requirePermissionSession();
+  assertAccountReady(current);
+  return current;
+}
+
 export async function permissionUpdateProfile(input: unknown): Promise<PermissionViewer> {
-  const current = await requirePermissionViewer();
+  const current = await requirePermissionSession();
   const data = parseInput(profileSchema, input);
   const token = getCookie(sessionCookieName());
 
@@ -228,7 +248,7 @@ export async function permissionUpdateProfile(input: unknown): Promise<Permissio
 }
 
 export async function permissionChangePassword(input: unknown): Promise<{ ok: true }> {
-  const current = await requirePermissionViewer();
+  const current = await requirePermissionSession();
   const data = parseInput(changePasswordSchema, input);
   const rows = await all<Array<RowDataPacket & { password_hash: string; role: Role }>>(
     "SELECT password_hash, role FROM users WHERE id = ? LIMIT 1",
@@ -262,21 +282,7 @@ export async function permissionChangePassword(input: unknown): Promise<{ ok: tr
       );
     }
 
-    await run("DELETE FROM sessions WHERE user_id = ?", [current.id], conn);
-    await run(
-      "DELETE FROM hrdo_sessions WHERE user_id IN (SELECT id FROM hrdo_users WHERE email = ? AND role = 'employee')",
-      [current.email],
-      conn,
-    );
-    if (token) {
-      await run(
-        "DELETE FROM permission_sessions WHERE user_id = ? AND token_hash <> ?",
-        [current.id, sha256(token)],
-        conn,
-      );
-    } else {
-      await run("DELETE FROM permission_sessions WHERE user_id = ?", [current.id], conn);
-    }
+    await revokeAccountSessions(current.email, conn, { table: "permission_sessions", token });
   });
   return { ok: true };
 }
@@ -289,6 +295,9 @@ export async function permissionChangePassword(input: unknown): Promise<{ ok: tr
 export async function permissionLogin(input: unknown): Promise<{ role: PermissionRole }> {
   const data = parseInput(loginSchema, input);
   const email = normaliseEmail(data.email);
+  if (await isCentralAdmin(email)) {
+    throw new AppError("Admin accounts must sign in through the main header login.");
+  }
 
   checkIpRateLimit(getRequestIP() ?? "unknown");
 

@@ -41,7 +41,7 @@ import { submitCoeRequestFn } from "@/server-functions";
 import { unwrap } from "@/lib/api";
 import { joinFullName } from "@/lib/name";
 import { normalizePhilippineMobileNumber } from "@/lib/validation";
-import { COE_COPY_TYPE_LABELS, HRDO, type CoeCopyType } from "@/lib/hrdo";
+import { COE_COPY_TYPE_LABELS, HRDO, coeProcessingDeadline, type CoeCopyType } from "@/lib/hrdo";
 import {
   COE_DEPARTMENTS,
   COE_DESCRIPTION_OPTIONS,
@@ -126,26 +126,6 @@ function formatPhilippineDate(value: string) {
   }).format(date);
 }
 
-function addWorkingDays(start: Date, count: number) {
-  const startParts = new Intl.DateTimeFormat("en-US", {
-    timeZone: PHILIPPINE_TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(start);
-  const values = Object.fromEntries(startParts.map(({ type, value }) => [type, value]));
-  const date = new Date(
-    Date.UTC(Number(values["year"]), Number(values["month"]) - 1, Number(values["day"])),
-  );
-  let remaining = count;
-  while (remaining > 0) {
-    date.setUTCDate(date.getUTCDate() + 1);
-    const weekday = date.getUTCDay();
-    if (weekday !== 0 && weekday !== 6) remaining -= 1;
-  }
-  return date.toISOString().slice(0, 10);
-}
-
 export const Route = createFileRoute("/hrdo/coe")({
   validateSearch: (search: Record<string, unknown>): CoeSearch => {
     const requestor = search["requestor"];
@@ -184,7 +164,9 @@ function CoeRequestPage() {
   const [descriptionDetails, setDescriptionDetails] = useState<Record<string, string>>({});
   const [customDescription, setCustomDescription] = useState("");
   const [note, setNote] = useState("");
-  const [dateNeeded, setDateNeeded] = useState(() => addWorkingDays(new Date(), 3));
+  const [dateNeeded, setDateNeeded] = useState(() =>
+    localDateValue(coeProcessingDeadline(new Date())),
+  );
   const [employeeEmail, setEmployeeEmail] = useState(viewerEmail);
   const [employeeNumber, setEmployeeNumber] = useState("");
   const [employeeName, setEmployeeName] = useState({
@@ -219,7 +201,7 @@ function CoeRequestPage() {
   } | null>(null);
 
   const dateRequested = localDateValue(new Date());
-  const minimumDateNeeded = addWorkingDays(new Date(), 3);
+  const minimumDateNeeded = localDateValue(coeProcessingDeadline(new Date()));
   const previewEmployeeName = joinFullName(employeeName);
   const subjectName = [subjectFirstName, subjectMiddleName, subjectLastName]
     .map((name) => name.trim())
@@ -314,7 +296,7 @@ function CoeRequestPage() {
       setDescriptionDetails({});
       setCustomDescription("");
       setNote("");
-      setDateNeeded(addWorkingDays(new Date(), 3));
+      setDateNeeded(localDateValue(coeProcessingDeadline(new Date())));
       setEmployeeEmail(viewerEmail);
       setEmployeeNumber("");
       setEmployeeName({
