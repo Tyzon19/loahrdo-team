@@ -45,6 +45,7 @@ import { Route as HrdoRequestsRouteImport } from './routes/hrdo/requests'
 import { Route as LeavesIndexRouteImport } from './routes/leaves.index'
 import { Route as LeavesAccountRouteImport } from './routes/leaves.account'
 import { Route as LeavesLoginRouteImport } from './routes/leaves.login'
+import { Route as LeavesRequestsRouteImport } from './routes/leaves.requests'
 import { Route as PermissionSlipsIndexRouteImport } from './routes/permission-slips.index'
 import { Route as PermissionSlipsIdRouteImport } from './routes/permission-slips.$id'
 import { Route as PermissionSlipsLoginRouteImport } from './routes/permission-slips.login'
@@ -61,6 +62,7 @@ import { Route as ApiGmailCallbackRouteImport } from './routes/api.gmail.callbac
 import { Route as ApiGmailConnectRouteImport } from './routes/api.gmail.connect'
 import { Route as ApiSheetsWebhookRouteImport } from './routes/api.sheets.webhook'
 import { Route as ApiVerifyTicketTokenRouteImport } from './routes/api.verify-ticket.$token'
+import { Route as ApiWebhooksLeaveTrackerRouteImport } from './routes/api/webhooks/leave-tracker'
 import { Route as ApiWebhooksSheetsSyncRouteImport } from './routes/api/webhooks/sheets-sync'
 import { Route as HrdoCoeIdRouteImport } from './routes/hrdo/coe_.$id'
 import { Route as ApiAuthGoogleCallbackRouteImport } from './routes/api.auth.google.callback'
@@ -248,6 +250,11 @@ const LeavesLoginRoute = LeavesLoginRouteImport.update({
   path: '/login',
   getParentRoute: () => LeavesRoute,
 } as any)
+const LeavesRequestsRoute = LeavesRequestsRouteImport.update({
+  id: '/requests',
+  path: '/requests',
+  getParentRoute: () => LeavesRoute,
+} as any)
 const PermissionSlipsIndexRoute = PermissionSlipsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -330,6 +337,11 @@ const ApiVerifyTicketTokenRoute = ApiVerifyTicketTokenRouteImport.update({
   path: '/api/verify-ticket/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWebhooksLeaveTrackerRoute = ApiWebhooksLeaveTrackerRouteImport.update({
+  id: '/api/webhooks/leave-tracker',
+  path: '/api/webhooks/leave-tracker',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiWebhooksSheetsSyncRoute = ApiWebhooksSheetsSyncRouteImport.update({
   id: '/api/webhooks/sheets-sync',
   path: '/api/webhooks/sheets-sync',
@@ -381,6 +393,7 @@ export interface FileRoutesByFullPath {
   '/hrdo/requests': typeof HrdoRequestsRoute
   '/leaves/account': typeof LeavesAccountRoute
   '/leaves/login': typeof LeavesLoginRoute
+  '/leaves/requests': typeof LeavesRequestsRoute
   '/permission-slips/$id': typeof PermissionSlipsIdRoute
   '/permission-slips/login': typeof PermissionSlipsLoginRoute
   '/permission-slips/profile': typeof PermissionSlipsProfileRoute
@@ -397,6 +410,7 @@ export interface FileRoutesByFullPath {
   '/api/gmail/connect': typeof ApiGmailConnectRoute
   '/api/sheets/webhook': typeof ApiSheetsWebhookRoute
   '/api/verify-ticket/$token': typeof ApiVerifyTicketTokenRoute
+  '/api/webhooks/leave-tracker': typeof ApiWebhooksLeaveTrackerRoute
   '/api/webhooks/sheets-sync': typeof ApiWebhooksSheetsSyncRoute
   '/hrdo/coe/$id': typeof HrdoCoeIdRoute
   '/requests/': typeof AuthenticatedRequestsIndexRoute
@@ -435,6 +449,7 @@ export interface FileRoutesByTo {
   '/hrdo/requests': typeof HrdoRequestsRoute
   '/leaves/account': typeof LeavesAccountRoute
   '/leaves/login': typeof LeavesLoginRoute
+  '/leaves/requests': typeof LeavesRequestsRoute
   '/permission-slips/$id': typeof PermissionSlipsIdRoute
   '/permission-slips/login': typeof PermissionSlipsLoginRoute
   '/permission-slips/profile': typeof PermissionSlipsProfileRoute
@@ -451,6 +466,7 @@ export interface FileRoutesByTo {
   '/api/gmail/connect': typeof ApiGmailConnectRoute
   '/api/sheets/webhook': typeof ApiSheetsWebhookRoute
   '/api/verify-ticket/$token': typeof ApiVerifyTicketTokenRoute
+  '/api/webhooks/leave-tracker': typeof ApiWebhooksLeaveTrackerRoute
   '/api/webhooks/sheets-sync': typeof ApiWebhooksSheetsSyncRoute
   '/hrdo/coe/$id': typeof HrdoCoeIdRoute
   '/requests': typeof AuthenticatedRequestsIndexRoute
@@ -493,6 +509,7 @@ export interface FileRoutesById {
   '/hrdo/requests': typeof HrdoRequestsRoute
   '/leaves/account': typeof LeavesAccountRoute
   '/leaves/login': typeof LeavesLoginRoute
+  '/leaves/requests': typeof LeavesRequestsRoute
   '/permission-slips/$id': typeof PermissionSlipsIdRoute
   '/permission-slips/login': typeof PermissionSlipsLoginRoute
   '/permission-slips/profile': typeof PermissionSlipsProfileRoute
@@ -509,6 +526,7 @@ export interface FileRoutesById {
   '/api/gmail/connect': typeof ApiGmailConnectRoute
   '/api/sheets/webhook': typeof ApiSheetsWebhookRoute
   '/api/verify-ticket/$token': typeof ApiVerifyTicketTokenRoute
+  '/api/webhooks/leave-tracker': typeof ApiWebhooksLeaveTrackerRoute
   '/api/webhooks/sheets-sync': typeof ApiWebhooksSheetsSyncRoute
   '/hrdo/coe_/$id': typeof HrdoCoeIdRoute
   '/_authenticated/requests/': typeof AuthenticatedRequestsIndexRoute
@@ -551,6 +569,7 @@ export interface FileRouteTypes {
     | '/hrdo/requests'
     | '/leaves/account'
     | '/leaves/login'
+    | '/leaves/requests'
     | '/permission-slips/$id'
     | '/permission-slips/login'
     | '/permission-slips/profile'
@@ -567,6 +586,7 @@ export interface FileRouteTypes {
     | '/api/gmail/connect'
     | '/api/sheets/webhook'
     | '/api/verify-ticket/$token'
+    | '/api/webhooks/leave-tracker'
     | '/api/webhooks/sheets-sync'
     | '/hrdo/coe/$id'
     | '/requests/'
@@ -605,6 +625,7 @@ export interface FileRouteTypes {
     | '/hrdo/requests'
     | '/leaves/account'
     | '/leaves/login'
+    | '/leaves/requests'
     | '/permission-slips/$id'
     | '/permission-slips/login'
     | '/permission-slips/profile'
@@ -621,6 +642,7 @@ export interface FileRouteTypes {
     | '/api/gmail/connect'
     | '/api/sheets/webhook'
     | '/api/verify-ticket/$token'
+    | '/api/webhooks/leave-tracker'
     | '/api/webhooks/sheets-sync'
     | '/hrdo/coe/$id'
     | '/requests'
@@ -662,6 +684,7 @@ export interface FileRouteTypes {
     | '/hrdo/requests'
     | '/leaves/account'
     | '/leaves/login'
+    | '/leaves/requests'
     | '/permission-slips/$id'
     | '/permission-slips/login'
     | '/permission-slips/profile'
@@ -678,6 +701,7 @@ export interface FileRouteTypes {
     | '/api/gmail/connect'
     | '/api/sheets/webhook'
     | '/api/verify-ticket/$token'
+    | '/api/webhooks/leave-tracker'
     | '/api/webhooks/sheets-sync'
     | '/hrdo/coe_/$id'
     | '/_authenticated/requests/'
@@ -706,6 +730,7 @@ export interface RootRouteChildren {
   ApiGmailConnectRoute: typeof ApiGmailConnectRoute
   ApiSheetsWebhookRoute: typeof ApiSheetsWebhookRoute
   ApiVerifyTicketTokenRoute: typeof ApiVerifyTicketTokenRoute
+  ApiWebhooksLeaveTrackerRoute: typeof ApiWebhooksLeaveTrackerRoute
   ApiWebhooksSheetsSyncRoute: typeof ApiWebhooksSheetsSyncRoute
 }
 
@@ -963,6 +988,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LeavesLoginRouteImport
       parentRoute: typeof LeavesRoute
     }
+    '/leaves/requests': {
+      id: '/leaves/requests'
+      path: '/requests'
+      fullPath: '/leaves/requests'
+      preLoaderRoute: typeof LeavesRequestsRouteImport
+      parentRoute: typeof LeavesRoute
+    }
     '/permission-slips/': {
       id: '/permission-slips/'
       path: '/'
@@ -1075,6 +1107,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiVerifyTicketTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/webhooks/leave-tracker': {
+      id: '/api/webhooks/leave-tracker'
+      path: '/api/webhooks/leave-tracker'
+      fullPath: '/api/webhooks/leave-tracker'
+      preLoaderRoute: typeof ApiWebhooksLeaveTrackerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/webhooks/sheets-sync': {
       id: '/api/webhooks/sheets-sync'
       path: '/api/webhooks/sheets-sync'
@@ -1170,12 +1209,14 @@ const HrdoRouteWithChildren = HrdoRoute._addFileChildren(HrdoRouteChildren)
 interface LeavesRouteChildren {
   LeavesAccountRoute: typeof LeavesAccountRoute
   LeavesLoginRoute: typeof LeavesLoginRoute
+  LeavesRequestsRoute: typeof LeavesRequestsRoute
   LeavesIndexRoute: typeof LeavesIndexRoute
 }
 
 const LeavesRouteChildren: LeavesRouteChildren = {
   LeavesAccountRoute: LeavesAccountRoute,
   LeavesLoginRoute: LeavesLoginRoute,
+  LeavesRequestsRoute: LeavesRequestsRoute,
   LeavesIndexRoute: LeavesIndexRoute,
 }
 
@@ -1234,6 +1275,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiGmailConnectRoute: ApiGmailConnectRoute,
   ApiSheetsWebhookRoute: ApiSheetsWebhookRoute,
   ApiVerifyTicketTokenRoute: ApiVerifyTicketTokenRoute,
+  ApiWebhooksLeaveTrackerRoute: ApiWebhooksLeaveTrackerRoute,
   ApiWebhooksSheetsSyncRoute: ApiWebhooksSheetsSyncRoute,
 }
 export const routeTree = rootRouteImport

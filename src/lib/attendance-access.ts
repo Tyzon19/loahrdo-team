@@ -31,6 +31,7 @@ export function safeAttendanceTarget(value: unknown): string {
     "/leaves",
     "/leaves/",
     "/leaves/account",
+    "/leaves/requests",
     "/admin/late-absences",
     "/director/late-absences",
   ].includes(target)

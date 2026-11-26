@@ -1,10 +1,17 @@
-import type { ComponentType } from "react";
+import type { ComponentType, ReactNode } from "react";
 import { act, cleanup, render, screen, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { listMyAttendanceFn } from "@/server-functions";
 import { Route } from "@/routes/leaves.index";
 
+vi.mock("@tanstack/react-router", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@tanstack/react-router")>();
+  return {
+    ...actual,
+    Link: ({ to, children }: { to: string; children: ReactNode }) => <a href={to}>{children}</a>,
+  };
+});
 vi.mock("@/server-functions", () => ({
   listMyAttendanceFn: vi.fn(),
   respondToAttendanceIncidentFn: vi.fn(),

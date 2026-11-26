@@ -767,6 +767,21 @@ export async function sendRegistrationOtpEmail(
   await sendMimeMessage(token, mime);
 }
 
+export async function sendLeaveEmail(recipient: string, subject: string, message: string) {
+  if (!validEmail(recipient)) throw new AppError("Invalid leave notification recipient.");
+  const url = new URL("/leaves/requests", siteUrlForEmail().origin).toString();
+  const text = `${message}\n\nReview your leave application: ${url}\n\nLyceum of Alabang — Human Resource Development Office`;
+  await sendMimeMessage(
+    await accessToken(),
+    createMimeMessage(
+      recipient,
+      subject,
+      text,
+      `<html><body style="font-family:Arial,sans-serif;line-height:1.6;color:#172033"><h1 style="font-size:22px">${escapeHtml(subject)}</h1><p>${escapeHtml(message)}</p><p><a href="${escapeHtml(url)}">Open Leave &amp; Attendance</a></p><p>Lyceum of Alabang<br>Human Resource Development Office</p></body></html>`,
+    ),
+  );
+}
+
 export async function sendPermissionSlipEmail(input: {
   kind: "head_review" | "employee_approved" | "employee_rejected";
   recipientName: string;

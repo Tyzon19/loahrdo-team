@@ -53,6 +53,7 @@ export function AttendanceShell({
             />
           )}
           <PortalLink to="/leaves/account" label="Attendance Account" icon={UserRound} />
+          <PortalLink to="/leaves/requests" label="Leave Applications" icon={ClipboardCheck} />
         </nav>
         <p className="border-t border-sidebar-border p-4 text-xs opacity-80">
           HRDO · Leave & Attendance
@@ -81,6 +82,9 @@ export function AttendanceShell({
           <Button asChild size="sm" variant="outline">
             <Link to="/leaves/account">Account</Link>
           </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link to="/leaves/requests">Leave Applications</Link>
+          </Button>
           {user.accountRole === "director" && (
             <Button asChild size="sm" variant="outline">
               <Link to="/director/late-absences">Executive Attendance</Link>
@@ -105,7 +109,12 @@ function PortalLink({
   label,
   icon: Icon,
 }: {
-  to: "/leaves" | "/leaves/account" | "/admin/late-absences" | "/director/late-absences";
+  to:
+    | "/leaves"
+    | "/leaves/account"
+    | "/leaves/requests"
+    | "/admin/late-absences"
+    | "/director/late-absences";
   label: string;
   icon: typeof CalendarDays;
 }) {

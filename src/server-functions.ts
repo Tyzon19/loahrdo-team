@@ -1,6 +1,38 @@
 import { createServerFn } from "@tanstack/react-start";
 import { runSafely } from "@/lib/errors";
 
+export const leaveReportingLinesFn = createServerFn({ method: "GET" }).handler(async () =>
+  runSafely(async () => (await import("./server/leaves")).leaveReportingLines()),
+);
+export const saveLeaveReportingLineFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/leaves")).saveLeaveReportingLine(data)),
+  );
+
+export const getLeaveFn = createServerFn({ method: "GET" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/leaves")).getLeave(data)),
+  );
+
+export const listLeavesFn = createServerFn({ method: "GET" }).handler(async () =>
+  runSafely(async () => (await import("./server/leaves")).listLeaves()),
+);
+export const createLeaveFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/leaves")).createLeave(data)),
+  );
+export const decideLeaveFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => input)
+  .handler(async ({ data }) =>
+    runSafely(async () => (await import("./server/leaves")).decideLeave(data)),
+  );
+export const retryLeaveDeliveryFn = createServerFn({ method: "POST" }).handler(async () =>
+  runSafely(async () => (await import("./server/leaves")).retryLeaveDelivery()),
+);
+
 export const bootstrapFn = createServerFn({ method: "GET" }).handler(async () => {
   try {
     const [

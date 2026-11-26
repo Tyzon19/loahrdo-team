@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { RefreshCw } from "lucide-react";
 import { PageHeader, Section, EmptyState } from "@/components/app/PageHeader";
@@ -107,10 +107,15 @@ function MyAttendance({ userId }: { userId: string }) {
   }
 
   const refresh = (
-    <Button variant="outline" size="sm" onClick={() => void attendance.refetch()}>
-      <RefreshCw className="mr-2 size-4" aria-hidden />
-      Refresh
-    </Button>
+    <div className="flex flex-wrap gap-2">
+      <Button asChild size="sm">
+        <Link to="/leaves/requests">Request leave</Link>
+      </Button>
+      <Button variant="outline" size="sm" onClick={() => void attendance.refetch()}>
+        <RefreshCw className="mr-2 size-4" aria-hidden />
+        Refresh
+      </Button>
+    </div>
   );
   return (
     <div className="mx-auto w-full max-w-7xl space-y-5">
