@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import type { RowDataPacket } from "mysql2/promise";
 import { all, run, getPool } from "@/server/db";
 import { viewer } from "@/server/auth";
 import { hrdoViewer } from "@/server/hrdo/auth";
@@ -97,14 +98,14 @@ let sequence = 0;
 
 function snapshot(names = ["CONCEPCION, CARL CHRISTIAN", "CONCEPCION, LARIZA G."]) {
   const values = Array.from({ length: 7 + names.length }, () => Array<string>(395).fill(""));
-  values[0]![0] = "6";
+  values[0]![0] = "11";
   values[1]![0] = "2026";
+  values[2]!.fill("true", 1, 373);
   for (const [i, name] of names.entries()) {
     const row = values[7 + i]!;
     row[0] = name;
     row[1] = "L";
     row[32] = "HE";
-    row[372] = "A";
     row[373] = "1";
     row[374] = "1.5";
     row[379] = "0";
@@ -150,6 +151,7 @@ describe.skipIf(!safe)("attendance acceptance against isolated MySQL", () => {
       "attendance_notifications",
       "attendance_profile_claims",
       "attendance_leave_incidents",
+      "attendance_workday_calendars",
       "hr_sheet_profiles",
       "sync_audit_logs",
       "sheet_sources",
@@ -191,14 +193,96 @@ describe.skipIf(!safe)("attendance acceptance against isolated MySQL", () => {
     expect(mine.profile?.fullName).toBe("CONCEPCION, CARL CHRISTIAN");
     expect(mine.profile?.remainingEl).toBe(4.5);
     expect(mine.logs.map((i) => [i.date, i.code, i.days])).toEqual([
-      ["2027-05-31", "ABSENT", 0],
-      ["2026-07-01", "HE", 0.5],
-      ["2026-06-01", "LATE", 0],
+      ["2026-02-01", "HE", 0.5],
+      ["2026-01-01", "LATE", 0],
     ]);
-    expect(mine.notifications).toHaveLength(2);
+    expect(mine.notifications).toHaveLength(1);
     vi.mocked(viewer).mockResolvedValue(other);
     expect((await getMyAttendance()).profile).toBeNull();
     expect((await getMyAttendance()).logs).toHaveLength(0);
+  });
+
+  it("mirrors every tracker date in the calendar year and retires entries removed from the sheet", async () => {
+    const initial = snapshot();
+    initial.values[7]![370] = "";
+    initial.values[7]![371] = "";
+    initial.values[7]![372] = "";
+    await ingestSheetsSnapshot(initial);
+    const profiles = await all<Array<RowDataPacket & { id: string }>>(
+      "SELECT id FROM hr_sheet_profiles WHERE sheet_row_number=8",
+    );
+    await run(
+      `INSERT INTO attendance_leave_incidents
+       (id,profile_id,incident_date,code,leave_type,credited_days,synced_at)
+       VALUES
+         (?,?,'2026-12-29','V','Vacation',1,NOW()),
+         (?,?,'2026-12-30','ABSENT','Unexcused Absence',0,NOW()),
+         (?,?,'2026-12-31','ABSENT','Unexcused Absence',0,NOW())`,
+      [
+        randomUUID(),
+        profiles[0]!.id,
+        randomUUID(),
+        profiles[0]!.id,
+        randomUUID(),
+        profiles[0]!.id,
+      ],
+    );
+    await approveFirst();
+
+    const updated = snapshot();
+    updated.values[7]![369] = "L";
+    updated.values[7]![370] = "V";
+    updated.values[7]![371] = "";
+    updated.values[7]![372] = "V";
+    await ingestSheetsSnapshot(updated);
+
+    const future = await all<
+      Array<RowDataPacket & { incident_date: string; code: string; is_active: number }>
+    >(
+      `SELECT incident_date,code,is_active FROM attendance_leave_incidents
+       WHERE profile_id=? AND incident_date BETWEEN '2026-12-28' AND '2026-12-31'
+       ORDER BY incident_date`,
+      [profiles[0]!.id],
+    );
+    expect(future).toEqual([
+      { incident_date: "2026-12-28", code: "LATE", is_active: 1 },
+      { incident_date: "2026-12-29", code: "V", is_active: 1 },
+      { incident_date: "2026-12-30", code: "ABSENT", is_active: 0 },
+      { incident_date: "2026-12-31", code: "V", is_active: 1 },
+    ]);
+    const mine = await getMyAttendance();
+    const futureLog = mine.logs.find((log) => log.date === "2026-12-28")!;
+    expect(mine.logs.some((log) => ["2026-12-29", "2026-12-31"].includes(log.date))).toBe(true);
+    expect(mine.logs.some((log) => log.date === "2026-12-30")).toBe(false);
+    expect(futureLog).toMatchObject({ code: "LATE" });
+    await expect(
+      respondToAttendanceIncident({
+        incidentId: futureLog.id,
+        revision: futureLog.revision,
+        explanation: "Please review this date.",
+      }),
+    ).resolves.toMatchObject({ ok: true });
+    const audit = await all<Array<RowDataPacket & { message: string | null }>>(
+      "SELECT message FROM sync_audit_logs WHERE id=?",
+      [updated.snapshotId],
+    );
+    expect(audit[0]!.message).toBeNull();
+  });
+
+  it("shows synchronized history from years outside the current tracker cycle", async () => {
+    await ingestSheetsSnapshot(snapshot());
+    await approveFirst();
+    const profiles = await all<Array<RowDataPacket & { id: string }>>(
+      "SELECT id FROM hr_sheet_profiles WHERE sheet_row_number=8",
+    );
+    await run(
+      `INSERT INTO attendance_leave_incidents
+       (id,profile_id,incident_date,code,leave_type,credited_days,synced_at)
+       VALUES (?,?,'2025-12-31','V','Vacation',1,NOW())`,
+      [randomUUID(), profiles[0]!.id],
+    );
+
+    expect((await getMyAttendance()).logs.map((log) => log.date)).toContain("2025-12-31");
   });
 
   it("updates every credit summary without changing unchanged attendance incidents", async () => {
@@ -216,7 +300,7 @@ describe.skipIf(!safe)("attendance acceptance against isolated MySQL", () => {
     const after = await getMyAttendance();
     expect(after.profile).toMatchObject({
       leavesThisMonth: 2.5,
-      leavesThisYear: 8,
+      leavesThisYear: 0,
       remainingEl: 9.5,
       remainingSl: 3.5,
       remainingVl: 4,
@@ -242,7 +326,7 @@ describe.skipIf(!safe)("attendance acceptance against isolated MySQL", () => {
     await approveAttendanceClaim({ claimId: pending.id, profileId: pending.candidates[1]!.id });
     expect(
       await all("SELECT id FROM attendance_notifications WHERE user_id = ?", [employee.id]),
-    ).toHaveLength(2);
+    ).toHaveLength(1);
   });
 
   it("rejects approving a different person with the same surname", async () => {
@@ -325,7 +409,7 @@ describe.skipIf(!safe)("attendance acceptance against isolated MySQL", () => {
     const current = (await getMyAttendance()).logs.find((i) => i.id === late.id)!;
     expect(current.acknowledgedAt).toBeTruthy();
     expect(current.explanation).toContain("Traffic");
-    expect((await getMyAttendance()).notifications).toHaveLength(2);
+    expect((await getMyAttendance()).notifications).toHaveLength(1);
   });
 
   it("rejects another employee's incident ID and forged profile identity", async () => {
@@ -366,7 +450,7 @@ describe.skipIf(!safe)("attendance acceptance against isolated MySQL", () => {
     await expect(
       respondToAttendanceIncident({ incidentId: late.id, revision: late.revision }),
     ).rejects.toThrow("changed");
-    expect((await getMyAttendance()).notifications).toHaveLength(3);
+    expect((await getMyAttendance()).notifications).toHaveLength(2);
     vi.mocked(viewer).mockResolvedValue(superAdmin);
     expect((await getAttendanceAdmin()).explanations[0]).toMatchObject({
       explanation: "Original late explanation.",
@@ -416,7 +500,7 @@ describe.skipIf(!safe)("attendance acceptance against isolated MySQL", () => {
     unknown.values[7]![1] = "UNKNOWN";
     await expect(ingestSheetsSnapshot(unknown)).rejects.toThrow("Unsupported code");
     expect(await all("SELECT id FROM attendance_leave_incidents WHERE is_active = 1")).toHaveLength(
-      6,
+      4,
     );
   });
 

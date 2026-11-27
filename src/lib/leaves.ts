@@ -19,6 +19,27 @@ export const leaveDate = z
     const date = new Date(`${value}T00:00:00Z`);
     return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
   }, "Enter a valid date.");
+
+export function leaveRequestBounds(cycleStart: string, cycleEnd: string) {
+  return { start: cycleStart, end: cycleEnd };
+}
+
+export function leaveRequestDateError(
+  dates: readonly string[],
+  cycleStart: string,
+  cycleEnd: string,
+  workingDates: readonly string[],
+) {
+  if (dates.some((date) => date < cycleStart || date > cycleEnd)) {
+    return `All leave dates must be inside the tracker calendar year (${cycleStart} to ${cycleEnd}).`;
+  }
+  const workingDateSet = new Set(workingDates);
+  if (dates.some((date) => !workingDateSet.has(date))) {
+    return "All selected leave dates must be marked as working days in the HR tracker.";
+  }
+  return null;
+}
+
 export function leaveRequiresPresident(role: Role) {
   return ["department_head", "transport_head", "director"].includes(role);
 }

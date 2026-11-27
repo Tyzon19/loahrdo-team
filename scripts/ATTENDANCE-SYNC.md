@@ -22,22 +22,25 @@ No service account key is needed. The previous onEdit script must be removed/dis
 
 ## Layout and balance rules
 
-- `A1` and `A2` are authoritative for the starting month/year. Month banners and weekday headings are display-only. The supplied reference has a first banner inconsistent with these settings; the server deliberately derives dates from A1/A2 and the fixed offsets.
+- `A1` is the currently selected month and `A2` is the tracker calendar year. A1 follows the active-month selector; changing it only changes the displayed month and must not shift record dates. The server maps the twelve 31-column blocks to January–December of A2.
+- STAFF row 3 is read as the tracker-calculated working-day calendar. Its formulas reflect the workbook's selected weekdays and holidays; leave requests and tracker write-backs reject dates not marked `TRUE`. Missing or invalid flags reject the snapshot instead of assuming weekdays.
+- All leave and attendance entries in the tracker calendar year are imported. A snapshot is authoritative within that year: existing entries absent from it are deactivated, and changed entries are updated without deleting their history. Previously synchronized years remain in employee history, and the month filter is built from all available record dates.
 - Rows begin at 8. Blank rows remain in the snapshot so `(department_group, sheet_row_number)` never shifts during serialization.
 - Columns B:NI contain exactly 12 blocks of 31 days. Impossible dates (such as June 31 or February 30) are skipped. Offsets restart at day 1 for every block, including year boundaries and leap years.
 - NJ/NK are selected-month/cycle used totals; NW/NX/NY are authoritative remaining EL/SL/VL balances. Empty/error balances or unknown codes on valid dates reject the full snapshot, preserving the previous good data.
 - `L`/`LATE` normalize to `LATE`, and `A`/`ABSENT` to `ABSENT`. Half-day codes are 0.5 days; daily full-day leave codes are 1 day.
-- The sheet's baseline is EL 6 + SL 5 + VL 5 + birthday 1. There is no remaining-birthday balance column: birthday remainder is `max(0, 1 + row-local BL carry over − NP birthday total)`. NP respects the sheet's working-day rules and HR adjustments; counting raw B cells would not. The UI labels this calculation. EL/SL/VL adjustments are taken directly from the sheet totals, never inferred from notes or capped at a hardcoded maximum in the UI.
+- The combined annual credit ceiling is 17 days. `leavesThisYear` is derived from 17 minus the combined remaining EL, SL, VL, and Birthday balances in the latest tracker snapshot; it is not counted from dated history rows. HR approval checks those tracker balances and reserves credited approvals awaiting tracker sync, without applying separate hard-coded per-category limits. The displayed total is capped at 17, while each category balance mirrors its tracker total. Existing incidents are preserved rather than silently removed.
+- The current leave-cycle dates still follow the tracker's selected calendar year. Employee-anniversary replenishment requires an authoritative hire-date/credit-anniversary field, which is not present in the current STAFF snapshot contract; do not infer it from A2.
 - Only row-local remarks containing RESIGNED, RETIRED or CARRY OVER are included; adjacent auxiliary legend text is not presented as an employee remark.
 
 ### Reviewed credit inputs and formulas
 
 | Sheet location                          | Owns                                               | Module handling                                                                                         |
 | --------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| A1/A2                                   | Cycle start month/year                             | Determines the 12-month attendance calendar                                                             |
-| A3 and B2                               | Selected month index and displayed month           | NJ is this selected month, not necessarily today's calendar month                                       |
-| B:NI                                    | Twelve 31-day blocks of leave codes                | Synced history; impossible dates are skipped                                                            |
-| Row 3 / row 4                           | Cycle / selected-month working-day flags           | Sheet formulas own the usage calculations                                                               |
+| A1/A2                                   | Selected month / calendar year                     | A1 only controls the displayed month; A2 determines January–December dates                             |
+| A3 and B2                               | Selected-month control and displayed month          | NJ is this selected month, not necessarily today's calendar month                                       |
+| B:NI                                    | January–December 31-day blocks of leave codes       | Synced history; impossible dates are skipped                                                            |
+| Row 3 / row 4                         | Cycle / selected-month working-day flags | Row 3 is synchronized for leave-date validation; sheet formulas own usage calculations |
 | Holidays!B2:B12; Sheet3!D1:E7; OD8:OE17 | Holiday dates, weekday lookup, working-day choices | Recalculated in Sheets before each snapshot                                                             |
 | OA/OB code legend; NL5:NV5              | Code meanings and summary headings                 | Existing supported codes retain their meanings; changing codes requires matching application validation |
 | NJ / NK                                 | Selected-month / cycle usage                       | Displayed directly from the snapshot                                                                    |
@@ -47,7 +50,7 @@ No service account key is needed. The previous onEdit script must be removed/dis
 | NY                                      | `max(5 - (NM + NT / 2), 0)`                        | TOTAL VL                                                                                                |
 | NP + row-local BL carry-over remark     | Birthday usage and carried credits                 | Derived birthday remainder, separately identified in the UI                                             |
 
-The reviewed workbook has numeric SL overrides at NL25 and NL63, and an individual schedule note at NL57. Its holiday list contains historical dates from 2018/2021 while the current cycle is June 2026–May 2027. These are HR workbook inputs, not values for the application to silently replace; verify the intended holiday calendar and per-person adjustments with HR before relying on the totals as policy calculations. Realtime synchronization faithfully reflects the sheet's current computed values.
+The reviewed workbook has numeric SL overrides at NL25 and NL63, and an individual schedule note at NL57. Its holiday list contains historical dates from 2018/2021. These are HR workbook inputs, not values for the application to silently replace; verify the intended holiday calendar and per-person adjustments with HR before relying on the totals as policy calculations. Realtime synchronization faithfully reflects the sheet's current computed values.
 
 ## Identity and access
 

@@ -62,6 +62,11 @@ function requestPath(message: EmailMessage): string {
   return `/requests/${encodeURIComponent(message.requestId)}`;
 }
 
+export const HRDO_EMAIL_CONFIDENTIALITY_HTML =
+  'This message contains privileged and confidential information and is intended only for the individual named. If you received this communication by error, please contact the sender immediately and delete the material from any computer. The above terms reflect a potential business arrangement, and are provided solely as a basis for further discussion, and are not intended to be and do not constitute a legally binding obligation.';
+
+export const HRDO_EMAIL_CONFIDENTIALITY_TEXT = HRDO_EMAIL_CONFIDENTIALITY_HTML;
+
 function absoluteActionUrl(baseUrl: string, path: string): string {
   let base: URL;
   try {
@@ -112,7 +117,7 @@ export function renderEmailTemplate(
     name: escapeHtml(message.toName),
     number: escapeHtml(message.requestNumber),
     subject: escapeHtml(message.subject),
-    logoUrl: escapeHtml(absoluteActionUrl(baseUrl, "/loa-loading.png")),
+    logoUrl: escapeHtml(absoluteActionUrl(baseUrl, "/hrdo-email-banner.jpg")),
     ticketContentId: ticketImageContentId ? escapeHtml(ticketImageContentId) : undefined,
   };
   const ticketRow = (label: string, value: string): [string, string] => [label, value];
@@ -153,6 +158,9 @@ export function renderEmailTemplate(
     "Lyceum of Alabang",
     "Physical Facilities Management Office",
     "This is an automated notification from the LOA Vehicle Reservation & Trip Ticket system.",
+    "",
+    "--",
+    HRDO_EMAIL_CONFIDENTIALITY_TEXT,
   ].join("\n");
 
   const html = `<!doctype html>
@@ -181,7 +189,7 @@ export function renderEmailTemplate(
           <table role="presentation" class="email-shell" width="600" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:600px;background-color:#ffffff;border:1px solid #e2e7ef;border-radius:8px;overflow:hidden;">
             <tr>
               <td style="padding:30px 32px 8px;">
-                <img class="email-logo" src="${safe.logoUrl}" width="190" alt="Lyceum of Alabang" style="display:block;width:190px;max-width:100%;height:auto;border:0;">
+                <img class="email-logo" src="${safe.logoUrl}" width="600" alt="Lyceum of Alabang Human Resource Development Office" style="display:block;width:100%;max-width:600px;height:auto;border:0;">
               </td>
             </tr>
             <tr>
@@ -214,6 +222,7 @@ export function renderEmailTemplate(
               <td style="padding:12px 32px 26px;">
                 <p style="margin:0;color:#353b45;font-size:14px;line-height:1.6;">Kind regards,<br><strong>Lyceum of Alabang<br>LOA HRDO DESK TEAM</strong></p>
                 <p style="margin:20px 0 0;color:#ff3333;font-size:13px;font-weight:700;line-height:1.6;">This is an automated notification. Please do not reply to this email.</p>
+                <p style="margin:16px 0 0;color:#687386;font-size:11px;font-style:italic;line-height:1.55;">${HRDO_EMAIL_CONFIDENTIALITY_HTML}</p>
               </td>
             </tr>
           </table>
@@ -238,7 +247,7 @@ export function renderRegistrationOtpEmail(
 
   const name = escapeHtml(input.recipientName);
   const code = escapeHtml(input.code);
-  const logo = escapeHtml(logoUrl);
+  const logo = escapeHtml(logoUrl.replace(/\/loa-loading\.png$/, "/hrdo-email-banner.jpg"));
   const ignoredNotice = "If you did not request this code, you can safely ignore this email.";
   const subject = "[LOA Vehicle Request] Verify your email address";
   const text = [
@@ -253,6 +262,9 @@ export function renderRegistrationOtpEmail(
     "Lyceum of Alabang",
     "Vehicle Reservation & Trip Ticket",
     "This is an automated message. Please do not reply.",
+    "",
+    "--",
+    HRDO_EMAIL_CONFIDENTIALITY_TEXT,
   ].join("\n");
   const html = `<!doctype html>
 <html lang="en">
@@ -267,7 +279,7 @@ export function renderRegistrationOtpEmail(
       <tr><td align="center" style="padding:32px 12px;">
         <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:600px;background-color:#ffffff;border:1px solid #e2e7ef;border-radius:8px;overflow:hidden;">
           <tr><td style="padding:30px 32px 8px;">
-            <img src="${logo}" width="190" alt="Lyceum of Alabang" style="display:block;width:190px;max-width:100%;height:auto;border:0;">
+            <img src="${logo}" width="600" alt="Lyceum of Alabang Human Resource Development Office" style="display:block;width:100%;max-width:600px;height:auto;border:0;">
           </td></tr>
           <tr><td style="padding:24px 32px 32px;">
             <p style="margin:0 0 18px;color:#353b45;font-size:14px;line-height:1.6;">Dear ${name},</p>
@@ -283,6 +295,7 @@ export function renderRegistrationOtpEmail(
           <tr><td style="padding:0 32px 26px;">
             <p style="margin:0;color:#353b45;font-size:14px;line-height:1.6;">Kind regards,<br><strong>Lyceum of Alabang<br>LOA HRDO DESK TEAM</strong></p>
             <p style="margin:18px 0 0;color:#687386;font-size:11px;line-height:1.6;">This is an automated message. Please do not reply to this email.</p>
+            <p style="margin:14px 0 0;color:#687386;font-size:11px;font-style:italic;line-height:1.55;">${HRDO_EMAIL_CONFIDENTIALITY_HTML}</p>
           </td></tr>
         </table>
       </td></tr>
@@ -313,7 +326,7 @@ export function renderTemporaryPasswordEmail(
   const name = escapeHtml(input.recipientName);
   const email = escapeHtml(input.email);
   const password = escapeHtml(input.temporaryPassword);
-  const logo = escapeHtml(logoUrl);
+  const logo = escapeHtml(logoUrl.replace(/\/loa-loading\.png$/, "/hrdo-email-banner.jpg"));
   const actionUrl = escapeHtml(loginUrl.toString());
   const systemName = input.systemName ?? "LOA Vehicle Reservation & Trip Ticket";
   const hrdoSystem = input.systemName === "LOA HRDO Certificate of Employment";
@@ -343,6 +356,9 @@ export function renderTemporaryPasswordEmail(
     "Lyceum of Alabang",
     systemName,
     "This is an automated message. Please do not reply.",
+    "",
+    "--",
+    HRDO_EMAIL_CONFIDENTIALITY_TEXT,
   ].join("\n");
   const html = `<!doctype html>
 <html lang="en">
@@ -357,7 +373,7 @@ export function renderTemporaryPasswordEmail(
       <tr><td align="center" style="padding:32px 12px;">
         <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:600px;background-color:#ffffff;border:1px solid #e2e7ef;border-radius:8px;overflow:hidden;">
           <tr><td style="padding:30px 32px 8px;">
-            <img src="${logo}" width="190" alt="Lyceum of Alabang" style="display:block;width:190px;max-width:100%;height:auto;border:0;">
+            <img src="${logo}" width="600" alt="Lyceum of Alabang Human Resource Development Office" style="display:block;width:100%;max-width:600px;height:auto;border:0;">
           </td></tr>
           <tr><td style="padding:24px 32px 32px;">
             <p style="margin:0 0 18px;color:#353b45;font-size:14px;line-height:1.6;">Dear ${name},</p>
@@ -375,6 +391,7 @@ export function renderTemporaryPasswordEmail(
           <tr><td style="padding:0 32px 26px;">
             <p style="margin:0;color:#353b45;font-size:14px;line-height:1.6;">Kind regards,<br><strong>Lyceum of Alabang<br>${hrdoSystem ? "LOA HRDO DESK TEAM" : "LOA PHYSICAL FACILITIES TEAM"}</strong></p>
             <p style="margin:18px 0 0;color:#687386;font-size:11px;line-height:1.6;">This is an automated message. Please do not reply to this email.</p>
+            <p style="margin:14px 0 0;color:#687386;font-size:11px;font-style:italic;line-height:1.55;">${HRDO_EMAIL_CONFIDENTIALITY_HTML}</p>
           </td></tr>
         </table>
       </td></tr>

@@ -97,7 +97,7 @@ describe("Gmail workflow delivery", () => {
     )?.[1];
     expect(htmlPart).toBeDefined();
     expect(Buffer.from(htmlPart?.replace(/\s/g, "") ?? "", "base64").toString("utf8")).toContain(
-      'src="https://vrtt.example.edu/loa-loading.png"',
+      'src="https://vrtt.example.edu/hrdo-email-banner.jpg"',
     );
     const textPart = sentMime.match(
       /Content-Type: text\/plain; charset="UTF-8"\r\nContent-Transfer-Encoding: base64\r\n\r\n([\s\S]*?)\r\n--loa_alt_[^\r\n]+/,
@@ -142,7 +142,7 @@ describe("Gmail workflow delivery", () => {
       /Content-Type: text\/html; charset="UTF-8"\r\nContent-Transfer-Encoding: base64\r\n\r\n([\s\S]*?)\r\n--loa_alt_[^\r\n]+/,
     )?.[1];
     expect(Buffer.from(htmlPart?.replace(/\s/g, "") ?? "", "base64").toString("utf8")).toContain(
-      'src="https://vrtt.example.edu/loa-loading.png"',
+      'src="https://vrtt.example.edu/hrdo-email-banner.jpg"',
     );
   });
 
@@ -366,7 +366,7 @@ describe("Gmail workflow delivery", () => {
       /Content-Type: text\/html; charset="UTF-8"\r\nContent-Transfer-Encoding: base64\r\n\r\n([\s\S]*?)\r\n--loa_alt_[^\r\n]+/,
     )?.[1];
     expect(Buffer.from(htmlPart?.replace(/\s/g, "") ?? "", "base64").toString("utf8")).toContain(
-      'src="https://vrtt.example.edu/loa-loading.png"',
+      'src="https://vrtt.example.edu/hrdo-email-banner.jpg"',
     );
     expect(sentMime).toContain(
       'Content-Disposition: attachment; filename="permission-slip-permission-1.png"',

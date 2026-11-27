@@ -177,4 +177,52 @@ describe("ready-to-paste Apps Script", () => {
     expect(setValue.mock.calls).toEqual([[4], [6]]);
     expect(sync).toHaveBeenCalledTimes(2);
   });
+  it("pins both month-navigation drawings in the frozen first column", () => {
+    const previous = {
+      getScript: () => "PreviousMonth",
+      setAnchorCell: vi.fn(),
+      setAnchorCellXOffset: vi.fn(),
+      setAnchorCellYOffset: vi.fn(),
+      setWidth: vi.fn(),
+      setHeight: vi.fn(),
+    };
+    const next = {
+      getScript: () => "NextMonth",
+      setAnchorCell: vi.fn(),
+      setAnchorCellXOffset: vi.fn(),
+      setAnchorCellYOffset: vi.fn(),
+      setWidth: vi.fn(),
+      setHeight: vi.fn(),
+    };
+    const anchor = {};
+    const sheet = { getImages: () => [previous, next], getRange: () => anchor };
+    const context = createContext({
+      SpreadsheetApp: {
+        getActiveSpreadsheet: () => ({ getSheetByName: () => sheet }),
+      },
+    });
+
+    runInContext(readFileSync(resolve("scripts/TrackerNavigation.gs"), "utf8"), context);
+    runInContext("pinMonthNavigationButtons()", context);
+
+    expect(previous.setAnchorCell).toHaveBeenCalledWith(anchor);
+    expect(previous.setAnchorCellXOffset).toHaveBeenCalledWith(8);
+    expect(next.setAnchorCellXOffset).toHaveBeenCalledWith(207);
+    expect(previous.setWidth).toHaveBeenCalledWith(30);
+    expect(next.setHeight).toHaveBeenCalledWith(18);
+  });
+  it("does not reposition a partial set of month-navigation drawings", () => {
+    const previous = { getScript: () => "PreviousMonth", setAnchorCell: vi.fn() };
+    const sheet = { getImages: () => [previous] };
+    const context = createContext({
+      SpreadsheetApp: {
+        getActiveSpreadsheet: () => ({ getSheetByName: () => sheet }),
+      },
+    });
+
+    runInContext(readFileSync(resolve("scripts/TrackerNavigation.gs"), "utf8"), context);
+
+    expect(() => runInContext("pinMonthNavigationButtons()", context)).toThrow("NextMonth");
+    expect(previous.setAnchorCell).not.toHaveBeenCalled();
+  });
 });

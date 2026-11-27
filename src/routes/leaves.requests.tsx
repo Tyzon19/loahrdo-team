@@ -1,15 +1,21 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Printer, ArrowLeft } from "lucide-react";
+import { Plus, Printer, ArrowLeft, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SignaturePad, type SignatureValue } from "@/components/app/SignaturePad";
+import { ButtonLoading, LoadingScreen } from "@/components/app/LoadingPanel";
 import { PageHeader } from "@/components/app/PageHeader";
 import { LeaveFormReceipt, LeaveNotes } from "@/components/attendance/LeaveFormReceipt";
-import { LEAVE_TYPES, LEAVE_STATUS, type LeaveRequest } from "@/lib/leaves";
+import {
+  LEAVE_TYPES,
+  LEAVE_STATUS,
+  leaveRequestBounds,
+  type LeaveRequest,
+} from "@/lib/leaves";
 import { attendanceAdminAllowed } from "@/lib/attendance-access";
 import { fmtDate } from "@/lib/format";
 import { unwrap } from "@/lib/api";
@@ -128,8 +134,8 @@ function ReportingLines({ busy, save }: { busy: boolean; save: (data: unknown) =
                 />
                 This employee is a department head
               </label>
-              <Button type="submit" disabled={!employeeId || !supervisorId}>
-                {busy ? "Saving…" : "Save reporting line"}
+              <Button type="submit" disabled={busy || !employeeId || !supervisorId}>
+                {busy ? <ButtonLoading label="Saving" /> : "Save reporting line"}
               </Button>
             </fieldset>
           </form>
@@ -213,7 +219,13 @@ function LeaveApplications() {
   const [creating, setCreating] = useState(false),
     [selected, setSelected] = useState<string | null>(null),
     [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
+    [busy, setBusy] = useState(false),
+    [success, setSuccess] = useState<{
+      title: string;
+      lead: string;
+      message: string;
+      reference: string;
+    } | null>(null);
   const detail = useQuery({
     queryKey: ["leave-applications", "detail", selected],
     queryFn: () => unwrap(getLeaveFn({ data: selected })),
@@ -243,18 +255,77 @@ function LeaveApplications() {
         <Button onClick={() => void result.refetch()}>Try again</Button>
       </div>
     );
-  const { user, requests, profile, pendingEmails, requiresPresident, reviewerName } = result.data;
+  const {
+    user,
+    requests,
+    profile,
+    pendingEmails,
+    requiresPresident,
+    reviewerName,
+    workdayCalendarAvailable,
+  } = result.data;
   const admin = attendanceAdminAllowed(user);
   const request = selected ? detail.data : undefined;
+  const requestBounds = profile
+    ? leaveRequestBounds(profile.cycleStart, profile.cycleEnd)
+    : null;
+
+  if (success) {
+    return (
+      <main className="coe-success-wrap">
+        <section
+          className="panel coe-success-card"
+          role="status"
+          aria-live="polite"
+          aria-labelledby="leave-success-title"
+        >
+          <div className="coe-success-logos" aria-label="Lyceum of Alabang and HRDO">
+            <img src="/loa-logo.png" alt="Lyceum of Alabang seal" width={72} height={72} />
+            <img src="/HRDO%20LOGO.png" alt="Human Resources Development Office logo" width={72} height={72} />
+          </div>
+          <div className="coe-success-icon" aria-hidden="true"><Check /></div>
+          <h1 id="leave-success-title">{success.title}</h1>
+          <p className="coe-success-lead">{success.lead}</p>
+          <p className="coe-success-message">{success.message}</p>
+          <p className="coe-success-reference">
+            Leave reference: <strong>{success.reference}</strong>
+          </p>
+          <div className="coe-success-actions">
+            <Button onClick={() => { setSuccess(null); setSelected(success.reference); }}>
+              View leave application
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSuccess(null);
+                setSelected(null);
+                setCreating(false);
+              }}
+            >
+              View all applications
+            </Button>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-6xl space-y-6">
+      {busy && <LoadingScreen label="Processing leave action" mode="overlay" immediate />}
       <PageHeader
         title="Leave Applications"
         description="File your leave, follow its approval, and keep a signed copy."
         actions={
           !creating && (
             <Button
-              disabled={!profile || !reviewerName}
+              disabled={
+                !profile ||
+                !reviewerName ||
+                !profile.workingDates?.length ||
+                !requestBounds ||
+                requestBounds.start > requestBounds.end
+              }
               onClick={() => {
                 setCreating(true);
                 setSelected(null);
@@ -275,6 +346,25 @@ function LeaveApplications() {
         <p role="alert" className="rounded-lg border p-4 text-sm">
           HR must assign your immediate supervisor or configure the President / CEO account before
           you can request leave.
+        </p>
+      )}
+      {profile && !profile.workingDates && (
+        <p role="alert" className="rounded-lg border p-4 text-sm">
+          {workdayCalendarAvailable
+            ? "HR must sync the tracker’s working-day settings before leave dates can be selected."
+            : "Leave applications are viewable, but the workday calendar is not installed. HR must apply the leave calendar migration and sync tracker settings before leave can be requested or approved."}
+        </p>
+      )}
+      {profile && profile.workingDates?.length === 0 && (
+        <p role="alert" className="rounded-lg border p-4 text-sm">
+          The synced tracker contains no working dates. HRDO must verify its working-day settings
+          before leave can be requested.
+        </p>
+      )}
+      {requestBounds && requestBounds.start > requestBounds.end && (
+        <p role="alert" className="rounded-lg border p-4 text-sm">
+          The tracker cycle dates are invalid. HRDO must correct and sync the tracker before new
+          leave requests can be submitted.
         </p>
       )}
       {selected && detail.isPending && <p role="status">Loading signed application…</p>}
@@ -302,7 +392,7 @@ function LeaveApplications() {
               disabled={busy}
               onClick={() => void act(() => unwrap(retryLeaveDeliveryFn()))}
             >
-              Retry email delivery
+              {busy ? <ButtonLoading label="Retrying" /> : "Retry email delivery"}
             </Button>
           )}
         </div>
@@ -311,14 +401,23 @@ function LeaveApplications() {
         <NewLeave
           name={profile!.name}
           department={user.department}
+          cycleStart={profile!.cycleStart}
+          cycleEnd={profile!.cycleEnd}
+          workingDates={profile!.workingDates}
           president={requiresPresident}
           reviewer={reviewerName}
           busy={busy}
           cancel={() => setCreating(false)}
           submit={(data) =>
             act(async () => {
-              await unwrap(createLeaveFn({ data }));
+              const result = await unwrap(createLeaveFn({ data }));
               setCreating(false);
+              setSuccess({
+                title: "Leave Application Submitted",
+                lead: "Your leave application has been sent for review.",
+                message: `${reviewerName} and HRDO have been notified as required. We will email you when the application is approved or rejected.`,
+                reference: result.id,
+              });
             })
           }
         />
@@ -378,7 +477,32 @@ function LeaveApplications() {
                 key={request.id}
                 request={request}
                 busy={busy}
-                submit={(data) => act(() => unwrap(decideLeaveFn({ data })))}
+                submit={(data) =>
+                  act(async () => {
+                    await unwrap(decideLeaveFn({ data }));
+                    const decision = (data as { decision: "approve" | "reject" }).decision;
+                    const hrDecision = request.status === "pending_hr";
+                    setSuccess({
+                      title:
+                        decision === "approve"
+                          ? hrDecision
+                            ? "Leave Approved Successfully"
+                            : "Leave Signed Successfully"
+                          : "Leave Application Rejected",
+                      lead:
+                        decision === "approve"
+                          ? "Your leave decision has been recorded."
+                          : "The leave application has been rejected.",
+                      message:
+                        decision === "approve"
+                          ? hrDecision
+                            ? "HRDO approval and credit classification have been saved. The employee will be notified."
+                            : "The application has been forwarded to HRDO for final review."
+                          : "The employee has been notified of the rejection.",
+                      reference: request.id,
+                    });
+                  })
+                }
               />
             )}
           <div className="overflow-hidden rounded-lg border">
@@ -437,6 +561,9 @@ function LeaveApplications() {
 function NewLeave({
   name,
   department,
+  cycleStart,
+  cycleEnd,
+  workingDates,
   president,
   reviewer,
   busy,
@@ -445,6 +572,9 @@ function NewLeave({
 }: {
   name: string;
   department: string;
+  cycleStart: string;
+  cycleEnd: string;
+  workingDates: string[] | null;
   president: boolean;
   reviewer: string | null;
   busy: boolean;
@@ -456,19 +586,28 @@ function NewLeave({
     [reason, setReason] = useState(""),
     [start, setStart] = useState(""),
     [end, setEnd] = useState(""),
-    [excluded, setExcluded] = useState<string[]>([]),
+    [selectedDates, setSelectedDates] = useState<string[]>([]),
     [signature, setSignature] = useState<SignatureValue | null>(null),
     [medical, setMedical] = useState<string | undefined>(),
     [fileError, setFileError] = useState("");
+  const bounds = leaveRequestBounds(cycleStart, cycleEnd);
+  const workingDateSet = new Set(workingDates ?? []);
   const dates: string[] = [];
-  if (start && end && start <= end) {
+  if (
+    start &&
+    end &&
+    start <= end &&
+    start >= bounds.start &&
+    end <= bounds.end &&
+    bounds.start <= bounds.end
+  ) {
     const date = new Date(`${start}T00:00:00Z`);
     while (date.toISOString().slice(0, 10) <= end && dates.length < 366) {
       dates.push(date.toISOString().slice(0, 10));
       date.setUTCDate(date.getUTCDate() + 1);
     }
   }
-  const selected = dates.filter((date) => !excluded.includes(date));
+  const selected = dates.filter((date) => selectedDates.includes(date));
   return (
     <form
       className="space-y-6 rounded-lg border bg-card p-4 sm:p-6"
@@ -498,7 +637,10 @@ function NewLeave({
         </p>
       </div>
       <LeaveNotes />
-      <fieldset disabled={busy} className="space-y-5">
+      <fieldset
+        disabled={busy || !workingDates?.length || bounds.start > bounds.end}
+        className="space-y-5"
+      >
         <legend className="sr-only">Leave application details</legend>
         <div className="space-y-2">
           <Label htmlFor="leave-type">Reason for leave</Label>
@@ -534,10 +676,12 @@ function NewLeave({
               id="leave-from"
               type="date"
               required
+              min={bounds.start}
+              max={bounds.end}
               value={start}
               onChange={(e) => {
                 setStart(e.target.value);
-                setExcluded([]);
+                setSelectedDates([]);
               }}
             />
           </div>
@@ -547,11 +691,12 @@ function NewLeave({
               id="leave-to"
               type="date"
               required
-              min={start}
+              min={start || bounds.start}
+              max={bounds.end}
               value={end}
               onChange={(e) => {
                 setEnd(e.target.value);
-                setExcluded([]);
+                setSelectedDates([]);
               }}
             />
           </div>
@@ -562,21 +707,27 @@ function NewLeave({
               Total number of days requested: {selected.length}
             </legend>
             <p className="mb-3 text-xs text-muted-foreground">
-              Select the actual leave dates. Uncheck rest days or holidays you are not requesting.
+              Check only the actual leave dates you are requesting. Non-working dates are disabled.
             </p>
             <div className="grid max-h-52 gap-1 overflow-y-auto sm:grid-cols-3">
               {dates.map((date) => (
                 <label key={date} className="flex min-h-11 items-center gap-2 text-sm">
                   <input
                     type="checkbox"
-                    checked={!excluded.includes(date)}
+                    checked={selectedDates.includes(date)}
+                    disabled={!workingDateSet.has(date)}
                     onChange={(e) =>
-                      setExcluded(
-                        e.target.checked ? excluded.filter((d) => d !== date) : [...excluded, date],
+                      setSelectedDates((current) =>
+                        e.target.checked
+                          ? [...current, date]
+                          : current.filter((selectedDate) => selectedDate !== date),
                       )
                     }
                   />
                   {fmtDate(date)}
+                  {!workingDateSet.has(date) && (
+                    <span className="text-xs text-muted-foreground">Not a working day</span>
+                  )}
                 </label>
               ))}
             </div>
@@ -623,13 +774,14 @@ function NewLeave({
           <Button
             type="submit"
             disabled={
+              busy ||
               !signature ||
               !selected.length ||
               Boolean(fileError) ||
               (code === "S" && selected.length >= 2 && !medical)
             }
           >
-            {busy ? "Submitting…" : "Sign & submit application"}
+            {busy ? <ButtonLoading label="Submitting" /> : "Sign & submit application"}
           </Button>
           <Button type="button" variant="outline" onClick={cancel}>
             Cancel
@@ -705,7 +857,7 @@ function Decision({
         <SignaturePad onChange={setSignature} />
         <div className="flex flex-wrap gap-3">
           <Button
-            disabled={!signature || (hr && credited === null)}
+            disabled={busy || !signature || (hr && credited === null)}
             onClick={() =>
               void submit({
                 id: request.id,
@@ -716,14 +868,14 @@ function Decision({
               })
             }
           >
-            {busy ? "Saving…" : hr ? "Receive & approve leave" : "Sign & forward to HR"}
+            {busy ? <ButtonLoading label="Saving" /> : hr ? "Receive & approve leave" : "Sign & forward to HR"}
           </Button>
           <Button
             variant="destructive"
-            disabled={!signature || note.trim().length < 3}
+            disabled={busy || !signature || note.trim().length < 3}
             onClick={() => void submit({ id: request.id, decision: "reject", signature, note })}
           >
-            Reject application
+            {busy ? <ButtonLoading label="Processing" /> : "Reject application"}
           </Button>
         </div>
       </fieldset>

@@ -63,10 +63,24 @@ function leavePushTracker_(config) {
   if (!sheet) throw new Error('STAFF tab was not found.');
   SpreadsheetApp.flush();
   var lastRow = Math.max(8, sheet.getLastRow());
-  if (lastRow > 5000 || sheet.getLastColumn() > 410) {
-    throw new Error('STAFF exceeds the supported 5000-row / 410-column snapshot size.');
+  if (lastRow > 5000) {
+    throw new Error('STAFF exceeds the supported 5000-row snapshot size.');
   }
-  var values = sheet.getRange(1, 1, lastRow, Math.max(389, sheet.getLastColumn())).getValues();
+  var lastColumn = 441;
+  var values = sheet.getRange(1, 1, lastRow, lastColumn).getValues();
+  var shifted = String(values[4] && values[4][404] || "")
+    .trim()
+    .toLowerCase() === "leaves this month";
+  values = values.map(function (row) {
+    if (!shifted) return row.slice(0, 410);
+    var normalized = row.slice(0, 389).concat(row.slice(420, 441));
+    normalized[373] = row[404];
+    normalized[379] = row[410];
+    normalized[386] = row[417];
+    normalized[387] = row[418];
+    normalized[388] = row[419];
+    return normalized;
+  });
   var payload = JSON.stringify({
     snapshotId: Utilities.getUuid(),
     departmentGroup: config.source.group,
@@ -134,17 +148,20 @@ function syncApprovedLeaves() {
         if (name !== job.full_name.trim()) {
           throw new Error('Employee row changed. HR must verify the tracker mapping.');
         }
-        var startMonth = Number(sheet.getRange('A1').getValue());
         var year = Number(sheet.getRange('A2').getValue());
-        var cycle = year + '-' + ('0' + startMonth).slice(-2) + '-01';
-        if (cycle !== job.cycle_start) {
-          throw new Error('Tracker cycle changed. Sync and review before writing.');
+        var calendarStart = year + '-01-01';
+        if (calendarStart !== job.cycle_start) {
+          throw new Error('Tracker calendar year changed. Sync and review before writing.');
         }
+        var expectedColumns = [];
         var cells = job.dates.map(function(date) {
           var parts = date.split('-').map(Number);
-          var offset = (parts[0] - year) * 12 + parts[1] - startMonth;
-          if (offset < 0 || offset > 11) throw new Error('Leave date is outside this tracker cycle.');
-          var cell = sheet.getRange(job.sheet_row_number, 2 + offset * 31 + parts[2] - 1);
+          if (parts[0] !== year) throw new Error('Leave date is outside this tracker calendar year.');
+          var column = 2 + (parts[1] - 1) * 31 + parts[2] - 1;
+          if (sheet.getRange(3, column).getValue() !== true) {
+            throw new Error('Leave date ' + date + ' is not a working day in the tracker.');
+          }
+          var cell = sheet.getRange(job.sheet_row_number, column);
           var existing = String(cell.getValue()).trim();
           if (cell.getNote() && cell.getNote() !== 'LOA leave application ' + job.id) {
             throw new Error('An HR note already exists on ' + date + '. Review it before updating.');
@@ -155,7 +172,17 @@ function syncApprovedLeaves() {
           if (existing === job.code && cell.getNote() !== 'LOA leave application ' + job.id) {
             throw new Error('A manually recorded leave already exists on ' + date + '. HR must reconcile it.');
           }
+          expectedColumns.push(column);
           return cell;
+        });
+        var leaveNote = 'LOA leave application ' + job.id;
+        var existingCells = sheet.getRange(job.sheet_row_number, 2, 1, 372);
+        existingCells.getNotes()[0].forEach(function(note, index) {
+          if (note === leaveNote && expectedColumns.indexOf(index + 2) === -1) {
+            var staleCell = sheet.getRange(job.sheet_row_number, index + 2);
+            staleCell.clearContent();
+            staleCell.clearNote();
+          }
         });
         // Validate every date before writing; notes make retries safe after partial execution.
         cells.forEach(function(cell) {

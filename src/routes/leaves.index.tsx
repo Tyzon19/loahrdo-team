@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { unwrap } from "@/lib/api";
 import { attendanceMonths, ATTENDANCE_REFRESH_MS, DEPARTMENT_LABELS } from "@/lib/attendance";
 import { fmtDate, fmtDateTime, fmtRange } from "@/lib/format";
-import { ATTENDANCE_CODES } from "@/lib/late-absences";
+import { ATTENDANCE_CODES, BASE_ALLOCATION } from "@/lib/late-absences";
 import {
   listMyAttendanceFn,
   respondToAttendanceIncidentFn,
@@ -62,9 +62,10 @@ function MyAttendance({ userId }: { userId: string }) {
     (log) => (!month || log.date.startsWith(month)) && (!code || log.code === code),
   );
   const selected = data.logs.find((log) => log.id === explainId);
-  const remaining = profile
+  const trackerRemaining = profile
     ? profile.remainingEl + profile.remainingSl + profile.remainingVl + profile.remainingBl
     : 0;
+  const remaining = profile ? Math.min(BASE_ALLOCATION, Math.max(0, trackerRemaining)) : 0;
 
   async function respond(log: (typeof data.logs)[number], text?: string) {
     if (busy) return;
@@ -191,10 +192,11 @@ function MyAttendance({ userId }: { userId: string }) {
                   Leave cycle and credit details
                 </summary>
                 <p className="mt-2 leading-relaxed text-muted-foreground">
-                  Your leave cycle runs from {fmtRange(profile.cycleStart, profile.cycleEnd)}. HRDO
-                  has not listed a separate credit expiry or a date for your next replenishment in
-                  this tracker. Birthday leave includes any carried credits and accounts for
-                  birthday leave used.
+                  Your current leave cycle runs from{" "}
+                  {fmtRange(profile.cycleStart, profile.cycleEnd)}. The combined annual credit is
+                  capped at 17 days. Emergency, Sick, Vacation, and Birthday balances come directly
+                  from the latest HR tracker totals; history rows do not recalculate those balances.
+                  Approved requests waiting to sync are reserved during HR approval.
                 </p>
               </details>
               {profile.remarks && <p className="pb-3 text-sm">{profile.remarks}</p>}
@@ -316,7 +318,7 @@ function MyAttendance({ userId }: { userId: string }) {
                   onChange={(e) => setMonth(e.target.value)}
                 >
                   <option value="">All months</option>
-                  {attendanceMonths(profile.cycleStart).map((m) => (
+                  {attendanceMonths(data.logs.map((log) => log.date)).map((m) => (
                     <option key={m.value} value={m.value}>
                       {m.label}
                     </option>

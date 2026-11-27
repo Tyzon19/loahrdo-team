@@ -30,6 +30,12 @@ try {
       "utf8",
     ),
   );
+  await root.query(
+    readFileSync(
+      new URL("./migrations/20261127-leave-working-day-calendar.sql", import.meta.url),
+      "utf8",
+    ),
+  );
   result =
     spawnSync(
       process.execPath,

@@ -1,9 +1,50 @@
 export const STAFF_GROUPS = ["NON_TEACHING", "COLLEGE", "BASIC_ED"] as const;
 export type StaffGroup = (typeof STAFF_GROUPS)[number];
 
-export const CYCLE_LABEL = "June 2026 - May 2027";
-export const CYCLE_EXPIRY_DATE = "2027-05-31";
 export const BASE_ALLOCATION = 17;
+
+const ANNUAL_LEAVE_CATEGORIES = {
+  E: "Emergency",
+  S: "Sick",
+  V: "Vacation",
+  B: "Birthday",
+} as const;
+
+export type AnnualLeaveCategory = keyof typeof ANNUAL_LEAVE_CATEGORIES;
+export type AnnualLeaveBalances = Record<AnnualLeaveCategory, number>;
+
+export function annualLeaveCreditCategory(code: string): AnnualLeaveCategory | null {
+  return code === "E" || code === "S" || code === "V" || code === "B" ? code : null;
+}
+
+export function annualLeaveCreditAvailabilityError(
+  code: string,
+  requestedDays: number,
+  balances: AnnualLeaveBalances,
+) {
+  const category = annualLeaveCreditCategory(code);
+  if (!category) return null;
+  if (!Number.isFinite(requestedDays) || requestedDays <= 0) {
+    throw new Error("Requested leave days must be a finite positive number.");
+  }
+  const availableByCategory: AnnualLeaveBalances = {
+    E: Math.max(0, balances.E),
+    S: Math.max(0, balances.S),
+    V: Math.max(0, balances.V),
+    B: Math.max(0, balances.B),
+  };
+  const totalAvailable = Math.min(
+    BASE_ALLOCATION,
+    Object.values(availableByCategory).reduce((total, days) => total + days, 0),
+  );
+  if (requestedDays > totalAvailable) {
+    return `This credited leave needs ${requestedDays} days, but only ${totalAvailable.toFixed(1)} remain in the ${BASE_ALLOCATION}-day tracker balance. Approve as not credited or review the tracker.`;
+  }
+  if (requestedDays > availableByCategory[category]) {
+    return `This credited ${ANNUAL_LEAVE_CATEGORIES[category]} leave needs ${requestedDays} days, but only ${availableByCategory[category].toFixed(1)} remain in that tracker balance. Approve as not credited or review the tracker.`;
+  }
+  return null;
+}
 
 export const ATTENDANCE_CODES = {
   S: { leaveType: "Sick Leave", creditedDays: 1 },
@@ -49,7 +90,6 @@ export interface ParsedBalance {
   remSl: number;
   remVl: number;
   remBl: number;
-  carryOverBl: number;
   totalLates: number;
   employeeStatusNote: string | null;
 }
@@ -64,6 +104,7 @@ export interface ParsedStaffRow {
 export interface ParsedStaffMatrix {
   cycleStart: string;
   cycleEnd: string;
+  workingDates: string[];
   rows: ParsedStaffRow[];
 }
 
@@ -110,11 +151,6 @@ export function attendanceSheetNameMatchesUserName(sheetEmployeeName: string, us
   return true;
 }
 
-function number(value: unknown, fallback = 0) {
-  const parsed = Number(text(value).replace(/,/g, ""));
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
 function dateAtOffset(year: number, month: number, offset: number) {
   const date = new Date(Date.UTC(year, month - 1, 1 + offset));
   return {
@@ -135,23 +171,37 @@ function statusNote(_values: string[][], row: string[]) {
 }
 
 export function parseStaffMatrix(values: string[][]): ParsedStaffMatrix {
-  const startMonth = Number(values[0]?.[0]);
-  const startYear = Number(values[1]?.[0]);
+  const activeMonth = Number(values[0]?.[0]);
+  const year = Number(values[1]?.[0]);
   if (
-    !Number.isInteger(startMonth) ||
-    startMonth < 1 ||
-    startMonth > 12 ||
-    !Number.isInteger(startYear) ||
-    startYear < 2000 ||
-    startYear > 2100
+    !Number.isInteger(activeMonth) ||
+    activeMonth < 1 ||
+    activeMonth > 12 ||
+    !Number.isInteger(year) ||
+    year < 2000 ||
+    year > 2100
   ) {
-    throw new Error("STAFF!A1 and A2 must contain a valid starting month and year.");
+    throw new Error("STAFF!A1 must contain a valid active month and A2 a valid calendar year.");
   }
-  const start = dateAtOffset(startYear, startMonth, 0).iso;
-  const end = new Date(Date.UTC(startYear, startMonth - 1 + 12, 0)).toISOString().slice(0, 10);
+  const start = dateAtOffset(year, 1, 0).iso;
+  const end = dateAtOffset(year, 12, 30).iso;
+  const workdayRow = values[2] ?? [];
+  const workingDates: string[] = [];
+  for (let offset = 0; offset < 372; offset += 1) {
+    const monthOffset = Math.floor(offset / 31);
+    const day = (offset % 31) + 1;
+    const dateObject = new Date(Date.UTC(year, monthOffset, day));
+    if (dateObject.getUTCDate() !== day) continue;
+    const flag = text(workdayRow[offset + 1]).toLowerCase();
+    if (flag !== "true" && flag !== "false") {
+      throw new Error(
+        `STAFF row 3, column ${offset + 2} must contain a calculated working-day flag.`,
+      );
+    }
+    if (flag === "true") workingDates.push(dateObject.toISOString().slice(0, 10));
+  }
   const summaryColumns = {
     month: 373,
-    year: 374,
     birthday: 379,
     el: 386,
     sl: 387,
@@ -179,7 +229,7 @@ export function parseStaffMatrix(values: string[][]): ParsedStaffMatrix {
     for (let offset = 0; offset < 372; offset += 1) {
       const monthOffset = Math.floor(offset / 31);
       const day = (offset % 31) + 1;
-      const dateObject = new Date(Date.UTC(startYear, startMonth - 1 + monthOffset, day));
+      const dateObject = new Date(Date.UTC(year, monthOffset, day));
       if (dateObject.getUTCDate() !== day) continue;
       const rawCode = text(row[offset + 1]).toUpperCase();
       if (!rawCode) continue;
@@ -206,9 +256,12 @@ export function parseStaffMatrix(values: string[][]): ParsedStaffMatrix {
       });
     }
 
-    const carryOverMatch = statusNote(values, row)?.match(/(\d+(?:\.\d+)?)\s+BL\s+CARRY OVER/i);
-    const carryOverBl = carryOverMatch ? number(carryOverMatch[1]) : 0;
     const totalLates = logs.filter((log) => log.code === "L" || log.code === "LATE").length;
+    const remEl = balanceNumber(summaryColumns.el);
+    const remSl = balanceNumber(summaryColumns.sl);
+    const remVl = balanceNumber(summaryColumns.vl);
+    const remBl = Math.max(0, 1 - balanceNumber(summaryColumns.birthday));
+    const remainingCredits = Math.min(BASE_ALLOCATION, Math.max(0, remEl + remSl + remVl + remBl));
     rows.push({
       sheetRowNumber: rowIndex + 1,
       sheetEmployeeName,
@@ -216,17 +269,16 @@ export function parseStaffMatrix(values: string[][]): ParsedStaffMatrix {
       balance: {
         sheetEmployeeName,
         leavesThisMonth: balanceNumber(summaryColumns.month),
-        leavesThisYear: balanceNumber(summaryColumns.year),
-        remEl: balanceNumber(summaryColumns.el),
-        remSl: balanceNumber(summaryColumns.sl),
-        remVl: balanceNumber(summaryColumns.vl),
-        remBl: Math.max(0, 1 + carryOverBl - balanceNumber(summaryColumns.birthday)),
-        carryOverBl,
+        leavesThisYear: BASE_ALLOCATION - remainingCredits,
+        remEl,
+        remSl,
+        remVl,
+        remBl,
         totalLates,
         employeeStatusNote: statusNote(values, row),
       },
     });
   }
 
-  return { cycleStart: start, cycleEnd: end, rows };
+  return { cycleStart: start, cycleEnd: end, workingDates, rows };
 }

@@ -5,10 +5,16 @@ import { requireAttendanceSession } from "./attendance-auth";
 import { authenticateSheetsWebhook } from "./attendance";
 import { attendanceAdminAllowed, type AttendanceViewer } from "@/lib/attendance-access";
 import { attendanceInstitutionalEmail } from "@/lib/attendance";
-import { AppError, parseInput } from "@/lib/errors";
+import { AppError, isMissingTableError, parseInput } from "@/lib/errors";
+import {
+  annualLeaveCreditAvailabilityError,
+  annualLeaveCreditCategory,
+  type AnnualLeaveBalances,
+} from "@/lib/late-absences";
 import {
   createLeaveSchema,
   decideLeaveSchema,
+  leaveRequestDateError,
   leaveRequiresPresident,
   type LeaveRequest,
 } from "@/lib/leaves";
@@ -27,6 +33,95 @@ const decode = (row: LeaveRow): LeaveRequest => ({
   dates: typeof row.dates === "string" ? JSON.parse(row.dates) : row.dates,
   balances: typeof row.balances === "string" ? JSON.parse(row.balances) : row.balances,
 });
+
+function decodeWorkingDates(value: unknown): string[] {
+  let parsed: unknown = value;
+  if (typeof value === "string") {
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      throw new AppError("Tracker working-day settings are invalid. Contact HR.");
+    }
+  }
+  if (
+    !Array.isArray(parsed) ||
+    parsed.some((date) => typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date))
+  ) {
+    throw new AppError("Tracker working-day settings are invalid. Contact HR.");
+  }
+  return parsed;
+}
+
+async function assertLeaveDatesAllowed(
+  dates: readonly string[],
+  profile: { department_group: string; cycle_start: string; cycle_end: string },
+  db: Db,
+) {
+  const calendars = await all<Array<RowDataPacket & { working_dates: unknown }>>(
+    "SELECT working_dates FROM attendance_workday_calendars WHERE department_group=?",
+    [profile.department_group],
+    db,
+  );
+  const calendar = calendars[0];
+  if (!calendar) {
+    throw new AppError(
+      "HR must sync tracker working-day settings before leave can be requested or approved.",
+    );
+  }
+  const error = leaveRequestDateError(
+    dates,
+    String(profile.cycle_start),
+    String(profile.cycle_end),
+    decodeWorkingDates(calendar.working_dates),
+  );
+  if (error) throw new AppError(error);
+}
+
+async function assertLeaveCreditsAvailable(
+  profileId: string,
+  cycleStart: string,
+  cycleEnd: string,
+  code: string,
+  dates: readonly string[],
+  trackerBalances: AnnualLeaveBalances,
+  db: Db,
+) {
+  if (!annualLeaveCreditCategory(code)) return;
+  if (Object.values(trackerBalances).some((balance) => !Number.isFinite(balance))) {
+    throw new AppError("Tracker leave balances are invalid. Contact HR.");
+  }
+  const incidents = await all<Array<RowDataPacket & { incident_date: string }>>(
+    "SELECT DATE_FORMAT(incident_date,'%Y-%m-%d') AS incident_date FROM attendance_leave_incidents WHERE profile_id=? AND is_active=1 AND incident_date BETWEEN ? AND ?",
+    [profileId, cycleStart, cycleEnd],
+    db,
+  );
+  const countedDates = new Set<string>();
+  incidents.forEach((incident) => countedDates.add(incident.incident_date));
+
+  const pendingRequests = await all<
+    Array<RowDataPacket & { code: string; dates: string | string[] }>
+  >(
+    "SELECT code,dates FROM leave_requests WHERE profile_id=? AND status='approved' AND credited=1 AND sync_status IN ('pending','error')",
+    [profileId],
+    db,
+  );
+  const availableBalances = { ...trackerBalances };
+  for (const request of pendingRequests) {
+    const category = annualLeaveCreditCategory(request.code);
+    if (!category) continue;
+    const requestDates =
+      typeof request.dates === "string" ? (JSON.parse(request.dates) as string[]) : request.dates;
+    for (const date of requestDates) {
+      if (date < cycleStart || date > cycleEnd || countedDates.has(date)) continue;
+      countedDates.add(date);
+      availableBalances[category] -= 1;
+    }
+  }
+
+  const error = annualLeaveCreditAvailabilityError(code, dates.length, availableBalances);
+  if (error) throw new AppError(error);
+}
+
 async function actor() {
   const user = await requireAttendanceSession();
   if (user.mustChangePassword || user.needsProfileCompletion)
@@ -125,10 +220,33 @@ export async function listLeaves() {
     `SELECT id,employee_id,employee_name,department,code,dates,status,president_required,recommender_id,recommender_name,credited,created_at,sync_status,sync_error FROM leave_requests WHERE employee_id=? OR recommender_id=? ${admin ? "OR 1=1" : ""} ORDER BY created_at DESC LIMIT 200`,
     [user.id, user.id],
   );
-  const profiles = await all<RowDataPacket[]>(
-    "SELECT full_name,remaining_sl,remaining_vl FROM hr_sheet_profiles WHERE claimed_by_user_id=? AND is_active=1",
-    [user.id],
-  );
+  let linkedProfiles: Array<
+    RowDataPacket & {
+      full_name: string;
+      department_group: string;
+      cycle_start: string;
+      cycle_end: string;
+      working_dates: unknown;
+    }
+  >;
+  let workdayCalendarAvailable = true;
+  try {
+    linkedProfiles = await all(
+      `SELECT p.full_name,p.department_group,p.cycle_start,p.cycle_end,c.working_dates
+       FROM hr_sheet_profiles p
+       LEFT JOIN attendance_workday_calendars c ON c.department_group=p.department_group
+       WHERE p.claimed_by_user_id=? AND p.is_active=1`,
+      [user.id],
+    );
+  } catch (error) {
+    if (!isMissingTableError(error)) throw error;
+    workdayCalendarAvailable = false;
+    linkedProfiles = await all(
+      `SELECT full_name,department_group,cycle_start,cycle_end,NULL AS working_dates
+       FROM hr_sheet_profiles WHERE claimed_by_user_id=? AND is_active=1`,
+      [user.id],
+    );
+  }
   const pending = await all<Array<RowDataPacket & { total: number }>>(
     `SELECT COUNT(*) AS total FROM leave_email_outbox e JOIN leave_requests r ON r.id=e.request_id WHERE e.sent_at IS NULL AND (r.employee_id=? OR r.recommender_id=? ${admin ? "OR 1=1" : ""})`,
     [user.id, user.id],
@@ -136,8 +254,19 @@ export async function listLeaves() {
   return {
     requests: rows.map(decode),
     user,
-    profile: profiles[0] ? { name: String(profiles[0]["full_name"]) } : null,
+    profile: linkedProfiles[0]
+      ? {
+          name: String(linkedProfiles[0].full_name),
+          cycleStart: String(linkedProfiles[0].cycle_start),
+          cycleEnd: String(linkedProfiles[0].cycle_end),
+          workingDates:
+            linkedProfiles[0].working_dates === null
+              ? null
+              : decodeWorkingDates(linkedProfiles[0].working_dates),
+        }
+      : null,
     pendingEmails: Number(pending[0]?.total ?? 0),
+    workdayCalendarAvailable,
     requiresPresident: reviewer.president,
     reviewerName: reviewer.head?.name ?? null,
   };
@@ -174,8 +303,15 @@ export async function createLeave(input: unknown) {
       if (previous[0].employee_id !== user.id) throw new AppError("Invalid request reference.");
       return;
     }
-    if (dates.some((date) => date < profile["cycle_start"] || date > profile["cycle_end"]))
-      throw new AppError("All leave dates must be inside your current tracker cycle.");
+    await assertLeaveDatesAllowed(
+      dates,
+      {
+        department_group: String(profile["department_group"]),
+        cycle_start: String(profile["cycle_start"]),
+        cycle_end: String(profile["cycle_end"]),
+      },
+      db,
+    );
     const { president, head } = await leaveReviewer(user, db);
     if (!head)
       throw new AppError(
@@ -257,6 +393,45 @@ export async function decideLeave(input: unknown) {
     if (!recommending && !hr)
       throw new AppError("This application is not awaiting your approval. Refresh the list.");
     const rejected = data.decision === "reject";
+    if (hr && !rejected) {
+      const linkedProfiles = await all<
+        Array<
+          RowDataPacket & {
+            department_group: string;
+            cycle_start: string;
+            cycle_end: string;
+            remaining_el: number | string;
+            remaining_sl: number | string;
+            remaining_vl: number | string;
+            remaining_bl: number | string;
+          }
+        >
+      >(
+        "SELECT department_group,cycle_start,cycle_end,remaining_el,remaining_sl,remaining_vl,remaining_bl FROM hr_sheet_profiles WHERE id=? FOR UPDATE",
+        [row.profile_id],
+        db,
+      );
+      const profile = linkedProfiles[0];
+      if (!profile) throw new AppError("The linked tracker profile is unavailable.");
+      const dates = decode(row).dates;
+      await assertLeaveDatesAllowed(dates, profile, db);
+      if (data.credited) {
+        await assertLeaveCreditsAvailable(
+          row.profile_id,
+          String(profile.cycle_start),
+          String(profile.cycle_end),
+          row.code,
+          dates,
+          {
+            E: Number(profile.remaining_el),
+            S: Number(profile.remaining_sl),
+            V: Number(profile.remaining_vl),
+            B: Number(profile.remaining_bl),
+          },
+          db,
+        );
+      }
+    }
     if (hr && !rejected && data.credited === undefined)
       throw new AppError("Select credited or not credited.");
     if (recommending) {
@@ -433,6 +608,22 @@ export async function leaveTrackerJobs(request: Request) {
           return;
         }
         const dates = decode(row).dates;
+        const linkedProfiles = await all<
+          Array<
+            RowDataPacket & {
+              department_group: string;
+              cycle_start: string;
+              cycle_end: string;
+            }
+          >
+        >(
+          "SELECT department_group,cycle_start,cycle_end FROM hr_sheet_profiles WHERE id=?",
+          [row.profile_id],
+          db,
+        );
+        const profile = linkedProfiles[0];
+        if (!profile) throw new AppError("The linked tracker profile is unavailable.");
+        await assertLeaveDatesAllowed(dates, profile, db);
         const incidents = await all<RowDataPacket[]>(
           "SELECT incident_date,code FROM attendance_leave_incidents WHERE profile_id=? AND is_active=1 AND incident_date IN (?)",
           [row.profile_id, dates],

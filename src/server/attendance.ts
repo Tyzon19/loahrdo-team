@@ -147,7 +147,6 @@ export async function getMyAttendance() {
       `SELECT i.* FROM attendance_leave_incidents i
       JOIN hr_sheet_profiles p ON p.id = i.profile_id
       WHERE p.claimed_by_user_id = ? AND p.is_active = 1 AND i.is_active = 1
-        AND i.incident_date BETWEEN p.cycle_start AND p.cycle_end
       ORDER BY i.incident_date DESC`,
       [current.id],
     ),
@@ -265,8 +264,7 @@ export async function respondToAttendanceIncident(input: unknown) {
     SET i.acknowledged_at = COALESCE(i.acknowledged_at, CURRENT_TIMESTAMP(3)), i.acknowledged_by_user_id = ?,
       i.explanation = COALESCE(?, i.explanation)
     WHERE i.id = ? AND i.revision = ? AND p.claimed_by_user_id = ?
-      AND p.is_active = 1 AND i.is_active = 1 AND i.code IN ('LATE','ABSENT')
-      AND i.incident_date BETWEEN p.cycle_start AND p.cycle_end`,
+      AND p.is_active = 1 AND i.is_active = 1 AND i.code IN ('LATE','ABSENT')`,
       [current.id, data.explanation ?? null, data.incidentId, data.revision, current.id],
       db,
     );
@@ -358,8 +356,8 @@ export async function approveAttendanceClaim(input: unknown) {
     const alerts = await all<Incident[]>(
       `SELECT * FROM attendance_leave_incidents WHERE profile_id = ?
       AND is_active = 1 AND acknowledged_at IS NULL AND code IN ('LATE','ABSENT')
-      AND incident_date BETWEEN ? AND ?`,
-      [profile.id, profile.cycle_start, profile.cycle_end],
+    AND incident_date BETWEEN ? AND ?`,
+    [profile.id, profile.cycle_start, profile.cycle_end],
       db,
     );
     for (const alert of alerts) await notify(claim.user_id, alert.code, alert.incident_date, db);
@@ -525,6 +523,15 @@ export async function ingestSheetsSnapshot(input: unknown) {
         }
       }
       await run(
+        `INSERT INTO attendance_workday_calendars
+         (department_group,cycle_start,cycle_end,working_dates,synced_at)
+         VALUES (?,?,?,?,CURRENT_TIMESTAMP(3))
+         ON DUPLICATE KEY UPDATE cycle_start=VALUES(cycle_start),cycle_end=VALUES(cycle_end),
+           working_dates=VALUES(working_dates),synced_at=CURRENT_TIMESTAMP(3)`,
+        [data.departmentGroup, matrix.cycleStart, matrix.cycleEnd, JSON.stringify(matrix.workingDates)],
+        db,
+      );
+      await run(
         "UPDATE hr_sheet_profiles SET is_active = 0 WHERE department_group = ?",
         [data.departmentGroup],
         db,
@@ -575,7 +582,12 @@ export async function ingestSheetsSnapshot(input: unknown) {
         const incomingDates = new Set(row.logs.map((log) => log.incidentDate));
         for (const log of row.logs) {
           const old = logsByDate.get(log.incidentDate);
-          if (old?.is_active && old.code === log.code) continue;
+          if (
+            old?.is_active &&
+            old.code === log.code &&
+            Number(old.credited_days) === log.creditedDays
+          )
+            continue;
           changesApplied += 1;
           await run(
             `INSERT INTO attendance_leave_incidents
@@ -600,7 +612,9 @@ export async function ingestSheetsSnapshot(input: unknown) {
           }
         }
         for (const old of oldLogs) {
-          if (old.is_active && !incomingDates.has(old.incident_date)) {
+          if (!old.is_active) continue;
+          const date = String(old.incident_date);
+          if (!incomingDates.has(date)) {
             changesApplied += 1;
             await run(
               "UPDATE attendance_leave_incidents SET is_active = 0, revision = revision + 1, synced_at = CURRENT_TIMESTAMP(3) WHERE id = ?",

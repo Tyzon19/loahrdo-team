@@ -56,6 +56,9 @@ export const claimSchema = z
     "Enter your complete first and last names.",
   );
 
+
+
+
 export const claimApprovalSchema = z
   .object({
     claimId: z.uuid(),
@@ -79,17 +82,19 @@ export const sheetsSnapshotSchema = z
     spreadsheetId: z.string().regex(/^[a-zA-Z0-9_-]{20,255}$/),
     sheetName: z.literal("STAFF"),
     capturedAt: z.iso.datetime(),
-    // Includes rows 1–7, blank employee rows, and optional NZ+ remarks.
     values: z.array(z.array(cell).max(410)).min(8).max(5000),
   })
   .strict();
 
-export function attendanceMonths(cycleStart = "2026-06-01") {
-  const start = new Date(`${cycleStart}T00:00:00Z`);
-  return Array.from({ length: 12 }, (_, i) => {
-    const date = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + i, 1));
+export function attendanceMonths(dates: readonly string[]) {
+  const months = [...new Set(dates.map((date) => date.slice(0, 7)))]
+    .filter((month) => /^\d{4}-(0[1-9]|1[0-2])$/.test(month))
+    .sort()
+    .reverse();
+  return months.map((month) => {
+    const date = new Date(`${month}-01T00:00:00Z`);
     return {
-      value: date.toISOString().slice(0, 7),
+      value: month,
       label: new Intl.DateTimeFormat("en-US", {
         month: "long",
         year: "numeric",

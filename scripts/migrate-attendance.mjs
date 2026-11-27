@@ -23,6 +23,7 @@ try {
     "20261124-attendance-sheets-sync.sql",
     "20261124-attendance-portal-isolation.sql",
     "20261126-leave-requests.sql",
+    "20261127-leave-working-day-calendar.sql",
   ]) {
     await connection.query(readFileSync(new URL(`./migrations/${file}`, import.meta.url), "utf8"));
   }

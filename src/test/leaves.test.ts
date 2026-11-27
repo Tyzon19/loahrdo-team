@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { createLeaveSchema, decideLeaveSchema, leaveRequiresPresident } from "@/lib/leaves";
+import {
+  createLeaveSchema,
+  decideLeaveSchema,
+  leaveRequestBounds,
+  leaveRequestDateError,
+  leaveRequiresPresident,
+} from "@/lib/leaves";
 const signature = { image: `data:image/png;base64,${"a".repeat(60)}`, method: "drawn" };
 const application = {
   id: "d2dd77e0-9c4b-4b53-92a3-a97c273c03fb",
@@ -38,5 +44,45 @@ describe("leave application boundaries", () => {
       decideLeaveSchema.safeParse({ id: application.id, decision: "reject", signature, note: "" })
         .success,
     ).toBe(false);
+  });
+
+  it("uses the tracker calendar year for leave date bounds", () => {
+    const bounds = leaveRequestBounds("2027-01-01", "2027-12-31");
+    expect(bounds).toEqual({ start: "2027-01-01", end: "2027-12-31" });
+    expect(
+      leaveRequestDateError(
+        ["2027-01-04"],
+        "2027-01-01",
+        "2027-12-31",
+        ["2027-01-04"],
+      ),
+    ).toBeNull();
+    expect(
+      leaveRequestDateError(
+        ["2026-12-31"],
+        "2027-01-01",
+        "2027-12-31",
+        ["2026-12-31"],
+      ),
+    ).toContain("calendar year");
+  });
+
+  it("rejects tracker-marked rest days while allowing selected working dates", () => {
+    expect(
+      leaveRequestDateError(
+        ["2026-11-26"],
+        "2026-01-01",
+        "2026-12-31",
+        ["2026-11-26"],
+      ),
+    ).toBeNull();
+    expect(
+      leaveRequestDateError(
+        ["2026-11-29"],
+        "2026-01-01",
+        "2026-12-31",
+        ["2026-11-26"],
+      ),
+    ).toContain("working day");
   });
 });

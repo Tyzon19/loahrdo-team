@@ -14,7 +14,6 @@ export const HRDO = {
   contactEmail: "itm@lyceumalabang.edu.ph",
 } as const;
 
-/** Three working days, excluding weekends, in the institution's time zone. */
 export const COE_PROCESSING_DAYS = 3;
 
 export function coeProcessingDeadline(start: Date): Date {
@@ -27,9 +26,7 @@ export function coeProcessingDeadline(start: Date): Date {
   }
   return deadline;
 }
-/** A request counts as "due soon" inside this window before its deadline. */
 export const COE_DUE_SOON_HOURS = 24;
-/** Largest signed COE document HR can attach to a request. */
 export const COE_MAX_DOCUMENT_BYTES = 5 * 1024 * 1024;
 export const COE_DOCUMENT_MIMES = {
   pdf: "application/pdf",

@@ -44,7 +44,7 @@ describe("professional email template", () => {
 
     expect(rendered.subject).toBe(message.subject);
     expect(rendered.html).toContain('name="viewport"');
-    expect(rendered.html).toContain('src="http://localhost:8080/loa-loading.png"');
+    expect(rendered.html).toContain('src="http://localhost:8080/hrdo-email-banner.jpg"');
     expect(rendered.html).toContain("Kind regards,");
     expect(rendered.html).toContain("Lyceum of Alabang");
     expect(rendered.html).toContain("http://localhost:8080/print/");
@@ -65,7 +65,7 @@ describe("professional email template", () => {
       );
 
       expect(rendered.subject).toContain("Verify your email address");
-      expect(rendered.html).toContain('src="https://vrtt.example.edu/loa-loading.png"');
+      expect(rendered.html).toContain('src="https://vrtt.example.edu/hrdo-email-banner.jpg"');
       expect(rendered.html).toContain("482913");
       expect(rendered.html).toContain("expires in <strong>10 minutes</strong>");
       expect(rendered.text).toContain("482913");
@@ -126,7 +126,7 @@ describe("professional email template", () => {
     );
 
     expect(rendered.subject).toBe("[LOA Vehicle Request] Your account is ready");
-    expect(rendered.html).toContain('src="https://vrtt.example.edu/loa-loading.png"');
+    expect(rendered.html).toContain('src="https://vrtt.example.edu/hrdo-email-banner.jpg"');
     expect(rendered.html).toContain("&lt;script&gt;Test&lt;/script&gt;");
     expect(rendered.html).toContain("temporary&lt;&amp;&gt;password");
     expect(rendered.html).toContain("Change this password immediately");

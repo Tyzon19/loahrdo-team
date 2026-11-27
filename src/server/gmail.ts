@@ -207,23 +207,26 @@ function createMimeMessage(
     base64(html),
     `--${alternativeBoundary}--`,
   ];
-  const bodyParts =
-    ticketImage && ticketFilename && ticketContentId
-      ? [
-          `Content-Type: multipart/related; boundary="${relatedBoundary}"`,
-          "",
-          `--${relatedBoundary}`,
-          ...alternativeParts,
-          `--${relatedBoundary}`,
-          `Content-Type: image/png; name="${ticketFilename}"`,
-          "Content-Transfer-Encoding: base64",
-          `Content-ID: <${ticketContentId}>`,
-          `Content-Disposition: inline; filename="${ticketFilename}"`,
-          "",
-          base64(ticketImage),
-          `--${relatedBoundary}--`,
-        ]
-      : alternativeParts;
+  const relatedParts = [
+    `Content-Type: multipart/related; boundary="${relatedBoundary}"`,
+    "",
+    `--${relatedBoundary}`,
+    ...alternativeParts,
+  ];
+  if (ticketImage && ticketFilename && ticketContentId) {
+    relatedParts.push(
+      `--${relatedBoundary}`,
+      `Content-Type: image/png; name="${ticketFilename}"`,
+      "Content-Transfer-Encoding: base64",
+      `Content-ID: <${ticketContentId}>`,
+      `Content-Disposition: inline; filename="${ticketFilename}"`,
+      "",
+      base64(ticketImage),
+    );
+  }
+  const bodyParts = ticketImage && ticketFilename && ticketContentId
+    ? [...relatedParts, `--${relatedBoundary}--`]
+    : alternativeParts;
 
   if (!attachments.length) {
     return [...headers, ...bodyParts, ""].join("\r\n");
@@ -719,7 +722,7 @@ export async function sendTemporaryPasswordEmail(input: {
         ...(input.systemName ? { systemName: input.systemName } : {}),
         ...(input.accountAction ? { accountAction: input.accountAction } : {}),
       },
-      new URL("/loa-loading.png", siteUrl.origin).toString(),
+      new URL("/hrdo-email-banner.jpg", siteUrl.origin).toString(),
     );
     const token = await accessToken();
     const mime = createMimeMessage(
@@ -761,7 +764,7 @@ export async function sendRegistrationOtpEmail(
   const token = await accessToken();
   const email = renderRegistrationOtpEmail(
     { recipientName, code, expiresInMinutes },
-    new URL("/loa-loading.png", siteUrl.origin).toString(),
+    new URL("/hrdo-email-banner.jpg", siteUrl.origin).toString(),
   );
   const mime = createMimeMessage(recipient, email.subject, email.text, email.html);
   await sendMimeMessage(token, mime);
@@ -777,7 +780,7 @@ export async function sendLeaveEmail(recipient: string, subject: string, message
       recipient,
       subject,
       text,
-      `<html><body style="font-family:Arial,sans-serif;line-height:1.6;color:#172033"><h1 style="font-size:22px">${escapeHtml(subject)}</h1><p>${escapeHtml(message)}</p><p><a href="${escapeHtml(url)}">Open Leave &amp; Attendance</a></p><p>Lyceum of Alabang<br>Human Resource Development Office</p></body></html>`,
+      `<!doctype html><html lang="en"><body style="margin:0;background:#f3f5f8;padding:32px 12px;font-family:Arial,sans-serif;color:#172033"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center"><table role="presentation" width="600" style="width:100%;max-width:600px;background:#fff;border:1px solid #e2e7ef;border-radius:8px;overflow:hidden"><tr><td><img src="${escapeHtml(new URL("/hrdo-email-banner.jpg", siteUrlForEmail().origin).toString())}" width="600" alt="Lyceum of Alabang Human Resource Development Office" style="display:block;width:100%;max-width:600px;height:auto;border:0"></td></tr><tr><td style="padding:28px 32px"><h1 style="margin:0 0 14px;color:#1f3b68;font-size:22px">${escapeHtml(subject)}</h1><p style="font-size:14px;line-height:1.65">${escapeHtml(message)}</p><p><a href="${escapeHtml(url)}" style="display:inline-block;padding:12px 18px;background:#1f3b68;border-radius:5px;color:#fff;text-decoration:none;font-weight:700">Open Leave &amp; Attendance</a></p></td></tr><tr><td style="padding:0 32px 26px;color:#687386;font-size:11px;font-style:italic;line-height:1.55"><strong style="display:block;margin-bottom:8px;color:#353b45;font-style:normal">Lyceum of Alabang — Human Resource Development Office</strong>This message contains privileged and confidential information and is intended only for the individual named. If you received this communication by error, please contact the sender immediately and delete the material from any computer. The above terms reflect a potential business arrangement, and are provided solely as a basis for further discussion, and are not intended to be and do not constitute a legally binding obligation.</td></tr></table></td></tr></table></body></html>`,
     ),
   );
 }
@@ -826,7 +829,7 @@ export async function sendPermissionSlipEmail(input: {
       reason: escapeHtml(input.reason),
       message: escapeHtml(message),
       actionUrl: escapeHtml(actionUrl),
-      logoUrl: escapeHtml(new URL("/loa-loading.png", siteUrl.origin).toString()),
+      logoUrl: escapeHtml(new URL("/hrdo-email-banner.jpg", siteUrl.origin).toString()),
     };
     const text = [
       `Dear ${input.recipientName},`,

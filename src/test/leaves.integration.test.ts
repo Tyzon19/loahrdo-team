@@ -59,18 +59,23 @@ const hr = {
   role: "SUPER_ADMIN" as const,
 };
 const signature = { image: `data:image/png;base64,${"a".repeat(60)}`, method: "drawn" };
-function input() {
+function input(overrides: { code?: string; dates?: string[] } = {}) {
   return {
     id: randomUUID(),
-    code: "V",
+    code: overrides.code ?? "V",
     reason: "Family appointment",
-    dates: ["2026-11-26"],
+    dates: overrides.dates ?? ["2026-11-26"],
     signature,
   };
 }
 describe.skipIf(!safe)("leave workflow in isolated MySQL", () => {
   afterAll(async () => {
     await run("DELETE FROM leave_reporting_lines");
+    await run("DELETE FROM attendance_workday_calendars WHERE department_group='COLLEGE'");
+    await run(
+      "DELETE FROM attendance_leave_incidents WHERE profile_id IN (SELECT id FROM hr_sheet_profiles WHERE claimed_by_user_id IN (?))",
+      [[employee.id, head.id]],
+    );
     for (const table of ["leave_email_outbox", "leave_request_days", "leave_requests"])
       await run(`DELETE FROM ${table}`);
     await run("DELETE FROM hr_sheet_profiles WHERE claimed_by_user_id IN (?)", [
@@ -80,6 +85,10 @@ describe.skipIf(!safe)("leave workflow in isolated MySQL", () => {
   });
   beforeEach(async () => {
     await run("DELETE FROM leave_reporting_lines");
+    await run(
+      "DELETE FROM attendance_leave_incidents WHERE profile_id IN (SELECT id FROM hr_sheet_profiles WHERE claimed_by_user_id IN (?))",
+      [[employee.id, head.id]],
+    );
     for (const table of ["leave_email_outbox", "leave_request_days", "leave_requests"])
       await run(`DELETE FROM ${table}`);
     for (const user of [employee, head, president, hr]) {
@@ -101,9 +110,17 @@ describe.skipIf(!safe)("leave workflow in isolated MySQL", () => {
     ]);
     for (const [index, user] of [employee, head].entries())
       await run(
-        "INSERT INTO hr_sheet_profiles(id,department_group,sheet_row_number,full_name,normalized_full_name,name_key,claimed_by_user_id,cycle_start,cycle_end,synced_at) VALUES(?,'COLLEGE',?,?,?, ?,?,'2026-06-01','2027-05-31',NOW()) ON DUPLICATE KEY UPDATE is_active=1",
+        "INSERT INTO hr_sheet_profiles(id,department_group,sheet_row_number,full_name,normalized_full_name,name_key,claimed_by_user_id,cycle_start,cycle_end,remaining_el,remaining_sl,remaining_vl,remaining_bl,synced_at) VALUES(?,'COLLEGE',?,?,?, ?,?,'2026-01-01','2026-12-31',6,5,5,1,NOW()) ON DUPLICATE KEY UPDATE is_active=1",
         [randomUUID(), 4000 + index, user.name, user.name, user.name, user.id],
       );
+    await run(
+      `INSERT INTO attendance_workday_calendars
+       (department_group,cycle_start,cycle_end,working_dates,synced_at)
+       VALUES ('COLLEGE','2026-01-01','2026-12-31',?,NOW())
+       ON DUPLICATE KEY UPDATE cycle_start=VALUES(cycle_start),cycle_end=VALUES(cycle_end),
+       working_dates=VALUES(working_dates),synced_at=VALUES(synced_at)`,
+      [JSON.stringify(["2026-11-26", "2026-11-27", "2026-01-04"])],
+    );
     vi.mocked(requireAttendanceSession).mockResolvedValue(employee);
   });
   it("enforces employee -> head -> HR and commits one request on retry", async () => {
@@ -129,6 +146,10 @@ describe.skipIf(!safe)("leave workflow in isolated MySQL", () => {
     ).rejects.toThrow("not awaiting");
     vi.mocked(requireAttendanceSession).mockResolvedValue(president);
     await expect(getLeave(data.id)).rejects.toThrow("access denied");
+  });
+  it("allows working days from the tracker calendar year and rejects tracker rest days", async () => {
+    await expect(createLeave({ ...input(), dates: ["2026-01-04"] })).resolves.toHaveProperty("id");
+    await expect(createLeave({ ...input(), dates: ["2026-11-29"] })).rejects.toThrow("working day");
   });
   it("routes a department head to the president and frees rejected dates", async () => {
     vi.mocked(requireAttendanceSession).mockResolvedValue(head);
@@ -182,6 +203,34 @@ describe.skipIf(!safe)("leave workflow in isolated MySQL", () => {
       error: expect.stringContaining("Not-credited"),
     });
     expect((await getLeave(data.id)).sync_status).toBe("not_required");
+  });
+  it("counts approved but unsynced applications before approving another credited request", async () => {
+    const firstDates = Array.from(
+      { length: 5 },
+      (_, index) => `2026-01-${String(index + 1).padStart(2, "0")}`,
+    );
+    const nextDate = "2026-01-06";
+    await run(
+      "UPDATE attendance_workday_calendars SET working_dates=? WHERE department_group='COLLEGE'",
+      [JSON.stringify([...firstDates, nextDate])],
+    );
+
+    const first = input({ code: "V", dates: firstDates });
+    await createLeave(first);
+    vi.mocked(requireAttendanceSession).mockResolvedValue(head);
+    await decideLeave({ id: first.id, decision: "approve", signature, note: "" });
+    vi.mocked(requireAttendanceSession).mockResolvedValue(hr);
+    await decideLeave({ id: first.id, decision: "approve", signature, note: "", credited: true });
+
+    const second = input({ code: "V", dates: [nextDate] });
+    vi.mocked(requireAttendanceSession).mockResolvedValue(employee);
+    await createLeave(second);
+    vi.mocked(requireAttendanceSession).mockResolvedValue(head);
+    await decideLeave({ id: second.id, decision: "approve", signature, note: "" });
+    vi.mocked(requireAttendanceSession).mockResolvedValue(hr);
+    await expect(
+      decideLeave({ id: second.id, decision: "approve", signature, note: "", credited: true }),
+    ).rejects.toThrow("only 0.0 remain in that tracker balance");
   });
   it("only permits HR to assign reporting lines and honors verified head status", async () => {
     const mapping = { employeeId: employee.id, supervisorId: head.id, isHead: true };
